@@ -1,0 +1,1 @@
+# IT342_EventWearify_G5_Palicte
