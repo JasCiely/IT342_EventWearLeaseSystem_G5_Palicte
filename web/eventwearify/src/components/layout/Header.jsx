@@ -3,19 +3,23 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import '../css/layout/Header.css';
 import { FiUser, FiShoppingBag } from 'react-icons/fi';
 import logo from '../../assets/logo.png';
+
 const Navbar = () => {
   const [scrolled, setScrolled] = useState(false);
   const [activeTab, setActiveTab] = useState('home');
   const navigate = useNavigate();
   const location = useLocation();
+
   useEffect(() => {
     const handleScroll = () => {
       const isScrolled = window.scrollY > 50;
       setScrolled(isScrolled);
     };
+
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
   // Update active tab based on current path or hash
   useEffect(() => {
     if (location.pathname === '/') {
@@ -30,6 +34,7 @@ const Navbar = () => {
       setActiveTab('');
     }
   }, [location]);
+
   const handleLinkClick = (tab, path, hash) => {
     setActiveTab(tab);
     if (path === '/') {
@@ -43,14 +48,19 @@ const Navbar = () => {
       navigate(path);
     }
   };
+
   const handleSignIn = () => {
-    // Add your sign-in logic here
-    console.log('Sign in clicked');
+    // Navigate to Auth page
+    navigate('/auth');
   };
+
   const handleBookNow = () => {
     // Add your booking logic here
     console.log('Book now clicked');
+    // You can also navigate to booking page if needed
+    // navigate('/booking');
   };
+
   return (
     <nav className={`navbar ${scrolled ? 'navbar-scrolled' : ''}`}>
       <div className="navbar-container">
@@ -104,4 +114,5 @@ const Navbar = () => {
     </nav>
   );
 };
+
 export default Navbar;
