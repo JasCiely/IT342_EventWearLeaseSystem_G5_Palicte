@@ -1,5 +1,6 @@
 import Header from '../components/layout/Header';
 import HeroSection from '../components/Home/HeroSection';
+import HowItWorks from '../components/Home/HowItWorks';
 
 
 const Index = () => {
@@ -8,6 +9,7 @@ const Index = () => {
       <Header />
       <main className="flex-1"> 
         <HeroSection />
+        <HowItWorks />
       </main>
     </div>
   );

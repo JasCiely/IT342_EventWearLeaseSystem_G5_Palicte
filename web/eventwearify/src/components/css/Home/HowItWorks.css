@@ -1,0 +1,130 @@
+.how-section {
+  padding: 100px 8%;
+  background-color: #f3f0eb; /* Matches the light beige background in your image */
+  font-family: 'Montserrat', sans-serif;
+  text-align: center;
+}
+
+.how-header {
+  margin-bottom: 80px;
+}
+
+.how-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 3rem;
+  color: #1a1a1a;
+  margin-bottom: 20px;
+  font-weight: 700;
+}
+
+.how-subtitle {
+  font-size: 16px;
+  color: #666;
+  max-width: 600px;
+  margin: 0 auto;
+  line-height: 1.6;
+}
+
+.steps-container {
+  position: relative;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Horizontal Timeline Line */
+.timeline-line {
+  position: absolute;
+  top: 45px; /* Centers with the icons */
+  left: 10%;
+  right: 10%;
+  height: 1px;
+  background: #d1d1d1;
+  z-index: 1;
+}
+
+.steps-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 30px;
+  position: relative;
+  z-index: 2;
+}
+
+.step-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.icon-wrapper {
+  position: relative;
+  width: 90px;
+  height: 90px;
+  background-color: #7a4a50; /* Primary Maroon */
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 25px;
+  transition: transform 0.3s ease;
+}
+
+.step-card:hover .icon-wrapper {
+  transform: translateY(-5px);
+}
+
+.step-number {
+  position: absolute;
+  top: 0;
+  right: -5px;
+  width: 28px;
+  height: 28px;
+  background-color: #f3d19e; /* Gold */
+  color: #4a1a20;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #f3f0eb;
+}
+
+.main-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.step-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.5rem;
+  color: #1a1a1a;
+  margin-bottom: 12px;
+  font-weight: 700;
+}
+
+.step-description {
+  font-size: 14px;
+  color: #555;
+  line-height: 1.6;
+  max-width: 220px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+  .steps-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 60px 20px;
+  }
+  .timeline-line {
+    display: none; /* Hide line on mobile for vertical flow */
+  }
+}
+
+@media (max-width: 600px) {
+  .steps-grid {
+    grid-template-columns: 1fr;
+  }
+}
