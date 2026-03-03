@@ -839,3 +839,88 @@ button:focus-visible {
   font-size: 0.875rem;
   margin-bottom: 12px;
 }
+
+/* Toast Notification - Appears in lower right corner */
+.toast-notification {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  min-width: 320px;
+  max-width: 400px;
+  background: white;
+  border-radius: 12px;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 
+    0 20px 35px rgba(0, 0, 0, 0.15),
+    0 8px 15px rgba(0, 0, 0, 0.1);
+  z-index: 9999;
+  animation: slideInRight 0.3s ease-out forwards;
+  border-left: 4px solid #4caf50;
+  font-family: 'Montserrat', sans-serif;
+}
+
+.toast-notification.success {
+  border-left-color: #10b981;
+}
+
+.toast-notification.error {
+  border-left-color: #ef4444;
+}
+
+.toast-notification.info {
+  border-left-color: #3b82f6;
+}
+
+.toast-notification svg {
+  flex-shrink: 0;
+}
+
+.toast-notification.success svg {
+  color: #10b981;
+}
+
+.toast-notification.error svg {
+  color: #ef4444;
+}
+
+.toast-notification.info svg {
+  color: #3b82f6;
+}
+
+.toast-notification span {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1f2937;
+  line-height: 1.5;
+  flex: 1;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOutRight {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+/* For the fade out animation */
+.toast-notification.hide {
+  animation: slideOutRight 0.3s ease-in forwards;
+}
