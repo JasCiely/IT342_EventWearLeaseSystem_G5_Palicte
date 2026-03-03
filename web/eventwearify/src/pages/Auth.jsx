@@ -44,7 +44,7 @@ const Auth = ({ onLogin }) => {
     setToast({ show: true, message, type });
     setTimeout(() => {
       setToast({ show: false, message: '', type: 'success' });
-    }, 2000);
+    }, 3000);
   };
 
   const checkPasswordStrength = (password) => {
@@ -149,12 +149,13 @@ const Auth = ({ onLogin }) => {
         const data = await response.json();
 
         if (!response.ok) {
-          // Handle backend validation/auth errors
+          // Handle backend validation/auth errors - show as toast
           if (data.message) {
-            setErrors({ general: data.message });
+            showToast(data.message, 'error');
           } else {
-            setErrors({ general: 'Invalid email or password.' });
+            showToast('Invalid email or password.', 'error');
           }
+          setIsLoading(false);
           return;
         }
 
@@ -193,13 +194,26 @@ const Auth = ({ onLogin }) => {
         if (!response.ok) {
           // Handle backend validation errors
           if (data.errors) {
-            // Spring validation errors (field-level)
-            setErrors(data.errors);
+            // Spring validation errors (field-level) - show all as toasts except password
+            Object.entries(data.errors).forEach(([field, message]) => {
+              if (field !== 'password') {
+                showToast(`${field}: ${message}`, 'error');
+              } else {
+                // Keep password errors in the form
+                setErrors(prev => ({ ...prev, [field]: message }));
+              }
+            });
           } else if (data.message) {
-            setErrors({ general: data.message });
+            // Check if it's a duplicate email error or other general error
+            if (data.message.toLowerCase().includes('email') && data.message.toLowerCase().includes('already')) {
+              showToast('This email is already registered. Please use a different email or sign in.', 'error');
+            } else {
+              showToast(data.message, 'error');
+            }
           } else {
-            setErrors({ general: 'Registration failed. Please try again.' });
+            showToast('Registration failed. Please try again.', 'error');
           }
+          setIsLoading(false);
           return;
         }
 
@@ -226,7 +240,7 @@ const Auth = ({ onLogin }) => {
 
     } catch (err) {
       // Network error / server down
-      setErrors({ general: 'Unable to connect to server. Please try again.' });
+      showToast('Unable to connect to server. Please try again.', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -277,10 +291,10 @@ const Auth = ({ onLogin }) => {
 
   return (
     <div className="auth-wrapper">
-      {/* Toast Notification */}
+      {/* Toast Notification - Shows in lower right corner */}
       {toast.show && (
         <div className={`toast-notification ${toast.type}`}>
-          <CheckCircle size={18} />
+          {toast.type === 'error' ? <AlertCircle size={18} /> : <CheckCircle size={18} />}
           <span>{toast.message}</span>
         </div>
       )}
@@ -330,14 +344,6 @@ const Auth = ({ onLogin }) => {
         </div>
 
         <form className="auth-form" onSubmit={handleSubmit} noValidate>
-
-          {/* General error banner */}
-          {errors.general && (
-            <div className="error-banner">
-              <AlertCircle size={16} />
-              <span>{errors.general}</span>
-            </div>
-          )}
 
           {!isLogin && (
             <div className="name-row">
