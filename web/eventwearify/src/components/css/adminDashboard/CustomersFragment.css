@@ -321,6 +321,41 @@
   font-size: 0.85rem; color: #bbb; user-select: none;
 }
 
+/* ─── Loading / error states ─────────────────────────────── */
+.cf-state-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 3rem 1rem;
+  font-size: 0.875rem;
+  color: #aaa;
+}
+.cf-state-row.error { color: #b45309; }
+
+.cf-retry-btn {
+  padding: 0.3rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid #b45309;
+  background: transparent;
+  color: #b45309;
+  font-size: 0.8rem;
+  font-family: 'Inter', -apple-system, sans-serif;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.cf-retry-btn:hover { background: #b45309; color: #fff; }
+
+/* Spin animation for Loader2 icon */
+@keyframes cf-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.cf-spin { animation: cf-spin 0.8s linear infinite; }
+
+/* Row being toggled — dim it slightly */
+.cf-row.toggling { opacity: 0.5; pointer-events: none; }
+
 /* ─── Responsive ─────────────────────────────────────────── */
 @media (max-width: 768px) {
   .cf-stats { grid-template-columns: 1fr; }
