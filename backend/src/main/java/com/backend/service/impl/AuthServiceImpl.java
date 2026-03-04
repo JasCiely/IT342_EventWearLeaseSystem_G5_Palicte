@@ -1,5 +1,6 @@
 package com.backend.service.impl;
 
+import com.backend.dto.request.ChangePasswordRequest;
 import com.backend.dto.request.LoginRequest;
 import com.backend.dto.request.RegisterRequest;
 import com.backend.dto.response.AuthResponse;
@@ -11,6 +12,7 @@ import com.backend.repository.UserRepository;
 import com.backend.security.JwtService;
 import com.backend.service.AuthService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -25,6 +27,7 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -37,12 +40,10 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public AuthResponse register(RegisterRequest request) {
-        // Check if email already exists
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new ResourceAlreadyExistsException("Email", "email", request.getEmail());
         }
 
-        // Create new user
         User user = new User();
         user.setFirstName(request.getFirstName().trim());
         user.setLastName(request.getLastName().trim());
@@ -52,10 +53,8 @@ public class AuthServiceImpl implements AuthService {
         user.setActive(true);
         user.setMustChangePassword(false);
 
-        // Save user
         User savedUser = userRepository.save(user);
 
-        // Generate JWT token
         Map<String, Object> claims = new HashMap<>();
         claims.put("role", "ROLE_USER");
         claims.put("userId", savedUser.getId());
@@ -76,21 +75,16 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public AuthResponse login(LoginRequest request) {
         try {
-            // FIX: Use the authentication principal directly to avoid unused variable
-            // warning
             Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(
                             request.getEmail().toLowerCase().trim(),
                             request.getPassword()));
 
-            // FIX: Get user from authenticated principal instead of re-querying
             User user = (User) authentication.getPrincipal();
 
-            // Update last login time
             user.setLastLoginAt(LocalDateTime.now());
             userRepository.save(user);
 
-            // Generate JWT token
             Map<String, Object> claims = new HashMap<>();
             claims.put("role", "ROLE_" + user.getRole().name());
             claims.put("userId", user.getId());
@@ -117,5 +111,34 @@ public class AuthServiceImpl implements AuthService {
         } catch (DisabledException e) {
             throw new InvalidCredentialsException("Account is disabled. Please contact administrator.");
         }
+    }
+
+    @Override
+    public void changePassword(String email, ChangePasswordRequest request) {
+        log.info("=== changePassword() called for email: {}", email);
+
+        log.info("Step 1: Looking up user by email...");
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new InvalidCredentialsException("User not found"));
+        log.info("Step 1 OK: User found - {}", user.getEmail());
+
+        log.info("Step 2: Verifying current password...");
+        boolean matches = passwordEncoder.matches(request.getCurrentPassword(), user.getPassword());
+        log.info("Step 2: Password matches = {}", matches);
+        if (!matches) {
+            throw new InvalidCredentialsException("Current password is incorrect");
+        }
+
+        log.info("Step 3: Encoding new password...");
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        log.info("Step 3 OK");
+
+        log.info("Step 4: Setting mustChangePassword = false...");
+        user.setMustChangePassword(false);
+        log.info("Step 4 OK");
+
+        log.info("Step 5: Saving user...");
+        userRepository.save(user);
+        log.info("Step 5 OK: User saved successfully");
     }
 }

@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.List;
 
 @Component
 @RequiredArgsConstructor
@@ -21,6 +22,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final UserDetailsService userDetailsService;
+
+    // These routes are public — skip JWT processing entirely for them
+    private static final List<String> PUBLIC_ROUTES = List.of(
+            "/api/auth/login",
+            "/api/auth/register");
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getServletPath();
+        return PUBLIC_ROUTES.stream().anyMatch(path::equals);
+    }
 
     @Override
     protected void doFilterInternal(

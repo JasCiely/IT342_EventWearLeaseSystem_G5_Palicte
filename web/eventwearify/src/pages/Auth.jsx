@@ -136,7 +136,6 @@ const Auth = ({ onLogin }) => {
 
     try {
       if (isLogin) {
-        // --- REAL LOGIN API CALL ---
         const response = await fetch(`${API_BASE_URL}/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -149,12 +148,8 @@ const Auth = ({ onLogin }) => {
         const data = await response.json();
 
         if (!response.ok) {
-          // Handle backend validation/auth errors - show as toast
-          if (data.message) {
-            showToast(data.message, 'error');
-          } else {
-            showToast('Invalid email or password.', 'error');
-          }
+          // data.message comes from your ErrorResponse.message field
+          showToast(data.message || 'Invalid email or password.', 'error');
           setIsLoading(false);
           return;
         }
@@ -169,15 +164,19 @@ const Auth = ({ onLogin }) => {
 
         if (onLogin) onLogin();
 
-        // Redirect based on role
+        // Backend sends "mustChangePassword" in AuthResponse
         if (data.role === 'ADMIN') {
-          navigate('/admin/dashboard');
+          if (data.mustChangePassword === true) {
+            localStorage.setItem("firstLogin", "true");
+            navigate('/admin/change-password');
+          } else {
+            navigate('/admin/dashboard');
+          }
         } else {
           navigate('/dashboard');
         }
 
       } else {
-        // --- REAL REGISTER API CALL ---
         const response = await fetch(`${API_BASE_URL}/register`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -192,19 +191,16 @@ const Auth = ({ onLogin }) => {
         const data = await response.json();
 
         if (!response.ok) {
-          // Handle backend validation errors
-          if (data.errors) {
-            // Spring validation errors (field-level) - show all as toasts except password
-            Object.entries(data.errors).forEach(([field, message]) => {
+          // FIX: Your ErrorResponse uses "validationErrors" not "errors"
+          if (data.validationErrors && Object.keys(data.validationErrors).length > 0) {
+            Object.entries(data.validationErrors).forEach(([field, message]) => {
               if (field !== 'password') {
-                showToast(`${field}: ${message}`, 'error');
+                showToast(`${message}`, 'error');
               } else {
-                // Keep password errors in the form
                 setErrors(prev => ({ ...prev, [field]: message }));
               }
             });
           } else if (data.message) {
-            // Check if it's a duplicate email error or other general error
             if (data.message.toLowerCase().includes('email') && data.message.toLowerCase().includes('already')) {
               showToast('This email is already registered. Please use a different email or sign in.', 'error');
             } else {
@@ -219,7 +215,6 @@ const Auth = ({ onLogin }) => {
 
         showToast("Account created successfully! You can now login.", 'success');
 
-        // Switch to login with email pre-filled
         setIsLogin(true);
         setFormData({
           firstName: '',
@@ -239,7 +234,6 @@ const Auth = ({ onLogin }) => {
       }
 
     } catch (err) {
-      // Network error / server down
       showToast('Unable to connect to server. Please try again.', 'error');
     } finally {
       setIsLoading(false);
@@ -291,7 +285,6 @@ const Auth = ({ onLogin }) => {
 
   return (
     <div className="auth-wrapper">
-      {/* Toast Notification - Shows in lower right corner */}
       {toast.show && (
         <div className={`toast-notification ${toast.type}`}>
           {toast.type === 'error' ? <AlertCircle size={18} /> : <CheckCircle size={18} />}
@@ -344,7 +337,6 @@ const Auth = ({ onLogin }) => {
         </div>
 
         <form className="auth-form" onSubmit={handleSubmit} noValidate>
-
           {!isLogin && (
             <div className="name-row">
               <div className={`input-group ${errors.firstName ? 'has-error' : ''}`}>
