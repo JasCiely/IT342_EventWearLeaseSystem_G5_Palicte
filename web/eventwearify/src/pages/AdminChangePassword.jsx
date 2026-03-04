@@ -217,7 +217,8 @@ const AdminChangePassword = () => {
 
       // ── SUCCESS ──
       localStorage.removeItem('firstLogin');
-      showToast('Password changed successfully! Redirecting...', 'success');
+      sessionStorage.setItem('showLoginSuccess', 'true');
+      showToast('Password changed successfully!', 'success');
       setTimeout(() => navigate('/admin/dashboard', { replace: true }), 1500);
 
     } catch (err) {

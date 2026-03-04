@@ -6,6 +6,7 @@ import com.backend.dto.request.RegisterRequest;
 import com.backend.dto.response.AuthResponse;
 import com.backend.security.JwtService;
 import com.backend.service.AuthService;
+import com.backend.service.TokenBlacklistService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +26,7 @@ public class AuthController {
 
     private final AuthService authService;
     private final JwtService jwtService;
+    private final TokenBlacklistService tokenBlacklistService;
 
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
@@ -71,7 +73,20 @@ public class AuthController {
             log.error("Exception type: {}", e.getClass().getName());
             log.error("Exception message: {}", e.getMessage());
             log.error("Stack trace: ", e);
-            throw e; // rethrow so GlobalExceptionHandler handles it
+            throw e;
         }
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<Map<String, String>> logout(HttpServletRequest httpRequest) {
+        String authHeader = httpRequest.getHeader("Authorization");
+
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            String token = authHeader.substring(7);
+            tokenBlacklistService.blacklistToken(token);
+            log.info("User logged out — token blacklisted");
+        }
+
+        return ResponseEntity.ok(Map.of("message", "Logged out successfully"));
     }
 }
