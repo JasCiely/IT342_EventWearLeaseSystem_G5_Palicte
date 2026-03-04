@@ -1,20 +1,42 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import DashboardHeader from '../components/adminDashboard/AdminDashboardHeader';
-import { CheckCircle } from 'lucide-react';
+import {
+  CheckCircle,
+  LayoutDashboard,
+  Package,
+  CalendarCheck,
+  Users,
+  UserCircle,
+  ChevronLeft,
+  ChevronRight,
+  Contact,
+} from 'lucide-react';
 import '../components/css/adminDashboard/AdminDashboardHeader.css';
+import '../components/css/adminDashboard/AdminDashboard.css';
 
 const API_BASE_URL = 'http://localhost:8080/api/auth';
 
-const AdminDashboard = () => {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const firstName = localStorage.getItem('firstName') || 'Admin';
+const NAV_ITEMS = [
+  { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/admin/dashboard' },
+  { key: 'inventory', label: 'Inventory', icon: Package,          path: '/admin/inventory' },
+  { key: 'bookings',  label: 'Bookings',  icon: CalendarCheck,    path: '/admin/bookings' },
+  { key: 'staff',     label: 'Staff',     icon: Users,            path: '/admin/staff' },
+  { key: 'customers', label: 'Customers', icon: Contact,          path: '/admin/customers' },
+  { key: 'profile',   label: 'Profile',   icon: UserCircle,       path: '/admin/profile' },
+];
 
-  const [toast, setToast] = useState({ show: false, message: '' });
+const AdminDashboard = () => {
+  const navigate   = useNavigate();
+  const location   = useLocation();
+  const firstName  = localStorage.getItem('firstName') || 'Admin';
+
+  const [collapsed, setCollapsed] = useState(false);
+  const [toast, setToast]         = useState({ show: false, message: '' });
+
+  const activeKey = NAV_ITEMS.find(item => location.pathname.startsWith(item.path))?.key || 'dashboard';
 
   useEffect(() => {
-    // Show success toast if redirected here after login or password change
     const justLoggedIn = sessionStorage.getItem('showLoginSuccess');
     if (justLoggedIn) {
       sessionStorage.removeItem('showLoginSuccess');
@@ -44,23 +66,66 @@ const AdminDashboard = () => {
   };
 
   return (
-    <div>
-      {/* Success toast — lower right */}
+    <div className="admin-layout">
+
+      {/* Fixed top header */}
+      <DashboardHeader userName={firstName} onLogout={handleLogout} />
+
+      <div className="admin-body">
+
+        {/* Fixed sidebar */}
+        <aside className={`admin-sidebar ${collapsed ? 'collapsed' : ''}`}>
+
+          {/* Brand mark inside sidebar */}
+          {!collapsed && (
+            <div className="sidebar-brand">
+              <span className="sidebar-brand-dot" />
+              <span className="sidebar-brand-text">Admin Panel</span>
+            </div>
+          )}
+
+          <nav className="sidebar-nav">
+            {NAV_ITEMS.map(({ key, label, icon: Icon, path }) => (
+              <button
+                key={key}
+                className={`sidebar-item ${activeKey === key ? 'active' : ''}`}
+                onClick={() => navigate(path)}
+                title={collapsed ? label : ''}
+              >
+                <span className="sidebar-icon-wrap">
+                  <Icon size={18} />
+                </span>
+                {!collapsed && <span className="sidebar-label">{label}</span>}
+              </button>
+            ))}
+          </nav>
+
+          {/* Collapse toggle at bottom */}
+          <button
+            className="sidebar-toggle"
+            onClick={() => setCollapsed(prev => !prev)}
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {collapsed ? <ChevronRight size={15} /> : <ChevronLeft size={15} />}
+            {!collapsed && <span>Collapse</span>}
+          </button>
+        </aside>
+
+        {/* Scrollable main content */}
+        <main className="admin-main">
+          <p style={{ color: '#aaa', fontSize: '0.95rem' }}>
+            Admin dashboard content coming soon.
+          </p>
+        </main>
+      </div>
+
+      {/* Success toast */}
       {toast.show && (
         <div className="dashboard-toast success">
-          <CheckCircle size={18} />
+          <CheckCircle size={16} />
           <span>{toast.message}</span>
         </div>
       )}
-
-      <DashboardHeader
-        userName={firstName}
-        onLogout={handleLogout}
-      />
-
-      <main style={{ padding: '2rem 4rem' }}>
-        <p>Admin dashboard content coming soon.</p>
-      </main>
     </div>
   );
 };

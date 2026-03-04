@@ -1,0 +1,265 @@
+/* ─── CSS Variables ──────────────────────────────────────── */
+:root {
+  --header-height: 96px;
+  --sidebar-width: 220px;
+  --sidebar-collapsed-width: 60px;
+
+  /* Sidebar — warm deep burgundy that pulls from the brand color */
+  --sidebar-bg: #2c1219;
+  --sidebar-hover-bg: rgba(196, 113, 127, 0.12);
+  --sidebar-active-bg: rgba(196, 113, 127, 0.2);
+  --sidebar-text: rgba(255, 230, 233, 0.55);
+  --sidebar-text-active: #ffe6e9;
+  --sidebar-accent: #c4717f;
+  --sidebar-border: rgba(196, 113, 127, 0.15);
+
+  --main-bg: #f5f4f1;
+  --transition: 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ─── Root layout ────────────────────────────────────────── */
+.admin-layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--main-bg);
+}
+
+.admin-body {
+  display: flex;
+  flex: 1;
+  padding-top: var(--header-height);
+}
+
+/* ─── Fixed header ───────────────────────────────────────── */
+.dashboard-header {
+  position: fixed !important;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  height: var(--header-height) !important;
+  box-shadow: 0 2px 16px rgba(44, 18, 25, 0.3);
+}
+
+/* ─── Fixed sidebar ──────────────────────────────────────── */
+.admin-sidebar {
+  position: fixed;
+  top: var(--header-height);
+  left: 0;
+  bottom: 0;
+  width: var(--sidebar-width);
+  background: var(--sidebar-bg);
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem 0.75rem 1rem;
+  z-index: 90;
+  transition: width var(--transition);
+  overflow: hidden;
+  border-right: 1px solid rgba(196, 113, 127, 0.1);
+}
+
+.admin-sidebar.collapsed {
+  width: var(--sidebar-collapsed-width);
+}
+
+/* ─── Sidebar brand ──────────────────────────────────────── */
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0 0.5rem 1.25rem;
+  border-bottom: 1px solid var(--sidebar-border);
+  margin-bottom: 0.75rem;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.sidebar-brand-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--sidebar-accent);
+  flex-shrink: 0;
+  box-shadow: 0 0 7px var(--sidebar-accent);
+}
+
+.sidebar-brand-text {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: rgba(255, 230, 233, 0.3);
+}
+
+/* ─── Nav ────────────────────────────────────────────────── */
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  flex: 1;
+}
+
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: var(--sidebar-text);
+  font-size: 0.875rem;
+  font-weight: 500;
+  font-family: 'Inter', -apple-system, sans-serif;
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  width: 100%;
+  transition: background var(--transition), color var(--transition);
+  position: relative;
+}
+
+.sidebar-item:hover {
+  background: var(--sidebar-hover-bg);
+  color: #ffe6e9;
+}
+
+.sidebar-item.active {
+  background: var(--sidebar-active-bg);
+  color: var(--sidebar-text-active);
+  font-weight: 600;
+}
+
+.sidebar-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 18%;
+  height: 64%;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--sidebar-accent);
+}
+
+.sidebar-icon-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  flex-shrink: 0;
+}
+
+.sidebar-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-sidebar.collapsed .sidebar-item {
+  justify-content: center;
+  padding: 0.65rem;
+}
+
+.admin-sidebar.collapsed .sidebar-brand {
+  display: none;
+}
+
+/* ─── Collapse toggle ────────────────────────────────────── */
+.sidebar-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  margin-top: 0.5rem;
+  border-radius: 8px;
+  border: 1px solid var(--sidebar-border);
+  background: transparent;
+  color: rgba(255, 230, 233, 0.3);
+  font-size: 0.78rem;
+  font-family: 'Inter', -apple-system, sans-serif;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  width: 100%;
+  transition: background var(--transition), color var(--transition), border-color var(--transition);
+}
+
+.sidebar-toggle:hover {
+  background: var(--sidebar-hover-bg);
+  color: rgba(255, 230, 233, 0.7);
+  border-color: rgba(196, 113, 127, 0.3);
+}
+
+.admin-sidebar.collapsed .sidebar-toggle {
+  justify-content: center;
+  padding: 0.6rem;
+}
+
+/* ─── Main content ───────────────────────────────────────── */
+.admin-main {
+  flex: 1;
+  margin-left: var(--sidebar-width);
+  padding: 2rem 2.5rem;
+  min-height: calc(100vh - var(--header-height));
+  overflow-y: auto;
+  transition: margin-left var(--transition);
+}
+
+.admin-body:has(.admin-sidebar.collapsed) .admin-main {
+  margin-left: var(--sidebar-collapsed-width);
+}
+
+/* ─── Toast ──────────────────────────────────────────────── */
+.dashboard-toast {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.8rem 1.2rem;
+  border-radius: 10px;
+  font-family: 'Inter', -apple-system, sans-serif;
+  font-size: 0.875rem;
+  font-weight: 500;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  animation: slideInToast 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.dashboard-toast.success {
+  background: #f0fdf4;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+
+@keyframes slideInToast {
+  from { opacity: 0; transform: translateY(12px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ─── Responsive ─────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .admin-sidebar {
+    width: var(--sidebar-collapsed-width);
+  }
+
+  .admin-sidebar .sidebar-brand,
+  .admin-sidebar .sidebar-label,
+  .admin-sidebar .sidebar-toggle span {
+    display: none;
+  }
+
+  .admin-sidebar .sidebar-item,
+  .admin-sidebar .sidebar-toggle {
+    justify-content: center;
+    padding: 0.65rem;
+  }
+
+  .admin-main {
+    margin-left: var(--sidebar-collapsed-width);
+    padding: 1.5rem;
+  }
+}
