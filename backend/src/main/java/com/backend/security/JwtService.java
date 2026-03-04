@@ -46,11 +46,13 @@ public class JwtService {
         return (username.equals(userDetails.getUsername())) && !isTokenExpired(token);
     }
 
-    private boolean isTokenExpired(String token) {
+    public boolean isTokenExpired(String token) {
         return extractExpiration(token).before(new Date());
     }
 
-    private Date extractExpiration(String token) {
+    // Changed from private to public so TokenBlacklistService can
+    // extract the expiration date when blacklisting a token on logout
+    public Date extractExpiration(String token) {
         return extractClaim(token, Claims::getExpiration);
     }
 

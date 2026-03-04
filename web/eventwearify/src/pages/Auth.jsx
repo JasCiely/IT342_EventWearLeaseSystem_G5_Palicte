@@ -148,7 +148,6 @@ const Auth = ({ onLogin }) => {
         const data = await response.json();
 
         if (!response.ok) {
-          // data.message comes from your ErrorResponse.message field
           showToast(data.message || 'Invalid email or password.', 'error');
           setIsLoading(false);
           return;
@@ -164,12 +163,13 @@ const Auth = ({ onLogin }) => {
 
         if (onLogin) onLogin();
 
-        // Backend sends "mustChangePassword" in AuthResponse
         if (data.role === 'ADMIN') {
           if (data.mustChangePassword === true) {
             localStorage.setItem("firstLogin", "true");
             navigate('/admin/change-password');
           } else {
+            // Set flag so AdminDashboard shows the welcome toast
+            sessionStorage.setItem("showLoginSuccess", "true");
             navigate('/admin/dashboard');
           }
         } else {
@@ -191,7 +191,6 @@ const Auth = ({ onLogin }) => {
         const data = await response.json();
 
         if (!response.ok) {
-          // FIX: Your ErrorResponse uses "validationErrors" not "errors"
           if (data.validationErrors && Object.keys(data.validationErrors).length > 0) {
             Object.entries(data.validationErrors).forEach(([field, message]) => {
               if (field !== 'password') {

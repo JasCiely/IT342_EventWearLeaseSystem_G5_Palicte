@@ -2,10 +2,19 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Index from './pages/Index';
 import Auth from './pages/Auth';
 import AdminChangePassword from './pages/AdminChangePassword';
+import AdminDashboard from './pages/AdminDashboard';
 
-// Guard: Only lets ADMIN through on first login
-// If not first login, redirects to admin dashboard
-// If not admin at all, redirects to home
+const AdminRoute = ({ children }) => {
+  const role = localStorage.getItem('userRole');
+  const isAuthenticated = localStorage.getItem('isAuthenticated');
+  const firstLogin = localStorage.getItem('firstLogin');
+
+  if (!isAuthenticated || role !== 'ADMIN') return <Navigate to="/auth" replace />;
+  if (firstLogin === 'true') return <Navigate to="/admin/change-password" replace />;
+
+  return children;
+};
+
 const AdminFirstLoginRoute = ({ children }) => {
   const role = localStorage.getItem('userRole');
   const firstLogin = localStorage.getItem('firstLogin');
@@ -30,6 +39,15 @@ function App() {
             <AdminFirstLoginRoute>
               <AdminChangePassword />
             </AdminFirstLoginRoute>
+          }
+        />
+
+        <Route
+          path="/admin/dashboard"
+          element={
+            <AdminRoute>
+              <AdminDashboard />
+            </AdminRoute>
           }
         />
 
