@@ -12,7 +12,14 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin/users")
-@CrossOrigin(origins = "http://localhost:5173")
+@CrossOrigin(origins = "http://localhost:5173", methods = {
+        RequestMethod.GET,
+        RequestMethod.POST,
+        RequestMethod.PATCH,
+        RequestMethod.PUT,
+        RequestMethod.DELETE,
+        RequestMethod.OPTIONS
+})
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminUserController {
@@ -21,11 +28,6 @@ public class AdminUserController {
 
     /**
      * GET /api/admin/users?page=0&size=8&search=&status=
-     *
-     * @param page   0-based page index
-     * @param size   rows per page (default 8)
-     * @param search optional name / email search string
-     * @param status optional filter: "active" | "inactive" | "" (all)
      */
     @GetMapping
     public ResponseEntity<UserPageResponse> getUsers(
@@ -40,8 +42,6 @@ public class AdminUserController {
 
     /**
      * GET /api/admin/users/{id}
-     * 
-     * Fetch a single customer's full details
      */
     @GetMapping("/{id}")
     public ResponseEntity<UserSummaryResponse> getUserById(@PathVariable String id) {
