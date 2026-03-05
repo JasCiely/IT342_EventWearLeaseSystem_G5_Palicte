@@ -35,6 +35,14 @@ public class User implements UserDetails {
     @Column(nullable = false)
     private String password;
 
+    @Column(length = 20, unique = true)
+    private String phone;
+
+    // Stores the full Supabase CDN URL e.g.
+    // https://zmvcvttzalkisomhguxh.supabase.co/storage/v1/object/public/profile-photos/avatars/uuid.jpg
+    @Column(name = "profile_photo_url")
+    private String profilePhotoUrl;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Role role;
@@ -65,7 +73,6 @@ public class User implements UserDetails {
         updatedAt = LocalDateTime.now();
     }
 
-    // UserDetails implementation
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return List.of(new SimpleGrantedAuthority("ROLE_" + role.name()));

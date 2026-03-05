@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import DashboardHeader from '../../components/adminDashboard/AdminDashboardHeader';
 import CustomersFragment from './fragment/CustomersFragment';
+import ProfileFragment from './fragment/ProfileFragment';
 import {
   CheckCircle,
   LayoutDashboard,
@@ -31,6 +32,7 @@ const NAV_ITEMS = [
 const renderFragment = (key) => {
   switch (key) {
     case 'customers': return <CustomersFragment />;
+    case 'profile':   return <ProfileFragment />;
     default:
       return (
         <p style={{ color: '#bbb', fontSize: '0.95rem', marginTop: '0.5rem' }}>

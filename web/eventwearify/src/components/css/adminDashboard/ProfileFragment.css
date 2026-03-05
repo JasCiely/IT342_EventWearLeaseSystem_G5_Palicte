@@ -1,0 +1,413 @@
+/* ════════════════════════════════════════════════════════════
+   ProfileFragment.css
+   Place at: src/components/css/adminDashboard/ProfileFragment.css
+
+   Theme mirrors CustomersFragment.css exactly:
+   — Warm off-white backgrounds  #faf9f7 / #fff
+   — Burgundy accent             #6b2d39
+   — Rose mid-tone               #c4717f
+   — Soft borders                #eeecea / #e4e2df
+   — Playfair Display headings, Inter body
+   ════════════════════════════════════════════════════════════ */
+
+/* ─── Root ───────────────────────────────────────────────── */
+.pf-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  font-family: 'Inter', -apple-system, sans-serif;
+  max-width: 1100px;
+}
+
+/* ─── Top block ──────────────────────────────────────────── */
+.pf-top {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding-bottom: 1.25rem;
+}
+
+/* ─── Page header ────────────────────────────────────────── */
+.pf-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding-top: 0.25rem;
+}
+.pf-title {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 1.65rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0 0 0.2rem;
+}
+.pf-subtitle {
+  font-size: 0.875rem;
+  color: #999;
+  margin: 0;
+}
+
+/* ─── Two-column grid ────────────────────────────────────── */
+.pf-grid {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 1.25rem;
+  align-items: start;
+}
+@media (max-width: 860px) {
+  .pf-grid { grid-template-columns: 1fr; }
+}
+
+/* ─── Cards ──────────────────────────────────────────────── */
+.pf-card {
+  background: #fff;
+  border: 1px solid #eeecea;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  transition: box-shadow 0.2s;
+}
+.pf-card:hover {
+  box-shadow: 0 4px 12px rgba(107, 45, 57, 0.07);
+}
+
+/* Avatar card — centred column */
+.pf-card--avatar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.4rem;
+}
+
+.pf-detail-col {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+/* Card section title */
+.pf-card-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #aaa;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin: 0 0 1.25rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #eeecea;
+}
+
+/* ─── Avatar ─────────────────────────────────────────────── */
+.pf-avatar-wrapper {
+  position: relative;
+  margin-bottom: 0.5rem;
+}
+.pf-avatar-circle {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6b2d39, #c4717f);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 3px solid #c4717f;
+  box-shadow: 0 4px 12px rgba(107, 45, 57, 0.2);
+}
+.pf-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.pf-avatar-initials {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: rgba(255, 230, 233, 0.95);
+  letter-spacing: 1px;
+}
+.pf-avatar-upload-btn {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #6b2d39;
+  border: 2px solid #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #fff;
+  transition: background 0.2s;
+}
+.pf-avatar-upload-btn:hover { background: #5a2530; }
+
+/* ── Photo action buttons (Save Photo + Discard) ── */
+.pf-photo-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.75rem;
+}
+.pf-btn-upload-photo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.42rem 0.9rem;
+  border-radius: 7px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-family: 'Inter', -apple-system, sans-serif;
+  cursor: pointer;
+  border: none;
+  background: #6b2d39;
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(107, 45, 57, 0.25);
+  transition: background 0.2s, opacity 0.2s;
+}
+.pf-btn-upload-photo:hover:not(:disabled) { background: #5a2530; }
+.pf-btn-upload-photo:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.pf-btn-discard-photo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  border: 1px solid #e4e2df;
+  background: transparent;
+  color: #b45309;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.pf-btn-discard-photo:hover:not(:disabled) {
+  background: rgba(180, 83, 9, 0.08);
+  border-color: #b45309;
+}
+.pf-btn-discard-photo:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.pf-avatar-name {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0.3rem 0 0;
+}
+.pf-avatar-role-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.28rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: rgba(107, 45, 57, 0.1);
+  color: #6b2d39;
+}
+.pf-avatar-email {
+  font-size: 0.78rem;
+  color: #999;
+  margin: 0.15rem 0 0;
+  word-break: break-all;
+}
+
+/* ─── Buttons ────────────────────────────────────────────── */
+.pf-btn-edit,
+.pf-btn-save,
+.pf-btn-cancel,
+.pf-btn-password {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  border-radius: 7px;
+  font-size: 0.825rem;
+  font-weight: 600;
+  font-family: 'Inter', -apple-system, sans-serif;
+  cursor: pointer;
+  border: none;
+  transition: background 0.2s, box-shadow 0.2s, opacity 0.2s;
+}
+
+.pf-btn-edit {
+  margin-top: 0.75rem;
+  background: transparent;
+  color: #6b2d39;
+  border: 1px solid #c4717f;
+}
+.pf-btn-edit:hover { background: rgba(107, 45, 57, 0.06); }
+
+.pf-btn-save {
+  background: #6b2d39;
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(107, 45, 57, 0.25);
+}
+.pf-btn-save:hover:not(:disabled) {
+  background: #5a2530;
+  box-shadow: 0 4px 10px rgba(107, 45, 57, 0.3);
+}
+.pf-btn-save:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.pf-btn-cancel {
+  background: transparent;
+  color: #999;
+  border: 1px solid #e4e2df;
+}
+.pf-btn-cancel:hover { border-color: #c0bdb9; color: #666; }
+
+.pf-btn-password {
+  background: #6b2d39;
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(107, 45, 57, 0.25);
+}
+.pf-btn-password:hover:not(:disabled) { background: #5a2530; }
+.pf-btn-password:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ─── Form grid ──────────────────────────────────────────── */
+.pf-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+@media (max-width: 600px) {
+  .pf-form-grid { grid-template-columns: 1fr; }
+}
+
+.pf-field { display: flex; flex-direction: column; gap: 0.35rem; }
+.pf-field--full { grid-column: 1 / -1; }
+
+.pf-field-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #aaa;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* ─── Inputs ─────────────────────────────────────────────── */
+.pf-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.pf-input-icon {
+  position: absolute;
+  left: 0.75rem;
+  color: #bbb;
+  pointer-events: none;
+}
+.pf-input {
+  width: 100%;
+  padding: 0.6rem 0.85rem 0.6rem 2.35rem;
+  background: #fff;
+  border: 1px solid #e4e2df;
+  border-radius: 8px;
+  color: #1a1a1a;
+  font-size: 0.875rem;
+  font-family: 'Inter', -apple-system, sans-serif;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-sizing: border-box;
+}
+.pf-input:focus {
+  border-color: #c4717f;
+  box-shadow: 0 0 0 3px rgba(196, 113, 127, 0.12);
+}
+.pf-input::placeholder { color: #c0bdb9; }
+
+/* password fields have no left icon — reset left padding */
+.pf-input--no-icon { padding-left: 0.85rem; }
+
+/* hide the native browser password-reveal eye (Edge, Chrome, IE) */
+.pf-input--no-icon::-ms-reveal,
+.pf-input--no-icon::-ms-clear,
+.pf-input--no-icon::-webkit-credentials-auto-fill-button,
+.pf-input--no-icon::-webkit-textfield-decoration-container { display: none; }
+
+
+/* password eye toggle */
+.pf-pw-toggle {
+  position: absolute;
+  right: 0.75rem;
+  background: none;
+  border: none;
+  color: #bbb;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  transition: color 0.15s;
+}
+.pf-pw-toggle:hover { color: #6b2d39; }
+
+/* ─── Read-only field value ──────────────────────────────── */
+.pf-field-value {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: #444;
+  padding: 0.45rem 0;
+  border-bottom: 1px dashed #eeecea;
+}
+.pf-field-value-icon { color: #ccc; flex-shrink: 0; }
+
+/* ─── Password strength bar ──────────────────────────────── */
+.pf-pw-strength-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.6rem;
+}
+.pf-pw-strength-bg {
+  flex: 1;
+  height: 4px;
+  background: #eeecea;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.pf-pw-strength-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.4s ease, background 0.4s ease;
+}
+.pf-pw-strength-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  min-width: 42px;
+  text-align: right;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ─── Background sync indicator (subtle, top-right of header) ── */
+.pf-sync-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  color: #c4717f;
+  opacity: 0.75;
+  align-self: center;
+}
+
+@keyframes pf-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.pf-spin { animation: pf-spin 0.8s linear infinite; }
+
+/* ─── Toast overrides (base class lives in AdminDashboard.css) ── */
+.dashboard-toast.error {
+  background: #fffaf8;
+  border-left-color: #b45309;
+}
+.dashboard-toast.error svg { color: #b45309; }
