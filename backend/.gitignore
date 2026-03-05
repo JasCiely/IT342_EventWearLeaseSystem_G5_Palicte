@@ -32,5 +32,64 @@ build/
 ### VS Code ###
 .vscode/
 
-# ── Environment variables — NEVER commit these ──
+# ── application.properties — contains real secrets, never commit ──
+src/main/resources/application.properties
+
+# ── Environment variables ──
 .env
+.env.local
+.env.*
+!.env.example
+
+# ── Maven build output ──
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# ── Local uploads folder ──
+uploads/
+
+# ── Compiled class files ──
+*.class
+
+# ── Log files ──
+*.log
+logs/
+
+# ── Package files ──
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# ── IntelliJ IDEA ──
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+!**/src/main/**/out/
+!**/src/test/**/out/
+
+# ── Eclipse ──
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+bin/
+!**/src/main/**/bin/
+!**/src/test/**/bin/
+
+# ── VS Code ──
+.vscode/
+
+# ── OS ──
+.DS_Store
+Thumbs.db
