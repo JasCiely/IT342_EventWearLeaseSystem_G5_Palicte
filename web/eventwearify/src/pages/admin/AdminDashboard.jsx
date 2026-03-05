@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import DashboardHeader from '../../components/adminDashboard/AdminDashboardHeader';
 import CustomersFragment from './fragment/CustomersFragment';
+import InventoryFragment from './fragment/InventoryFragment';
 import ProfileFragment from './fragment/ProfileFragment';
+import BookingsFragment from './fragment/BookingsFragment';
 import {
   CheckCircle,
   LayoutDashboard,
@@ -31,8 +33,10 @@ const NAV_ITEMS = [
 // Render the correct fragment based on active nav key
 const renderFragment = (key) => {
   switch (key) {
+    case 'inventory': return <InventoryFragment />;
     case 'customers': return <CustomersFragment />;
     case 'profile':   return <ProfileFragment />;
+    case 'bookings':  return <BookingsFragment />;
     default:
       return (
         <p style={{ color: '#bbb', fontSize: '0.95rem', marginTop: '0.5rem' }}>
