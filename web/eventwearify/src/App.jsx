@@ -56,7 +56,7 @@ function App() {
           }
         />
 
-        {/* Admin first-login password change — guarded */}
+        {/* Admin first-login passwor      d change — guarded */}
         <Route
           path="/admin/change-password"
           element={
