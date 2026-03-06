@@ -173,6 +173,8 @@ const Auth = ({ onLogin }) => {
             navigate('/admin/dashboard');
           }
         } else {
+          // Set flag so CustomerDashboard shows the welcome toast
+          sessionStorage.setItem("showLoginSuccess", "true");
           navigate('/dashboard');
         }
 

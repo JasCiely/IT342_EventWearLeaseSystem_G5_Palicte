@@ -3,6 +3,7 @@ import Index from './pages/Index';
 import Auth from './pages/Auth';
 import AdminChangePassword from './pages/admin/AdminChangePassword';
 import AdminDashboard from './pages/admin/AdminDashboard';
+import CustomerDashboard from './pages/customer/CustomerDashboard';
 
 // Guard: only admins who have completed password change can access the dashboard
 const AdminRoute = ({ children }) => {
@@ -27,12 +28,33 @@ const AdminFirstLoginRoute = ({ children }) => {
   return children;
 };
 
+// Guard: only authenticated non-admin users can access customer pages
+const CustomerRoute = ({ children }) => {
+  const isAuthenticated = localStorage.getItem('isAuthenticated');
+  const role            = localStorage.getItem('userRole');
+
+  if (!isAuthenticated || isAuthenticated === 'false') return <Navigate to="/auth" replace />;
+  if (role === 'ADMIN') return <Navigate to="/admin/dashboard" replace />;
+
+  return children;
+};
+
 function App() {
   return (
     <Router>
       <Routes>
         <Route path="/" element={<Index />} />
         <Route path="/auth" element={<Auth />} />
+
+        {/* Customer dashboard — guarded */}
+        <Route
+          path="/dashboard"
+          element={
+            <CustomerRoute>
+              <CustomerDashboard />
+            </CustomerRoute>
+          }
+        />
 
         {/* Admin first-login password change — guarded */}
         <Route
