@@ -89,4 +89,41 @@ public class AuthController {
 
         return ResponseEntity.ok(Map.of("message", "Logged out successfully"));
     }
+
+    // ── Forgot Password Endpoints ──────────────────────────────────────────────
+    @PostMapping("/forgot-password")
+    public ResponseEntity<Map<String, String>> forgotPassword(@RequestBody Map<String, String> body) {
+        String email = body.get("email");
+        if (email == null || email.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Email is required"));
+        }
+        authService.sendPasswordResetOtp(email.trim().toLowerCase());
+        // Always return success to prevent email enumeration
+        return ResponseEntity.ok(Map.of("message", "If that email is registered, an OTP has been sent."));
+    }
+
+    @PostMapping("/verify-otp")
+    public ResponseEntity<Map<String, String>> verifyOtp(@RequestBody Map<String, String> body) {
+        String email = body.get("email");
+        String otp = body.get("otp");
+        try {
+            authService.verifyOtp(email, otp);
+            return ResponseEntity.ok(Map.of("message", "OTP verified successfully."));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<Map<String, String>> resetPassword(@RequestBody Map<String, String> body) {
+        String email = body.get("email");
+        String otp = body.get("otp");
+        String newPassword = body.get("newPassword");
+        try {
+            authService.resetPassword(email, otp, newPassword);
+            return ResponseEntity.ok(Map.of("message", "Password reset successfully."));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
 }

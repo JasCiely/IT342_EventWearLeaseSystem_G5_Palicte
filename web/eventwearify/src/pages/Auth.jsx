@@ -338,7 +338,7 @@ const Auth = ({ onLogin }) => {
 
   const handleForgotPassword = (e) => {
     e.preventDefault();
-    showToast("Password reset feature coming soon!", 'info');
+    navigate('/forgot-password');
   };
 
   const clearForm = () => {
