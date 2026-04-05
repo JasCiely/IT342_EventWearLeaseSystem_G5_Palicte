@@ -34,7 +34,7 @@ public class AdminUserServiceImpl implements AdminUserService {
             activeFilter = false;
 
         Page<User> userPage = userRepository.findUsersFiltered(
-                Role.USER, search.trim(), activeFilter, pageable);
+                Role.CUSTOMER, search.trim(), activeFilter, pageable);
 
         List<UserSummaryResponse> content = userPage.getContent()
                 .stream()

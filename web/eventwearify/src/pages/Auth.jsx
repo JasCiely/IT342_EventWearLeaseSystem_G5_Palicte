@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../components/css/pages/Auth.css';
 import { 
@@ -16,7 +16,19 @@ import logo from '../assets/logo.png';
 
 const API_BASE_URL = 'http://localhost:8080/api/auth';
 
-// Google "G" SVG Icon component
+// ── Security: Whitelist allowed error parameters ──
+const ALLOWED_OAUTH_ERRORS = ['not_registered', 'oauth_failed', 'cancelled', 'access_denied'];
+
+// ── Security: Predefined error messages (prevent XSS via backend messages) ──
+const ERROR_MESSAGES = {
+  EMAIL_EXISTS: 'This email is already registered. Please use a different email or sign in.',
+  INVALID_CREDENTIALS: 'Invalid email or password.',
+  INVALID_EMAIL: 'Please enter a valid email address.',
+  WEAK_PASSWORD: 'Password does not meet security requirements.',
+  SERVER_ERROR: 'Unable to connect to server. Please try again.',
+  REGISTRATION_FAILED: 'Registration failed. Please try again.',
+};
+
 const GoogleIcon = () => (
   <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
     <g>
@@ -53,11 +65,43 @@ const Auth = ({ onLogin }) => {
   
   const navigate = useNavigate();
 
+  // ── Security: Validate and handle OAuth2 errors ────────────────────────────
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const error = params.get('error');
+
+    // Security: Only process whitelisted error codes
+    if (error && ALLOWED_OAUTH_ERRORS.includes(error)) {
+      if (error === 'not_registered') {
+        showToast(
+          'No EventWear account found for this Google email. Please sign up first.',
+          'error'
+        );
+        setIsLogin(true);
+      } else if (error === 'oauth_failed') {
+        showToast('Google sign-in failed. Please try again.', 'error');
+      } else if (error === 'cancelled' || error === 'access_denied') {
+        showToast('Google sign-in was cancelled. Please try again if you wish to continue.', 'info');
+      }
+      
+      // Clean URL to prevent re-showing error on refresh
+      window.history.replaceState({}, '', '/auth');
+    } else if (error) {
+      // Security: Log unknown error codes but don't display them
+      console.warn('Unknown OAuth error parameter:', error);
+      window.history.replaceState({}, '', '/auth');
+    }
+
+    // Reset loading state in case user used browser back button
+    setIsGoogleLoading(false);
+  }, []);
+  // ──────────────────────────────────────────────────────────────────────────
+
   const showToast = (message, type = 'success') => {
     setToast({ show: true, message, type });
     setTimeout(() => {
       setToast({ show: false, message: '', type: 'success' });
-    }, 3000);
+    }, 5000);
   };
 
   const checkPasswordStrength = (password) => {
@@ -88,14 +132,16 @@ const Auth = ({ onLogin }) => {
     navigate('/home'); 
   };
 
-  // ─── Google OAuth Handler ───────────────────────────────────────────────────
   const handleGoogleLogin = () => {
     setIsGoogleLoading(true);
-    // Redirect to Spring Boot Google OAuth2 endpoint
-    // Spring Security will handle the redirect to Google's consent screen
-    window.location.href = `${API_BASE_URL.replace('/api/auth', '')}/oauth2/authorization/google`;
+    
+    // Track OAuth flow start (for analytics/timeout detection)
+    sessionStorage.setItem('oauthStartTime', Date.now().toString());
+    
+    window.location.href = isLogin
+      ? 'http://localhost:8080/oauth2/authorization/google'
+      : 'http://localhost:8080/oauth2/authorization/google-register';
   };
-  // ────────────────────────────────────────────────────────────────────────────
 
   const validateForm = () => {
     const newErrors = {};
@@ -149,6 +195,33 @@ const Auth = ({ onLogin }) => {
     return Object.keys(newErrors).length === 0;
   };
 
+  // ── Security: Handle backend errors safely ────────────────────────────────
+  const handleBackendError = (data) => {
+    // Security: Use predefined messages instead of echoing backend strings
+    if (data.errorCode && ERROR_MESSAGES[data.errorCode]) {
+      showToast(ERROR_MESSAGES[data.errorCode], 'error');
+      return;
+    }
+
+    // Handle specific known error patterns
+    if (data.message) {
+      const msg = data.message.toLowerCase();
+      if (msg.includes('email') && msg.includes('already')) {
+        showToast(ERROR_MESSAGES.EMAIL_EXISTS, 'error');
+      } else if (msg.includes('password')) {
+        showToast(ERROR_MESSAGES.WEAK_PASSWORD, 'error');
+      } else if (msg.includes('invalid') && msg.includes('credentials')) {
+        showToast(ERROR_MESSAGES.INVALID_CREDENTIALS, 'error');
+      } else {
+        // Generic error - don't echo potentially unsafe message
+        showToast(ERROR_MESSAGES.SERVER_ERROR, 'error');
+      }
+    } else {
+      showToast(ERROR_MESSAGES.SERVER_ERROR, 'error');
+    }
+  };
+  // ──────────────────────────────────────────────────────────────────────────
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
@@ -170,7 +243,14 @@ const Auth = ({ onLogin }) => {
         const data = await response.json();
 
         if (!response.ok) {
-          showToast(data.message || 'Invalid email or password.', 'error');
+          handleBackendError(data);
+          setIsLoading(false);
+          return;
+        }
+
+        // Security: Validate token exists before storing
+        if (!data.token) {
+          showToast(ERROR_MESSAGES.SERVER_ERROR, 'error');
           setIsLoading(false);
           return;
         }
@@ -215,19 +295,14 @@ const Auth = ({ onLogin }) => {
           if (data.validationErrors && Object.keys(data.validationErrors).length > 0) {
             Object.entries(data.validationErrors).forEach(([field, message]) => {
               if (field !== 'password') {
-                showToast(`${message}`, 'error');
+                // Security: Use safe error handling
+                handleBackendError({ message });
               } else {
                 setErrors(prev => ({ ...prev, [field]: message }));
               }
             });
-          } else if (data.message) {
-            if (data.message.toLowerCase().includes('email') && data.message.toLowerCase().includes('already')) {
-              showToast('This email is already registered. Please use a different email or sign in.', 'error');
-            } else {
-              showToast(data.message, 'error');
-            }
           } else {
-            showToast('Registration failed. Please try again.', 'error');
+            handleBackendError(data);
           }
           setIsLoading(false);
           return;
@@ -254,7 +329,8 @@ const Auth = ({ onLogin }) => {
       }
 
     } catch (err) {
-      showToast('Unable to connect to server. Please try again.', 'error');
+      console.error('Network error:', err);
+      showToast(ERROR_MESSAGES.SERVER_ERROR, 'error');
     } finally {
       setIsLoading(false);
     }
@@ -377,7 +453,6 @@ const Auth = ({ onLogin }) => {
         </button>
 
         <div className="separator"><span>or</span></div>
-        {/* ─────────────────────── */}
 
         <form className="auth-form" onSubmit={handleSubmit} noValidate>
           {!isLogin && (

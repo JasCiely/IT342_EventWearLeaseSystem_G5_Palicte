@@ -4,20 +4,22 @@ import Auth from './pages/Auth';
 import AdminChangePassword from './pages/admin/AdminChangePassword';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import CustomerDashboard from './pages/customer/CustomerDashboard';
+import OAuth2Callback from './pages/OAuth2Callback';
 
-// Guard: only admins who have completed password change can access the dashboard
 const AdminRoute = ({ children }) => {
   const role            = localStorage.getItem('userRole');
   const isAuthenticated = localStorage.getItem('isAuthenticated');
+  const token           = localStorage.getItem('token');
   const firstLogin      = localStorage.getItem('firstLogin');
 
-  if (!isAuthenticated || role !== 'ADMIN') return <Navigate to="/auth" replace />;
-  if (firstLogin === 'true') return <Navigate to="/admin/change-password" replace />;
+  if (!token || !isAuthenticated || isAuthenticated === 'false' || role !== 'ADMIN')
+    return <Navigate to="/auth" replace />;
+  if (firstLogin === 'true')
+    return <Navigate to="/admin/change-password" replace />;
 
   return children;
 };
 
-// Guard: only admins on first login can access the change-password page
 const AdminFirstLoginRoute = ({ children }) => {
   const role       = localStorage.getItem('userRole');
   const firstLogin = localStorage.getItem('firstLogin');
@@ -28,23 +30,35 @@ const AdminFirstLoginRoute = ({ children }) => {
   return children;
 };
 
-// Guard: only authenticated non-admin users can access customer pages
 const CustomerRoute = ({ children }) => {
   const isAuthenticated = localStorage.getItem('isAuthenticated');
+  const token           = localStorage.getItem('token');
   const role            = localStorage.getItem('userRole');
 
-  if (!isAuthenticated || isAuthenticated === 'false') return <Navigate to="/auth" replace />;
-  if (role === 'ADMIN') return <Navigate to="/admin/dashboard" replace />;
+  if (!token || !isAuthenticated || isAuthenticated === 'false')
+    return <Navigate to="/auth" replace />;
+  if (role === 'ADMIN')
+    return <Navigate to="/admin/dashboard" replace />;
 
   return children;
 };
 
 function App() {
+
+  const handleLogin = () => {
+  };
+
   return (
     <Router>
       <Routes>
         <Route path="/" element={<Index />} />
-        <Route path="/auth" element={<Auth />} />
+        <Route path="/auth" element={<Auth onLogin={handleLogin} />} />
+
+        {/* Google OAuth2 callback — must be public, no guard */}
+        <Route
+          path="/oauth2/callback"
+          element={<OAuth2Callback onLogin={handleLogin} />}
+        />
 
         {/* Customer dashboard — guarded */}
         <Route
@@ -56,7 +70,7 @@ function App() {
           }
         />
 
-        {/* Admin first-login passwor      d change — guarded */}
+        {/* Admin first-login password change — guarded */}
         <Route
           path="/admin/change-password"
           element={
