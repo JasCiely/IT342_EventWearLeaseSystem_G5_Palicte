@@ -5,6 +5,7 @@ import AdminChangePassword from './pages/admin/AdminChangePassword';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import CustomerDashboard from './pages/customer/CustomerDashboard';
 import OAuth2Callback from './pages/OAuth2Callback';
+import ForgotPassword from './pages/ForgotPassword';
 
 const AdminRoute = ({ children }) => {
   const role            = localStorage.getItem('userRole');
@@ -89,7 +90,7 @@ function App() {
             </AdminRoute>
           }
         />
-
+        <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>

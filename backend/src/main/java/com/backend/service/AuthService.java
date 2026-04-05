@@ -11,4 +11,10 @@ public interface AuthService {
     AuthResponse login(LoginRequest request);
 
     void changePassword(String email, ChangePasswordRequest request);
+
+    void sendPasswordResetOtp(String email);
+
+    void verifyOtp(String email, String otp);
+
+    void resetPassword(String email, String otp, String newPassword);
 }
