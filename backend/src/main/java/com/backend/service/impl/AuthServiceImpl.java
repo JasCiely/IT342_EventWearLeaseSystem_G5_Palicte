@@ -49,7 +49,7 @@ public class AuthServiceImpl implements AuthService {
         user.setLastName(request.getLastName().trim());
         user.setEmail(request.getEmail().toLowerCase().trim());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
-        user.setRole(Role.USER);
+        user.setRole(Role.CUSTOMER);
         user.setActive(true);
         user.setMustChangePassword(false);
 
