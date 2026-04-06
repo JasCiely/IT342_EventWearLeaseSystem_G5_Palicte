@@ -1848,3 +1848,359 @@
   padding-left: 3.2rem;
   background: #fff;
 }
+
+/* ════════════════════════════════════════════════════════════
+   APPEND these styles to InventoryManagement.css
+   ════════════════════════════════════════════════════════════ */
+
+/* ── Loading / error states ──────────────────────────────── */
+.inv-loading-state,
+.inv-error-state {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 1rem;
+  padding: 4rem 2rem; color: #aaa; font-size: 0.875rem;
+}
+.inv-spinner {
+  animation: inv-spin 0.9s linear infinite; color: #c4717f;
+}
+.inv-spinner-inline {
+  animation: inv-spin 0.7s linear infinite;
+}
+@keyframes inv-spin { to { transform: rotate(360deg); } }
+
+/* ── Status pin — top RIGHT so it never conflicts with ribbon ── */
+.inv-grid-status-pin {
+  position: absolute;
+  top: 8px; right: 8px;   /* ← moved to right */
+  left: auto;
+  z-index: 4;
+}
+
+/* ── Promo ribbon — bottom LEFT of image ────────────────── */
+.inv-grid-promo-ribbon {
+  position: absolute;
+  bottom: 10px; left: 0;   /* ← bottom of image, not top */
+  top: auto;
+  z-index: 3;
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  padding: 0.28rem 0.65rem 0.28rem 0.5rem;
+  background: linear-gradient(135deg, #6b2d39, #c4717f);
+  color: #fff;
+  font-size: 0.68rem; font-weight: 800;
+  letter-spacing: 0.04em;
+  border-radius: 0 20px 20px 0;
+  box-shadow: 0 2px 8px rgba(107,45,57,0.35);
+}
+
+/* ── Promo code pill below price in grid card ────────────── */
+.inv-promo-code-pill {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  margin-top: 0.4rem;
+  padding: 0.22rem 0.6rem;
+  background: rgba(14,116,144,0.08);
+  border: 1px solid rgba(14,116,144,0.2);
+  border-radius: 20px;
+  font-size: 0.69rem; font-weight: 700; color: #0e7490;
+}
+.inv-promo-code-pill-disc {
+  font-weight: 500; opacity: 0.8;
+}
+
+/* ── List row promo highlight ────────────────────────────── */
+.inv-tr-promo {
+  background: rgba(196,113,127,0.03) !important;
+  border-left: 3px solid rgba(196,113,127,0.4);
+}
+.inv-tr-promo:hover { background: rgba(196,113,127,0.06) !important; }
+
+/* ── Promo badge in list view name cell ──────────────────── */
+.inv-list-promo-badge {
+  display: inline-flex; align-items: center; gap: 0.25rem;
+  margin-top: 0.3rem;
+  padding: 0.18rem 0.5rem;
+  background: rgba(14,116,144,0.09);
+  border: 1px solid rgba(14,116,144,0.18);
+  border-radius: 20px;
+  font-size: 0.68rem; font-weight: 700; color: #0e7490;
+}
+
+/* ── Promo banner in View modal ──────────────────────────── */
+.inv-view-promo-banner {
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(14,116,144,0.08), rgba(196,113,127,0.08));
+  border: 1px solid rgba(14,116,144,0.18);
+  color: #0e7490;
+}
+.inv-view-promo-banner svg { flex-shrink: 0; color: #c4717f; }
+.inv-view-promo-banner-title {
+  font-size: 0.82rem; font-weight: 700; color: #1a1a1a;
+}
+.inv-view-promo-banner-sub {
+  font-size: 0.73rem; color: #888; margin-top: 0.15rem;
+}
+.inv-view-promo-banner-price {
+  margin-left: auto; display: flex; flex-direction: column;
+  align-items: flex-end; flex-shrink: 0;
+}
+.inv-view-promo-was {
+  font-size: 0.73rem; color: #bbb;
+  text-decoration: line-through;
+}
+.inv-view-promo-now {
+  font-size: 1rem; font-weight: 800; color: #15803d;
+}
+
+/* ── Promo card LIVE highlight ───────────────────────────── */
+.inv-promo-card-live {
+  border-color: rgba(21,128,61,0.3);
+  box-shadow: 0 0 0 1.5px rgba(21,128,61,0.12);
+}
+
+/* ── Item thumbnails inside promo card ───────────────────── */
+.inv-promo-item-thumbs {
+  display: flex; gap: 0.3rem;
+  margin-bottom: 0.6rem; flex-wrap: nowrap; overflow: hidden;
+}
+.inv-promo-item-thumb-wrap {
+  width: 40px; height: 40px; border-radius: 7px;
+  overflow: hidden; flex-shrink: 0;
+  border: 1.5px solid #eeecea;
+  background: #faf9f7; position: relative;
+}
+.inv-promo-item-thumb-img {
+  position: absolute !important; inset: 0;
+  width: 100% !important; height: 100% !important;
+  object-fit: cover !important; object-position: center top;
+}
+.inv-promo-item-thumb-more {
+  width: 40px; height: 40px; border-radius: 7px;
+  background: rgba(107,45,57,0.08); color: #6b2d39;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.72rem; font-weight: 700; flex-shrink: 0;
+  border: 1.5px solid rgba(107,45,57,0.15);
+}
+
+/* ── Saved badge in media dropzone ──────────────────────── */
+.inv-media-existing-badge {
+  position: absolute; bottom: 5px; left: 5px;
+  background: rgba(21,128,61,0.85); color: #fff;
+  font-size: 0.58rem; font-weight: 700;
+  padding: 0.12rem 0.38rem; border-radius: 4px;
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+
+/* ── Lightbox topbar (item name above image) ─────────────── */
+.inv-lightbox-topbar {
+  text-align: center; padding: 0 1rem;
+}
+.inv-lightbox-itemname {
+  display: block; font-size: 1rem; font-weight: 700;
+  color: #fff; margin-bottom: 0.2rem;
+}
+.inv-lightbox-catnote {
+  font-size: 0.75rem; color: rgba(255,255,255,0.5);
+}
+
+/* ── Lightbox footer (counter + dots) ───────────────────── */
+.inv-lightbox-footer {
+  display: flex; align-items: center; justify-content: center;
+  gap: 0.75rem; margin-top: 0.25rem;
+}
+
+/* ── Better image display in grid media area ─────────────── */
+.inv-grid-media-inner,
+.inv-list-thumb-inner {
+  object-position: center top !important;
+}
+
+/* ── Confirm Delete Modal — append to InventoryManagement.css ── */
+
+.inv-confirm-delete-body {
+  display: flex; flex-direction: column; align-items: center;
+  text-align: center; gap: 0.75rem; padding: 0.5rem 0;
+}
+
+.inv-confirm-delete-icon {
+  width: 60px; height: 60px; border-radius: 50%;
+  background: rgba(220,38,38,0.08);
+  display: flex; align-items: center; justify-content: center;
+  color: #dc2626;
+}
+
+.inv-confirm-delete-msg {
+  font-size: 0.95rem; color: #1a1a1a; margin: 0; line-height: 1.5;
+}
+
+.inv-confirm-delete-sub {
+  font-size: 0.8rem; color: #999; margin: 0; line-height: 1.55;
+}
+
+.inv-btn-delete-confirm {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  padding: 0.55rem 1.1rem; border-radius: 8px;
+  background: #dc2626; color: #fff; border: none;
+  font-size: 0.825rem; font-weight: 600; font-family: inherit;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(220,38,38,0.25);
+  transition: background 0.2s, box-shadow 0.2s;
+}
+.inv-btn-delete-confirm:hover {
+  background: #b91c1c;
+  box-shadow: 0 4px 10px rgba(220,38,38,0.35);
+}
+
+/* Styles for indeterminate checkboxes */
+.inv-group-check input[type="checkbox"]:indeterminate {
+  position: relative;
+  background-color: #6b2d39;
+}
+
+.inv-group-check input[type="checkbox"]:indeterminate::after {
+  content: "−";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+/* Selected summary bar */
+.inv-selected-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.75rem;
+  background: rgba(21, 128, 61, 0.08);
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #15803d;
+  border: 1px solid rgba(21, 128, 61, 0.15);
+}
+
+.inv-selected-summary svg {
+  flex-shrink: 0;
+}
+
+/* Empty items message */
+.inv-empty-items-message {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 2rem;
+  color: #999;
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+/* Improved checkbox item styling */
+.inv-group-item {
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 0.6rem !important;
+  padding: 0.6rem 0.75rem !important;
+  margin: 0.1rem 0;
+  border-radius: 8px !important;
+  transition: all 0.15s ease;
+}
+
+.inv-group-item:hover {
+  background: rgba(107, 45, 57, 0.06) !important;
+  transform: translateX(2px);
+}
+
+.inv-group-item input[type="checkbox"] {
+  margin-top: 0.15rem;
+  flex-shrink: 0;
+}
+
+.inv-group-item-info {
+  flex: 1;
+}
+
+.inv-group-item-name {
+  font-size: 0.85rem !important;
+  font-weight: 600 !important;
+  color: #1a1a1a;
+  margin-bottom: 0.2rem;
+}
+
+.inv-group-item-sub {
+  font-size: 0.7rem !important;
+  color: #888 !important;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+/* Subgroup header styling */
+.inv-subgroup-header {
+  transition: background 0.15s ease;
+  border-radius: 6px;
+  margin: 0.1rem 0;
+  cursor: pointer;
+}
+
+.inv-subgroup-header:hover {
+  background: #f5f2f0 !important;
+}
+
+/* Nested items indentation */
+.inv-group-items {
+  padding-left: 2.8rem !important;
+  border-left: 2px solid #f0eeec;
+  margin-left: 0.5rem;
+}
+
+/* Scrollbar styling */
+.inv-grouped-items {
+  scrollbar-width: thin;
+  scrollbar-color: #c4717f #eeecea;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.inv-grouped-items::-webkit-scrollbar {
+  width: 6px;
+}
+
+.inv-grouped-items::-webkit-scrollbar-track {
+  background: #eeecea;
+  border-radius: 10px;
+}
+
+.inv-grouped-items::-webkit-scrollbar-thumb {
+  background: #c4717f;
+  border-radius: 10px;
+}
+
+.inv-grouped-items::-webkit-scrollbar-thumb:hover {
+  background: #6b2d39;
+}
+
+/* Category header styling */
+.inv-group-header {
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.inv-group-header:hover {
+  background: #f5f2f0 !important;
+}
+
+/* Count badges */
+.inv-group-count {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #aaa;
+  background: #eeecea;
+  border-radius: 20px;
+  padding: 0.1rem 0.45rem;
+  margin-left: 0.5rem;
+}
