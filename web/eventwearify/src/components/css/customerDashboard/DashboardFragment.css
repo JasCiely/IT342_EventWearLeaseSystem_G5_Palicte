@@ -1,0 +1,62 @@
+.dashboard-grid-layout {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 25px;
+}
+
+.customer-card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid #eee;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+
+.card-heading {
+    font-size: 16px;
+    font-weight: 600;
+    color: #2b1017;
+    margin-bottom: 15px;
+}
+
+/* Featured Outfits Mini Grid */
+.featured-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+}
+
+.outfit-card-mini {
+    text-align: center;
+}
+
+.outfit-img-placeholder {
+    height: 120px;
+    background: #f7f5f5;
+    border-radius: 8px;
+    margin-bottom: 10px;
+}
+
+.btn-card-action {
+    width: 100%;
+    padding: 8px;
+    background: #421a24;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+/* Browsing History */
+.history-circles {
+    display: flex;
+    gap: 10px;
+}
+
+.circle-item {
+    width: 45px;
+    height: 55px;
+    background: #ddd;
+    border-radius: 5px;
+}

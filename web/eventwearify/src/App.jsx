@@ -8,10 +8,10 @@ import OAuth2Callback from './pages/OAuth2Callback';
 import ForgotPassword from './pages/ForgotPassword';
 
 const AdminRoute = ({ children }) => {
-  const role            = localStorage.getItem('userRole');
+  const role = localStorage.getItem('userRole');
   const isAuthenticated = localStorage.getItem('isAuthenticated');
-  const token           = localStorage.getItem('token');
-  const firstLogin      = localStorage.getItem('firstLogin');
+  const token = localStorage.getItem('token');
+  const firstLogin = localStorage.getItem('firstLogin');
 
   if (!token || !isAuthenticated || isAuthenticated === 'false' || role !== 'ADMIN')
     return <Navigate to="/auth" replace />;
@@ -22,7 +22,7 @@ const AdminRoute = ({ children }) => {
 };
 
 const AdminFirstLoginRoute = ({ children }) => {
-  const role       = localStorage.getItem('userRole');
+  const role = localStorage.getItem('userRole');
   const firstLogin = localStorage.getItem('firstLogin');
 
   if (role !== 'ADMIN') return <Navigate to="/" replace />;
@@ -33,8 +33,8 @@ const AdminFirstLoginRoute = ({ children }) => {
 
 const CustomerRoute = ({ children }) => {
   const isAuthenticated = localStorage.getItem('isAuthenticated');
-  const token           = localStorage.getItem('token');
-  const role            = localStorage.getItem('userRole');
+  const token = localStorage.getItem('token');
+  const role = localStorage.getItem('userRole');
 
   if (!token || !isAuthenticated || isAuthenticated === 'false')
     return <Navigate to="/auth" replace />;
@@ -45,8 +45,8 @@ const CustomerRoute = ({ children }) => {
 };
 
 function App() {
-
   const handleLogin = () => {
+    // Logic for post-login actions if needed
   };
 
   return (
@@ -55,15 +55,18 @@ function App() {
         <Route path="/" element={<Index />} />
         <Route path="/auth" element={<Auth onLogin={handleLogin} />} />
 
-        {/* Google OAuth2 callback — must be public, no guard */}
+        {/* Google OAuth2 callback */}
         <Route
           path="/oauth2/callback"
           element={<OAuth2Callback onLogin={handleLogin} />}
         />
 
-        {/* Customer dashboard — guarded */}
+        {/* UPDATED: Customer dashboard paths.
+            We use /customer/* so that /customer/outfits, /customer/profile, etc. 
+            all load the CustomerDashboard component.
+        */}
         <Route
-          path="/dashboard"
+          path="/customer/*"
           element={
             <CustomerRoute>
               <CustomerDashboard />
@@ -71,7 +74,7 @@ function App() {
           }
         />
 
-        {/* Admin first-login password change — guarded */}
+        {/* Admin first-login password change */}
         <Route
           path="/admin/change-password"
           element={
@@ -81,7 +84,7 @@ function App() {
           }
         />
 
-        {/* All /admin/* paths go to AdminDashboard — sidebar fragments handle the rest */}
+        {/* Admin Dashboard wildcard */}
         <Route
           path="/admin/*"
           element={
@@ -90,7 +93,12 @@ function App() {
             </AdminRoute>
           }
         />
+
         <Route path="/forgot-password" element={<ForgotPassword />} />
+        
+        {/* Default Redirect: If user goes to /dashboard, send to the new /customer/dashboard path */}
+        <Route path="/dashboard" element={<Navigate to="/customer/dashboard" replace />} />
+        
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>

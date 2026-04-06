@@ -1,0 +1,245 @@
+/* ─── Font Imports ───────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,100..900;1,100..900&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap');
+
+/* ─── Variables ──────────────────────────────────────────── */
+.cust-layout {
+  --c-header-h: 96px;
+  --c-sidebar-w: 220px;
+  --c-sidebar-collapsed: 60px;
+  --c-burgundy: #2c1219;
+  --c-accent: #c4717f;
+  --c-bg: #f5f4f1;
+  --c-text-main: #ffe6e9;
+  --c-text-dim: rgba(255, 230, 233, 0.55);
+  --c-transition: 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--c-bg);
+  
+  /* Primary UI Font (Inter) */
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── Header ────────────────────────────────────────────── */
+.cust-header {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: var(--c-header-h);
+  background: var(--c-burgundy);
+  z-index: 100;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-right: 2.5rem;
+  border-bottom: 1px solid rgba(196, 113, 127, 0.15);
+  box-shadow: 0 2px 16px rgba(44, 18, 25, 0.3);
+}
+
+.cust-header-brand {
+  width: var(--c-sidebar-w);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0 1.5rem;
+  border-right: 1px solid rgba(196, 113, 127, 0.15);
+  height: 100%;
+  transition: width var(--c-transition);
+}
+
+/* ─── Logo Styling (Added for image_a9cb88.png look) ─── */
+.cust-logo-container {
+  width: 44px;
+  height: 44px;
+  background-color: #3d1c24; /* Dark burgundy container */
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 15px rgba(196, 113, 127, 0.3); /* Subtle glow */
+}
+
+.cust-actual-logo {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+}
+
+.cust-brand-name { 
+  display: block; 
+  font-family: 'Playfair Display', serif;
+  font-weight: 700; 
+  color: var(--c-text-main); 
+  font-size: 1.1rem; 
+}
+
+.cust-brand-sub { 
+  font-family: 'Inter', sans-serif;
+  font-size: 0.65rem; 
+  font-weight: 600;
+  color: rgba(255, 230, 233, 0.35); 
+  text-transform: uppercase; 
+  letter-spacing: 0.1em; 
+}
+
+/* ─── Sidebar (Target Font Area) ────────────────────────── */
+.cust-body { 
+  display: flex; 
+  flex: 1; 
+  padding-top: var(--c-header-h); 
+}
+
+.cust-sidebar {
+  position: fixed;
+  top: var(--c-header-h); left: 0; bottom: 0;
+  width: var(--c-sidebar-w);
+  background: var(--c-burgundy);
+  transition: width var(--c-transition);
+  display: flex; flex-direction: column;
+  padding: 1.5rem 0.75rem 1rem;
+  z-index: 90;
+  border-right: 1px solid rgba(196, 113, 127, 0.1);
+}
+
+.cust-sidebar.collapsed { width: var(--c-sidebar-collapsed); }
+
+/* Sidebar "MENU" Label Styling */
+.cust-sidebar-label-text { 
+  font-family: 'Inter', sans-serif;
+  font-size: 0.7rem; 
+  color: rgba(255, 230, 233, 0.3); 
+  font-weight: 600; 
+  text-transform: uppercase; 
+  letter-spacing: 0.13em; /* This gives it the "Admin" luxury look */
+}
+
+.cust-sidebar-label { 
+  display: flex; 
+  align-items: center; 
+  gap: 0.6rem; 
+  padding: 0 0.5rem 1.25rem; 
+  border-bottom: 1px solid rgba(196, 113, 127, 0.15); 
+  margin-bottom: 0.75rem; 
+}
+
+.cust-sidebar-dot { 
+  width: 7px; height: 7px; 
+  border-radius: 50%; 
+  background: var(--c-accent); 
+  box-shadow: 0 0 7px var(--c-accent); 
+}
+
+/* Sidebar Navigation Item Styling */
+.cust-nav-item {
+  display: flex; 
+  align-items: center; 
+  gap: 0.75rem; 
+  padding: 0.65rem 0.75rem; 
+  border-radius: 8px;
+  background: transparent; 
+  border: none; 
+  cursor: pointer;
+  transition: all var(--c-transition); 
+  width: 100%; 
+  text-align: left;
+
+  /* Matches Admin Font Style */
+  font-family: 'Inter', sans-serif;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--c-text-dim);
+  letter-spacing: 0.01em;
+}
+
+.cust-nav-item:hover { 
+  background: rgba(196, 113, 127, 0.12); 
+  color: #ffe6e9; 
+}
+
+.cust-nav-item.active {
+  background: rgba(196, 113, 127, 0.2); 
+  color: #ffe6e9; 
+  font-weight: 600; /* Bold when active */
+  position: relative;
+}
+
+.cust-nav-item.active::before {
+  content: ''; 
+  position: absolute; 
+  left: 0; top: 18%; height: 64%; width: 3px; 
+  background: var(--c-accent); 
+  border-radius: 0 3px 3px 0;
+}
+
+.cust-sidebar-toggle {
+  margin-top: auto; 
+  display: flex; 
+  align-items: center; 
+  gap: 0.5rem; 
+  padding: 0.6rem 0.75rem;
+  background: transparent; 
+  border: 1px solid rgba(196, 113, 127, 0.15); 
+  color: rgba(255, 230, 233, 0.3);
+  cursor: pointer; 
+  border-radius: 8px;
+  
+  /* Matches Admin Sidebar Toggle */
+  font-family: 'Inter', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+/* ─── Main Content ──────────────────────────────────────── */
+.cust-main {
+  flex: 1;
+  margin-left: var(--c-sidebar-w);
+  padding: 2.5rem 3rem;
+  transition: margin-left var(--c-transition);
+  min-height: calc(100vh - var(--c-header-h));
+}
+
+.cust-sidebar.collapsed + .cust-main { 
+  margin-left: var(--c-sidebar-collapsed); 
+}
+
+/* ─── Buttons & Misc ────────────────────────────────────── */
+.cust-header-right { display: flex; align-items: center; gap: 1rem; }
+
+.cust-welcome-box { display: flex; flex-direction: column; align-items: flex-end; }
+.cust-welcome-greet { font-size: 0.7rem; color: rgba(255, 230, 233, 0.4); }
+.cust-welcome-name { font-size: 0.95rem; font-weight: 600; color: #ffe6e9; }
+
+.cust-divider { width: 1px; height: 28px; background: rgba(196, 113, 127, 0.2); }
+
+.cust-btn-action {
+  background: rgba(196, 113, 127, 0.18); 
+  color: #ffe6e9; 
+  border: 1px solid rgba(196, 113, 127, 0.3);
+  padding: 0.6rem 1.2rem; 
+  border-radius: 7px; 
+  display: flex; 
+  align-items: center; 
+  gap: 0.45rem; 
+  cursor: pointer;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.cust-btn-logout {
+  background: transparent; 
+  color: rgba(255, 230, 233, 0.5); 
+  border: 1px solid rgba(196, 113, 127, 0.2);
+  padding: 0.6rem 1.2rem; 
+  border-radius: 7px; 
+  display: flex; 
+  align-items: center; 
+  gap: 0.45rem; 
+  cursor: pointer;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 500;
+}

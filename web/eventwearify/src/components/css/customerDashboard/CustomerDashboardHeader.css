@@ -1,0 +1,44 @@
+.customer-header {
+    height: 80px;
+    padding: 0 40px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: transparent;
+}
+
+.header-welcome h1 {
+    margin: 0;
+    font-size: 24px;
+    color: #2b1017;
+}
+
+.header-welcome p {
+    margin: 0;
+    color: #8c8c8c;
+    font-size: 14px;
+}
+
+.header-btns {
+    display: flex;
+    gap: 15px;
+}
+
+.btn-outline {
+    padding: 10px 20px;
+    border: 1px solid #2b1017;
+    background: transparent;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.btn-filled {
+    padding: 10px 20px;
+    background: #2b1017;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+}
