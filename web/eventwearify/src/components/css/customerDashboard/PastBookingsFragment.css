@@ -1,0 +1,48 @@
+.table-container {
+    width: 100%;
+    background: white;
+    border-radius: 12px;
+    border: 1px solid #eee;
+    overflow: hidden;
+}
+
+.past-bookings-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.past-bookings-table th {
+    background: #f9f9f9;
+    padding: 15px;
+    text-align: left;
+    font-size: 13px;
+    color: #666;
+    border-bottom: 1px solid #eee;
+}
+
+.past-bookings-table td {
+    padding: 15px;
+    font-size: 14px;
+    border-bottom: 1px solid #f1f1f1;
+}
+
+.status-tag {
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.status-tag.complete {
+    background: #e6f4ea;
+    color: #1e7e34;
+}
+
+.btn-text {
+    background: none;
+    border: none;
+    color: #2b1017;
+    font-weight: 600;
+    text-decoration: underline;
+    cursor: pointer;
+}
