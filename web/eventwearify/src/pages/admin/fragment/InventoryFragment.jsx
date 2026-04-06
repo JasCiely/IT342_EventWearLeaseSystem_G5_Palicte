@@ -1,21 +1,26 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import '../../../components/css/adminDashboard/InventoryManagement.css';
 import {
   Plus, Search, Edit2, Trash2, Eye, X, Tag, Package, AlertCircle, CheckCircle,
   Percent, DollarSign, Gift, Shirt, LayoutGrid, List, Video, Image, Play, Wrench,
-  ChevronDown, ChevronLeft, ChevronRight,
+  ChevronDown, ChevronLeft, ChevronRight, Loader2, Sparkles,
 } from 'lucide-react';
 import {
-  CATEGORIES, CATEGORY_MAP, SIZES, COLORS, CAT_COLORS,
-  ITEM_STATUS_META, MANUAL_ITEM_STATUSES,
-  SEED_ITEMS, SEED_PROMOS, todayStr, fmtDate, genId,
+  CATEGORIES, CATEGORY_MAP, SIZES, COLORS, COLOR_SWATCHES, LIGHT_COLORS,
+  CAT_COLORS, ITEM_STATUS_META, MANUAL_ITEM_STATUSES,
+  todayStr, fmtDate,
+  fetchItems, fetchPromotions,
+  createItem as apiCreateItem,
+  updateItem as apiUpdateItem,
+  deleteItem as apiDeleteItem,
+  createPromotion as apiCreatePromotion,
+  updatePromotion as apiUpdatePromotion,
+  deletePromotion as apiDeletePromotion,
 } from './sharedData.js';
 
 // ────────────────────────────────────────────────────────────
 // Helpers
 // ────────────────────────────────────────────────────────────
-
-/** Normalise any item to a mediaFiles array */
 const getMediaFiles = item =>
   item.mediaFiles?.length ? item.mediaFiles
   : item.media            ? [{ url: item.media, type: item.mediaType || 'image' }]
@@ -34,14 +39,24 @@ export function StatusBadge({ status, meta = ITEM_STATUS_META }) {
   );
 }
 
+export function PromoBadge({ promo }) {
+  if (!promo) return null;
+  const savings = promo.type === 'percentage' ? `${promo.value}% off` : `₱${promo.value} off`;
+  return (
+    <span className="inv-promo-badge">
+      <Sparkles size={9}/> {promo.code} · {savings}
+    </span>
+  );
+}
+
 export function MediaThumb({ item, className = '' }) {
-  const bg       = CAT_COLORS[item.category] || '#6b2d39';
-  const files    = getMediaFiles(item);
-  const first    = files[0] || null;
+  const bg    = CAT_COLORS[item.category] || '#6b2d39';
+  const files = getMediaFiles(item);
+  const first = files[0] || null;
 
   if (!first) return (
-    <div className={`inv-media-placeholder ${className}`} style={{'--cat-color':bg}}>
-      <Shirt size={26} style={{ color:bg, opacity:0.55 }}/>
+    <div className={`inv-media-placeholder ${className}`} style={{'--cat-color': bg}}>
+      <Shirt size={28} style={{ color: bg, opacity: 0.45 }}/>
     </div>
   );
   if (first.type === 'video') return (
@@ -51,7 +66,10 @@ export function MediaThumb({ item, className = '' }) {
       <span className="inv-video-badge"><Play size={9} fill="white"/> Video</span>
     </div>
   );
-  return <img src={first.url} alt={item.name} className={`inv-media-img ${className}`}/>;
+  return (
+    <img src={first.url} alt={item.name} className={`inv-media-img ${className}`}
+         loading="lazy" style={{ objectFit:'cover', objectPosition:'center top' }}/>
+  );
 }
 
 export function Toast({ toast }) {
@@ -65,30 +83,26 @@ export function Toast({ toast }) {
 }
 
 // ────────────────────────────────────────────────────────────
-// Fullscreen Gallery Lightbox  (animated swipe left/right)
+// Fullscreen Gallery Lightbox
 // ────────────────────────────────────────────────────────────
 function MediaGallery({ item, startIndex = 0, onClose }) {
-  const files      = getMediaFiles(item);
-  const [idx,  setIdx]  = useState(startIndex);
-  const [phase, setPhase] = useState('idle'); // 'idle' | 'exit-left' | 'exit-right'
+  const files = getMediaFiles(item);
+  const [idx,   setIdx]  = useState(startIndex);
+  const [phase, setPhase] = useState('idle');
   const [next,  setNext]  = useState(null);
   const touchX = useRef(null);
 
   const go = useCallback((newIdx, dir) => {
     if (phase !== 'idle') return;
-    setNext(newIdx);
-    setPhase(dir === 'next' ? 'exit-left' : 'exit-right');
+    setNext(newIdx); setPhase(dir === 'next' ? 'exit-left' : 'exit-right');
   }, [phase]);
 
-  // After exit animation ends, swap slide
   const handleAnimEnd = () => {
     if (phase === 'idle') return;
-    setIdx(next);
-    setPhase('idle');
-    setNext(null);
+    setIdx(next); setPhase('idle'); setNext(null);
   };
 
-  const prev = useCallback(() => go((idx - 1 + files.length) % files.length, 'prev'), [idx, files.length, go]);
+  const prev      = useCallback(() => go((idx - 1 + files.length) % files.length, 'prev'), [idx, files.length, go]);
   const nextSlide = useCallback(() => go((idx + 1) % files.length, 'next'), [idx, files.length, go]);
 
   useEffect(() => {
@@ -113,9 +127,11 @@ function MediaGallery({ item, startIndex = 0, onClose }) {
   return (
     <div className="inv-lightbox" onClick={onClose}>
       <button className="inv-lightbox-close" onClick={onClose}><X size={18}/></button>
-
       <div className="inv-lightbox-inner" onClick={e => e.stopPropagation()}>
-        {/* ── Stage ── */}
+        <div className="inv-lightbox-topbar">
+          <span className="inv-lightbox-itemname">{item.name}</span>
+          <span className="inv-lightbox-catnote">{item.category}{item.subtype ? ` · ${item.subtype}` : ''} · Size {item.size}</span>
+        </div>
         <div className="inv-gallery-stage"
           onTouchStart={e => { touchX.current = e.touches[0].clientX; }}
           onTouchEnd={e => {
@@ -124,55 +140,38 @@ function MediaGallery({ item, startIndex = 0, onClose }) {
             if (Math.abs(d) > 42) d < 0 ? nextSlide() : prev();
             touchX.current = null;
           }}>
-
           <div key={idx} className={slideClass} onAnimationEnd={handleAnimEnd}>
             {current.type === 'video'
               ? <video src={current.url} controls autoPlay className="inv-lightbox-media"/>
-              : <img   src={current.url} alt={item.name}   className="inv-lightbox-media"/>}
+              : <img src={current.url} alt={item.name} className="inv-lightbox-media"
+                     style={{ objectFit:'contain', objectPosition:'center' }}/>}
           </div>
-
           {files.length > 1 && (
             <>
-              <button className="inv-gallery-arrow inv-gallery-arrow-prev"
-                onClick={e => { e.stopPropagation(); prev(); }}>
-                <ChevronLeft size={22}/>
-              </button>
-              <button className="inv-gallery-arrow inv-gallery-arrow-next"
-                onClick={e => { e.stopPropagation(); nextSlide(); }}>
-                <ChevronRight size={22}/>
-              </button>
+              <button className="inv-gallery-arrow inv-gallery-arrow-prev" onClick={e => { e.stopPropagation(); prev(); }}><ChevronLeft size={22}/></button>
+              <button className="inv-gallery-arrow inv-gallery-arrow-next" onClick={e => { e.stopPropagation(); nextSlide(); }}><ChevronRight size={22}/></button>
             </>
           )}
         </div>
-
-        {/* ── Caption ── */}
-        <div className="inv-lightbox-caption">
-          <strong>{item.name}</strong>
-          <span>{item.category}{item.subtype ? ` · ${item.subtype}` : ''} · Size {item.size} · {item.color}</span>
+        <div className="inv-lightbox-footer">
           {files.length > 1 && <span className="inv-gallery-counter">{idx + 1} / {files.length}</span>}
+          {files.length > 1 && (
+            <div className="inv-gallery-dots">
+              {files.map((_, i) => (
+                <button key={i} className={`inv-gallery-dot${i === idx ? ' active' : ''}`}
+                  onClick={e => { e.stopPropagation(); go(i, i > idx ? 'next' : 'prev'); }}/>
+              ))}
+            </div>
+          )}
         </div>
-
-        {/* ── Dot indicators ── */}
-        {files.length > 1 && (
-          <div className="inv-gallery-dots">
-            {files.map((_, i) => (
-              <button key={i}
-                className={`inv-gallery-dot${i === idx ? ' active' : ''}`}
-                onClick={e => { e.stopPropagation(); go(i, i > idx ? 'next' : 'prev'); }}/>
-            ))}
-          </div>
-        )}
-
-        {/* ── Thumbnail strip ── */}
         {files.length > 1 && (
           <div className="inv-gallery-strip">
             {files.map((f, i) => (
-              <button key={i}
-                className={`inv-gallery-strip-thumb${i === idx ? ' active' : ''}`}
+              <button key={i} className={`inv-gallery-strip-thumb${i === idx ? ' active' : ''}`}
                 onClick={e => { e.stopPropagation(); go(i, i > idx ? 'next' : 'prev'); }}>
                 {f.type === 'video'
                   ? <div className="inv-gallery-strip-video"><Play size={10} fill="white"/></div>
-                  : <img src={f.url} alt={`t${i}`}/>}
+                  : <img src={f.url} alt={`t${i}`} style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top' }}/>}
               </button>
             ))}
           </div>
@@ -183,7 +182,7 @@ function MediaGallery({ item, startIndex = 0, onClose }) {
 }
 
 // ────────────────────────────────────────────────────────────
-// Inline Gallery  (inside View modal — swipeable + strip)
+// Inline Gallery (inside View modal)
 // ────────────────────────────────────────────────────────────
 function InlineGallery({ item, onOpenFullscreen }) {
   const files  = getMediaFiles(item);
@@ -194,10 +193,8 @@ function InlineGallery({ item, onOpenFullscreen }) {
 
   const go = (newIdx, dir) => {
     if (phase !== 'idle') return;
-    setNext(newIdx);
-    setPhase(dir === 'next' ? 'exit-left' : 'exit-right');
+    setNext(newIdx); setPhase(dir === 'next' ? 'exit-left' : 'exit-right');
   };
-
   const handleAnimEnd = () => {
     if (phase === 'idle') return;
     setIdx(next); setPhase('idle'); setNext(null);
@@ -217,7 +214,6 @@ function InlineGallery({ item, onOpenFullscreen }) {
 
   return (
     <div className="inv-view-gallery">
-      {/* Main stage */}
       <div className="inv-view-gallery-stage"
         onClick={() => onOpenFullscreen(idx)}
         onTouchStart={e => { touchX.current = e.touches[0].clientX; }}
@@ -229,44 +225,35 @@ function InlineGallery({ item, onOpenFullscreen }) {
           }
           touchX.current = null;
         }}>
-
         <div key={idx} className={slideClass} onAnimationEnd={handleAnimEnd}>
           {current.type === 'video'
             ? <video src={current.url} muted preload="metadata"
-                style={{ width:'100%', height:'100%', objectFit:'cover' }}/>
-            : <img src={current.url} alt={item.name}
-                style={{ width:'100%', height:'100%', objectFit:'cover' }}/>}
+                style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover' }}/>
+            : <img src={current.url} alt={item.name} loading="lazy"
+                style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top' }}/>}
         </div>
-
         <div className="inv-view-gallery-overlay">
           <Eye size={17}/> {current.type === 'video' ? 'Play Video' : 'View Full'}
         </div>
-
         {files.length > 1 && (
           <>
             <button className="inv-gallery-arrow inv-gallery-arrow-prev sm"
-              onClick={e => { e.stopPropagation(); go((idx-1+files.length)%files.length,'prev'); }}>
-              <ChevronLeft size={15}/>
-            </button>
+              onClick={e => { e.stopPropagation(); go((idx-1+files.length)%files.length,'prev'); }}><ChevronLeft size={15}/></button>
             <button className="inv-gallery-arrow inv-gallery-arrow-next sm"
-              onClick={e => { e.stopPropagation(); go((idx+1)%files.length,'next'); }}>
-              <ChevronRight size={15}/>
-            </button>
+              onClick={e => { e.stopPropagation(); go((idx+1)%files.length,'next'); }}><ChevronRight size={15}/></button>
           </>
         )}
         {files.length > 1 && <span className="inv-view-gallery-count">{idx+1}/{files.length}</span>}
       </div>
-
-      {/* Thumbnail strip */}
       {files.length > 1 && (
         <div className="inv-view-gallery-strip">
           {files.map((f, i) => (
-            <button key={i}
-              className={`inv-view-strip-thumb${i === idx ? ' active' : ''}`}
+            <button key={i} className={`inv-view-strip-thumb${i === idx ? ' active' : ''}`}
               onClick={() => go(i, i > idx ? 'next' : 'prev')}>
               {f.type === 'video'
                 ? <div className="inv-gallery-strip-video"><Play size={9} fill="white"/></div>
-                : <img src={f.url} alt={`t${i}`}/>}
+                : <img src={f.url} alt={`t${i}`}
+                    style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top' }}/>}
             </button>
           ))}
         </div>
@@ -291,7 +278,13 @@ function MediaDropZone({ files, onChange, hasError }) {
     valid.forEach(file => {
       const reader = new FileReader();
       reader.onload = e => {
-        newOnes.push({ url: e.target.result, type: file.type.startsWith('video/') ? 'video' : 'image', name: file.name });
+        newOnes.push({
+          file,
+          url:  e.target.result,
+          type: file.type.startsWith('video/') ? 'video' : 'image',
+          name: file.name,
+          isExisting: false,
+        });
         done++;
         if (done === valid.length) onChange([...files, ...newOnes]);
       };
@@ -305,14 +298,13 @@ function MediaDropZone({ files, onChange, hasError }) {
 
   return (
     <div className="inv-multi-dropzone-wrap">
-      {/* Drop target */}
       <div className={`inv-dropzone${drag?' dragging':''}${hasError?' inv-dropzone-error':''}`}
         onClick={() => ref.current.click()}
         onDragOver={e => { e.preventDefault(); setDrag(true); }}
         onDragLeave={() => setDrag(false)}
         onDrop={e => { e.preventDefault(); setDrag(false); addFiles(e.dataTransfer.files); }}>
         <div className="inv-dropzone-hint">
-          <div className="inv-dropzone-icons"><Image size={20}/><span>+</span><Video size={20}/></div>
+          <div className="inv-dropzone-icons"><Image size={22}/><span>+</span><Video size={22}/></div>
           <span>{files.length > 0 ? 'Add more photos / videos' : 'Drop images or videos, or click to browse'}</span>
           <small>JPEG · PNG · MP4 · MOV · multiple files allowed</small>
           {hasError && (
@@ -324,19 +316,20 @@ function MediaDropZone({ files, onChange, hasError }) {
         <input ref={ref} type="file" accept="image/*,video/*" multiple style={{ display:'none' }}
                onChange={e => { addFiles(e.target.files); e.target.value=''; }}/>
       </div>
-
-      {/* Preview grid */}
       {files.length > 0 && (
         <div className="inv-media-preview-grid">
           {files.map((f, i) => (
             <div key={i} className={`inv-media-preview-item${i===0?' primary':''}`}>
               {f.type === 'video'
                 ? <div className="inv-media-preview-video">
-                    <video src={f.url} muted preload="metadata" style={{ width:'100%',height:'100%',objectFit:'cover' }}/>
+                    <video src={f.url} muted preload="metadata"
+                      style={{ width:'100%', height:'100%', objectFit:'cover' }}/>
                     <span className="inv-video-badge"><Play size={8} fill="white"/> Video</span>
                   </div>
-                : <img src={f.url} alt={`media-${i}`}/>}
+                : <img src={f.url} alt={`media-${i}`}
+                    style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top' }}/>}
               {i === 0 && <span className="inv-media-preview-primary-badge">Cover</span>}
+              {f.isExisting && <span className="inv-media-existing-badge">Saved</span>}
               <div className="inv-media-preview-actions">
                 <button title="Move left"  onClick={e=>moveLeft(i,e)}  disabled={i===0}><ChevronLeft size={11}/></button>
                 <button title="Move right" onClick={e=>moveRight(i,e)} disabled={i===files.length-1}><ChevronRight size={11}/></button>
@@ -351,15 +344,23 @@ function MediaDropZone({ files, onChange, hasError }) {
 }
 
 // ────────────────────────────────────────────────────────────
-// Grouped Item Checkboxes (promo modal)
-// • Clicking the category checkbox selects-all AND auto-opens
-// • Items are further grouped by subtype inside each category
+// Grouped Item Checkboxes (promo modal) - COMPLETE FIXED VERSION
 // ────────────────────────────────────────────────────────────
 function GroupedItemCheckboxes({ items, selected, onChange }) {
-  const [openCats,     setOpenCats]     = useState({});
-  const [openSubtypes, setOpenSubtypes] = useState({});
+  // Initialize with ALL categories OPEN by default, subcategories CLOSED initially
+  const [openCats, setOpenCats] = useState(() => {
+    const initial = {};
+    CATEGORIES.forEach(cat => {
+      initial[cat] = true; // Categories open by default
+    });
+    return initial;
+  });
+  
+  const [openSubtypes, setOpenSubtypes] = useState(() => {
+    return {}; // All subcategories start CLOSED
+  });
 
-  // Build: { category: { subtype: [items] } }
+  // Group items by category and subtype
   const grouped = CATEGORIES.reduce((acc, cat) => {
     const ci = items.filter(i => i.category === cat);
     if (!ci.length) return acc;
@@ -373,53 +374,85 @@ function GroupedItemCheckboxes({ items, selected, onChange }) {
     return acc;
   }, {});
 
-  const catItems   = cat => Object.values(grouped[cat] || {}).flat();
-  const isCatAll   = cat => catItems(cat).every(i => selected.includes(i.id));
-  const isCatPart  = cat => catItems(cat).some(i => selected.includes(i.id)) && !isCatAll(cat);
+  const catItems = cat => Object.values(grouped[cat] || {}).flat();
+  const isCatAll = cat => catItems(cat).length > 0 && catItems(cat).every(i => selected.includes(i.id));
+  const isCatPart = cat => {
+    const catItemIds = catItems(cat).map(i => i.id);
+    const selectedInCat = selected.filter(id => catItemIds.includes(id)).length;
+    return selectedInCat > 0 && selectedInCat < catItems(cat).length;
+  };
+  
+  const isStAll = (cat, st) => {
+    const stItems = grouped[cat][st] || [];
+    return stItems.length > 0 && stItems.every(i => selected.includes(i.id));
+  };
+  
+  const isStPart = (cat, st) => {
+    const stItems = grouped[cat][st] || [];
+    const selectedInSt = stItems.filter(i => selected.includes(i.id)).length;
+    return selectedInSt > 0 && selectedInSt < stItems.length;
+  };
 
-  const isStAll    = (cat, st) => (grouped[cat][st] || []).every(i => selected.includes(i.id));
-  const isStPart   = (cat, st) => (grouped[cat][st] || []).some(i => selected.includes(i.id)) && !isStAll(cat, st);
-
-  // Clicking category checkbox → toggle all + auto-open if selecting
   const toggleCatAll = cat => {
     const ids = catItems(cat).map(i => i.id);
     const willSelect = !isCatAll(cat);
-    willSelect
-      ? onChange([...new Set([...selected, ...ids])])
-      : onChange(selected.filter(id => !ids.includes(id)));
-    // Auto-open when selecting, keep open if already open
-    if (willSelect) setOpenCats(p => ({ ...p, [cat]: true }));
+    if (willSelect) {
+      onChange([...new Set([...selected, ...ids])]);
+    } else {
+      onChange(selected.filter(id => !ids.includes(id)));
+    }
   };
-
+  
   const toggleStAll = (cat, st) => {
     const ids = (grouped[cat][st] || []).map(i => i.id);
-    isStAll(cat, st)
-      ? onChange(selected.filter(id => !ids.includes(id)))
-      : onChange([...new Set([...selected, ...ids])]);
-    if (!isStAll(cat, st)) setOpenSubtypes(p => ({ ...p, [`${cat}__${st}`]: true }));
+    if (isStAll(cat, st)) {
+      onChange(selected.filter(id => !ids.includes(id)));
+    } else {
+      onChange([...new Set([...selected, ...ids])]);
+    }
   };
-
-  const toggleItem    = id  => onChange(selected.includes(id) ? selected.filter(x => x !== id) : [...selected, id]);
+  
+  const toggleItem = id => {
+    onChange(selected.includes(id) ? selected.filter(x => x !== id) : [...selected, id]);
+  };
+  
   const toggleCatOpen = cat => setOpenCats(p => ({ ...p, [cat]: !p[cat] }));
-  const toggleStOpen  = key => setOpenSubtypes(p => ({ ...p, [key]: !p[key] }));
+  const toggleStOpen = key => setOpenSubtypes(p => ({ ...p, [key]: !p[key] }));
+
+  // Calculate total selected items count
+  const totalSelected = selected.length;
 
   return (
     <div className="inv-grouped-items">
+      {totalSelected > 0 && (
+        <div className="inv-selected-summary">
+          <CheckCircle size={12} />
+          <span>{totalSelected} item{totalSelected !== 1 ? 's' : ''} selected</span>
+        </div>
+      )}
+      
       {Object.entries(grouped).map(([cat, subtypeMap]) => {
         const allCatItems = catItems(cat);
         const selectedCount = allCatItems.filter(i => selected.includes(i.id)).length;
         const subtypes = Object.keys(subtypeMap);
-
+        const catChecked = isCatAll(cat);
+        const catIndeterminate = isCatPart(cat);
+        
         return (
           <div key={cat} className="inv-group">
-            {/* ── Category row ── */}
             <div className="inv-group-header" onClick={() => toggleCatOpen(cat)}>
               <label className="inv-group-check" onClick={e => e.stopPropagation()}>
-                <input type="checkbox"
-                  checked={isCatAll(cat)}
-                  ref={el => { if (el) el.indeterminate = isCatPart(cat); }}
+                <input 
+                  type="checkbox"
+                  checked={catChecked}
+                  ref={el => {
+                    if (el) {
+                      el.indeterminate = catIndeterminate;
+                    }
+                  }}
                   onChange={() => toggleCatAll(cat)}
-                  style={{ accentColor:'#6b2d39' }}/>
+                  style={{ accentColor: '#6b2d39' }}
+                />
               </label>
               <span className="inv-group-cat">
                 <span className="inv-cat-dot" style={{ background: CAT_COLORS[cat] || '#6b2d39' }}/>
@@ -428,25 +461,31 @@ function GroupedItemCheckboxes({ items, selected, onChange }) {
               </span>
               <ChevronDown size={13} className={`inv-group-chevron${openCats[cat] ? ' open' : ''}`}/>
             </div>
-
-            {/* ── Category content: subtypes ── */}
+            
             {openCats[cat] && (
               <div className="inv-group-subtypes">
                 {subtypes.map(st => {
-                  const stKey   = `${cat}__${st}`;
+                  const stKey = `${cat}__${st}`;
                   const stItems = subtypeMap[st];
                   const stSelCount = stItems.filter(i => selected.includes(i.id)).length;
-
+                  const stChecked = isStAll(cat, st);
+                  const stIndeterminate = isStPart(cat, st);
+                  
                   return (
                     <div key={st} className="inv-subgroup">
-                      {/* Subtype header row */}
                       <div className="inv-subgroup-header" onClick={() => toggleStOpen(stKey)}>
                         <label className="inv-group-check" onClick={e => e.stopPropagation()}>
-                          <input type="checkbox"
-                            checked={isStAll(cat, st)}
-                            ref={el => { if (el) el.indeterminate = isStPart(cat, st); }}
+                          <input 
+                            type="checkbox"
+                            checked={stChecked}
+                            ref={el => {
+                              if (el) {
+                                el.indeterminate = stIndeterminate;
+                              }
+                            }}
                             onChange={() => toggleStAll(cat, st)}
-                            style={{ accentColor:'#6b2d39' }}/>
+                            style={{ accentColor: '#6b2d39' }}
+                          />
                         </label>
                         <span className="inv-subgroup-label">
                           {st}
@@ -454,19 +493,22 @@ function GroupedItemCheckboxes({ items, selected, onChange }) {
                         </span>
                         <ChevronDown size={11} className={`inv-group-chevron${openSubtypes[stKey] ? ' open' : ''}`}/>
                       </div>
-
-                      {/* Items under this subtype */}
+                      
                       {openSubtypes[stKey] && (
                         <div className="inv-group-items">
                           {stItems.map(item => (
                             <label key={item.id} className="inv-checkbox-item inv-group-item">
-                              <input type="checkbox"
+                              <input 
+                                type="checkbox"
                                 checked={selected.includes(item.id)}
                                 onChange={() => toggleItem(item.id)}
-                                style={{ accentColor:'#6b2d39' }}/>
+                                style={{ accentColor: '#6b2d39' }}
+                              />
                               <div className="inv-group-item-info">
                                 <span className="inv-group-item-name">{item.name}</span>
-                                <span className="inv-group-item-sub">Size {item.size} · {item.color} · ₱{item.price.toLocaleString()}</span>
+                                <span className="inv-group-item-sub">
+                                  Size: {item.size} · Color: {item.color} · ₱{item.price.toLocaleString()}
+                                </span>
                               </div>
                             </label>
                           ))}
@@ -480,39 +522,72 @@ function GroupedItemCheckboxes({ items, selected, onChange }) {
           </div>
         );
       })}
+      
+      {Object.keys(grouped).length === 0 && (
+        <div className="inv-empty-items-message">
+          <AlertCircle size={16} />
+          <span>No items available. Please add items first.</span>
+        </div>
+      )}
     </div>
   );
 }
 
 // ════════════════════════════════════════════════════════════
-// MAIN FRAGMENT
+// MAIN FRAGMENT - Optimized with instant rendering
 // ════════════════════════════════════════════════════════════
 export default function InventoryFragment() {
-  const [items,  setItems]  = useState(SEED_ITEMS);
-  const [promos, setPromos] = useState(SEED_PROMOS);
+  const [items,     setItems]     = useState([]);
+  const [promos,    setPromos]    = useState([]);
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [loadError, setLoadError] = useState('');
 
   const [categoryMap, setCategoryMap] = useState(() => {
     const map = {};
     CATEGORIES.forEach(cat => { map[cat] = [...(CATEGORY_MAP[cat]||[])]; });
-    SEED_ITEMS.forEach(item => {
-      if (item.subtype && item.subtype !== 'Others' && map[item.category]) {
-        if (!map[item.category].includes(item.subtype)) {
-          const oi = map[item.category].indexOf('Others');
-          oi >= 0 ? map[item.category].splice(oi,0,item.subtype) : map[item.category].push(item.subtype);
-        }
-      }
-    });
     return map;
   });
 
+  // Use useEffect with immediate data fetching but no loading state
+  useEffect(() => {
+    const load = async () => {
+      setLoadError('');
+      try {
+        const [itemsData, promosData] = await Promise.all([fetchItems(), fetchPromotions()]);
+        setItems(itemsData);
+        setPromos(promosData);
+        itemsData.forEach(item => {
+          if (item.subtype && item.subtype !== 'Others') {
+            const defaults = CATEGORY_MAP[item.category] || [];
+            if (!defaults.includes(item.subtype)) {
+              setCategoryMap(prev => {
+                const list = prev[item.category] || [];
+                if (list.includes(item.subtype)) return prev;
+                const oi = list.indexOf('Others');
+                const upd = [...list];
+                oi >= 0 ? upd.splice(oi, 0, item.subtype) : upd.push(item.subtype);
+                return { ...prev, [item.category]: upd };
+              });
+            }
+          }
+        });
+        setIsInitialized(true);
+      } catch (err) {
+        setLoadError(err.message || 'Failed to load inventory data.');
+        setIsInitialized(true); // Still mark as initialized to show error state
+      }
+    };
+    load();
+  }, []);
+
   const registerSubtype = (category, subtype) => {
-    if (!subtype || subtype==='Others') return;
+    if (!subtype || subtype === 'Others') return;
     setCategoryMap(prev => {
-      const list = prev[category]||[];
+      const list = prev[category] || [];
       if (list.includes(subtype)) return prev;
       const oi = list.indexOf('Others');
       const upd = [...list];
-      oi >= 0 ? upd.splice(oi,0,subtype) : upd.push(subtype);
+      oi >= 0 ? upd.splice(oi, 0, subtype) : upd.push(subtype);
       return { ...prev, [category]: upd };
     });
   };
@@ -535,18 +610,29 @@ export default function InventoryFragment() {
   const [sortDir,       setSortDir]       = useState('asc');
   const [modal,         setModal]         = useState(null);
   const [selected,      setSelected]      = useState(null);
-  const [gallery,       setGallery]       = useState(null);   // { item, startIndex }
+  const [gallery,       setGallery]       = useState(null);
   const [toast,         setToast]         = useState({ show:false, type:'success', message:'' });
   const [errors,        setErrors]        = useState({});
   const [customSubtype, setCustomSubtype] = useState('');
+  const [saving,        setSaving]        = useState(false);
+
+  // ── Confirm delete state ──────────────────────────────────
+  const [confirmDelete, setConfirmDelete] = useState(null);
 
   const blank      = { name:'', category:'', subtype:'', size:'', color:'Ivory', price:'', status:'Available', mediaFiles:[], ageRange:'', description:'' };
   const blankPromo = { code:'', type:'percentage', value:'', items:[], start:'', end:'', active:true };
   const [form,      setForm]      = useState(blank);
   const [promoForm, setPromoForm] = useState(blankPromo);
 
-  const showToast  = (type, msg) => { setToast({show:true,type,message:msg}); setTimeout(()=>setToast({show:false,type:'success',message:''}),3000); };
-  const closeModal = () => { setModal(null); setSelected(null); setErrors({}); setCustomSubtype(''); };
+  const showToast = useCallback((type, msg) => {
+    setToast({ show: true, type, message: msg });
+    const timer = setTimeout(() => {
+      setToast({ show: false, type: 'success', message: '' });
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const closeModal = () => { setModal(null); setSelected(null); setErrors({}); setCustomSubtype(''); setSaving(false); };
   const setF  = v => setForm(p=>({...p,...v}));
   const setPF = v => setPromoForm(p=>({...p,...v}));
 
@@ -562,77 +648,150 @@ export default function InventoryFragment() {
 
   const validatePromo = () => {
     const e = {};
-    if (!promoForm.code.trim())  e.code  = 'Promo code is required.';
-    if (!promoForm.value||Number(promoForm.value)<=0) e.value='Value is required.';
-    if (!promoForm.start)        e.start = 'Valid From date is required.';
-    if (!promoForm.end)          e.end   = 'Valid Until date is required.';
-    if (promoForm.start&&promoForm.end&&promoForm.end<promoForm.start) e.end='End date must be after start date.';
+    if (!promoForm.code.trim())                                        e.code  = 'Promo code is required.';
+    if (!promoForm.value || Number(promoForm.value) <= 0)             e.value = 'Value is required.';
+    if (!promoForm.start)                                              e.start = 'Valid From date is required.';
+    if (!promoForm.end)                                                e.end   = 'Valid Until date is required.';
+    if (promoForm.start&&promoForm.end&&promoForm.end<promoForm.start) e.end   = 'End date must be after start date.';
     setErrors(e);
-    return Object.keys(e).length===0;
+    return Object.keys(e).length === 0;
   };
 
-  const saveItem = () => {
-    const finalSubtype = form.subtype==='Others' ? (customSubtype.trim()||'Others') : form.subtype;
+  // ── Active promo helpers ──────────────────────────────────
+  const activePromo = useCallback(item => {
+    const now = todayStr();
+    return promos.find(p =>
+      p.active &&
+      Array.isArray(p.items) &&
+      p.items.includes(item.id) &&
+      p.start <= now &&
+      p.end   >= now
+    );
+  }, [promos]);
+
+  const discPrice = item => {
+    const p = activePromo(item);
+    if (!p) return item.price;
+    return p.type === 'percentage' ? item.price * (1 - p.value / 100) : item.price - p.value;
+  };
+
+  // ── Save Item ─────────────────────────────────────────────
+  const saveItem = async () => {
+    const finalSubtype = form.subtype === 'Others' ? (customSubtype.trim() || 'Others') : form.subtype;
     const finalForm    = { ...form, subtype: finalSubtype };
 
     const e = {};
-    if (!finalForm.mediaFiles?.length)                           e.media    = 'At least one photo or video is required.';
-    if (!finalForm.name.trim())                                  e.name     = 'Item name is required.';
-    if (!finalForm.category)                                     e.category = 'Category is required.';
-    if (!finalForm.subtype||finalForm.subtype==='Others')        e.subtype  = 'Please specify the type.';
-    if (!finalForm.size)                                         e.size     = 'Size is required.';
-    if (!finalForm.price||Number(finalForm.price)<=0)           e.price    = 'Valid price is required.';
+    if (!finalForm.mediaFiles?.length)                        e.media    = 'At least one photo or video is required.';
+    if (!finalForm.name.trim())                               e.name     = 'Item name is required.';
+    if (!finalForm.category)                                  e.category = 'Category is required.';
+    if (!finalForm.subtype || finalForm.subtype === 'Others') e.subtype  = 'Please specify the type.';
+    if (!finalForm.size)                                      e.size     = 'Size is required.';
+    if (!finalForm.price || Number(finalForm.price) <= 0)    e.price    = 'Valid price is required.';
     if (Object.keys(e).length) { setErrors(e); return; }
 
-    const defaultSubs = CATEGORY_MAP[finalForm.category]||[];
-    if (finalSubtype && finalSubtype!=='Others' && !defaultSubs.includes(finalSubtype))
-      registerSubtype(finalForm.category, finalSubtype);
+    setSaving(true);
 
-    if (modal==='add') {
-      setItems(p=>[...p, { ...finalForm, id:`I${genId()}`, price:Number(finalForm.price) }]);
-      showToast('success','Item added!');
-    } else {
-      setItems(p=>p.map(i=>i.id===selected.id ? { ...finalForm, id:selected.id, price:Number(finalForm.price) } : i));
-      showToast('success','Item updated!');
+    const keepUrls = finalForm.mediaFiles.filter(f => f.isExisting).map(f => f.url);
+    const newFiles = finalForm.mediaFiles.filter(f => !f.isExisting).map(f => f.file);
+
+    const itemData = {
+      name: finalForm.name, category: finalForm.category,
+      subtype: finalSubtype, size: finalForm.size, color: finalForm.color,
+      price: Number(finalForm.price), status: finalForm.status,
+      ageRange: finalForm.ageRange, description: finalForm.description,
+    };
+
+    try {
+      if (modal === 'add') {
+        const created = await apiCreateItem(itemData, newFiles);
+        setItems(p => [...p, created]);
+        showToast('success', 'Item added!');
+      } else {
+        const updated = await apiUpdateItem(selected.id, itemData, newFiles, keepUrls);
+        setItems(p => p.map(i => i.id === selected.id ? updated : i));
+        showToast('success', 'Item updated!');
+      }
+      const defaultSubs = CATEGORY_MAP[finalForm.category] || [];
+      if (finalSubtype && finalSubtype !== 'Others' && !defaultSubs.includes(finalSubtype))
+        registerSubtype(finalForm.category, finalSubtype);
+      closeModal();
+    } catch (err) {
+      showToast('error', err.message || 'Failed to save item.');
+    } finally {
+      setSaving(false);
     }
-    closeModal();
   };
 
-  const deleteItem = id => { setItems(p=>p.filter(i=>i.id!==id)); showToast('success','Item deleted.'); };
+  // ── Delete helpers with immediate UI update ───────────────
+  const askDeleteItem  = item  => setConfirmDelete({ type: 'item',  id: item.id,   name: item.name });
+  const askDeletePromo = promo => setConfirmDelete({ type: 'promo', id: promo.id,  name: promo.code });
 
-  const savePromo = () => {
+  const handleConfirmedDelete = async () => {
+    if (!confirmDelete) return;
+    const { type, id, name } = confirmDelete;
+    
+    // Close modal immediately
+    setConfirmDelete(null);
+    
+    try {
+      if (type === 'item') {
+        // Optimistically update UI first
+        setItems(prev => prev.filter(i => i.id !== id));
+        await apiDeleteItem(id);
+        showToast('success', `"${name}" deleted successfully.`);
+      } else {
+        // Optimistically update UI first
+        setPromos(prev => prev.filter(p => p.id !== id));
+        await apiDeletePromotion(id);
+        showToast('success', `Promo "${name}" deleted successfully.`);
+      }
+    } catch (err) {
+      // If deletion fails, revert the optimistic update
+      showToast('error', err.message || 'Failed to delete.');
+      // Refresh data to ensure consistency
+      try {
+        const [itemsData, promosData] = await Promise.all([fetchItems(), fetchPromotions()]);
+        setItems(itemsData);
+        setPromos(promosData);
+      } catch (refreshErr) {
+        console.error('Failed to refresh data:', refreshErr);
+      }
+    }
+  };
+
+  const savePromo = async () => {
     if (!validatePromo()) return;
-    if (selected) {
-      setPromos(p=>p.map(x=>x.id===selected.id ? { ...promoForm,id:selected.id,value:Number(promoForm.value) } : x));
-      showToast('success','Promo updated!');
-    } else {
-      setPromos(p=>[...p, { ...promoForm,id:`P${genId()}`,value:Number(promoForm.value) }]);
-      showToast('success','Promo created!');
+    setSaving(true);
+    try {
+      if (selected) {
+        const updated = await apiUpdatePromotion(selected.id, promoForm);
+        setPromos(p => p.map(x => x.id === selected.id ? updated : x));
+        showToast('success', 'Promo updated!');
+      } else {
+        const created = await apiCreatePromotion(promoForm);
+        setPromos(p => [...p, created]);
+        showToast('success', 'Promo created!');
+      }
+      closeModal();
+    } catch (err) {
+      showToast('error', err.message || 'Failed to save promo.');
+    } finally {
+      setSaving(false);
     }
-    closeModal();
-  };
-
-  const activePromo = item => {
-    const now = todayStr();
-    return promos.find(p=>p.active&&p.items.includes(item.id)&&p.start<=now&&p.end>=now);
-  };
-  const discPrice = item => {
-    const p = activePromo(item);
-    return p ? (p.type==='percentage' ? item.price*(1-p.value/100) : item.price-p.value) : item.price;
   };
 
   const displayed = items
     .filter(i => {
-      const q=search.toLowerCase();
-      return (!q||i.name.toLowerCase().includes(q)||i.category.toLowerCase().includes(q)||(i.subtype||'').toLowerCase().includes(q))
-        && (filterCat==='All'||i.category===filterCat)
-        && (filterSubtype==='All'||i.subtype===filterSubtype)
-        && (filterStat==='All'||i.status===filterStat);
+      const q = search.toLowerCase();
+      return (!q || i.name.toLowerCase().includes(q) || i.category.toLowerCase().includes(q) || (i.subtype||'').toLowerCase().includes(q))
+        && (filterCat     === 'All' || i.category === filterCat)
+        && (filterSubtype === 'All' || i.subtype  === filterSubtype)
+        && (filterStat    === 'All' || i.status   === filterStat);
     })
-    .sort((a,b) => {
-      let va=a[sortBy],vb=b[sortBy];
-      if(typeof va==='string'){va=va.toLowerCase();vb=vb.toLowerCase();}
-      return sortDir==='asc'?(va>vb?1:-1):(va<vb?1:-1);
+    .sort((a, b) => {
+      let va = a[sortBy], vb = b[sortBy];
+      if (typeof va === 'string') { va = va.toLowerCase(); vb = vb.toLowerCase(); }
+      return sortDir === 'asc' ? (va > vb ? 1 : -1) : (va < vb ? 1 : -1);
     });
 
   const toggleSort = col => { if(sortBy===col) setSortDir(d=>d==='asc'?'desc':'asc'); else{setSortBy(col);setSortDir('asc');} };
@@ -644,29 +803,52 @@ export default function InventoryFragment() {
     maintenance: items.filter(i=>i.status==='Maintenance').length,
   };
 
-  const ErrMsg = ({ field }) => errors[field] ? <span className="inv-field-error">{errors[field]}</span> : null;
-
-  // Subtype dropdown helpers for add/edit modal
-  const _subtypeUsed    = form.category ? [...new Set(items.filter(i=>i.category===form.category&&i.subtype&&i.subtype!=='Others').map(i=>i.subtype))] : [];
-  const _subtypeFull    = form.category ? [...(categoryMap[form.category]||[])] : [];
-  const _subtypeVisible = _subtypeFull.filter(s=>s==='Others'||_subtypeUsed.includes(s));
-  if (selected?.subtype&&selected.subtype!=='Others'&&!_subtypeVisible.includes(selected.subtype)) {
-    const _idx=_subtypeVisible.indexOf('Others');
-    _idx>=0?_subtypeVisible.splice(_idx,0,selected.subtype):_subtypeVisible.push(selected.subtype);
-  }
-  const _subtypeSelectVal  = _subtypeVisible.includes(form.subtype)?form.subtype:(form.subtype&&form.subtype!=='Others'?'Others':(form.subtype||''));
-  const _subtypeShowCustom = form.subtype==='Others';
-
-  // ── Open edit from view modal ──
   const openEdit = item => {
-    const defaultSubs = CATEGORY_MAP[item.category]||[];
-    const isCustom = item.subtype && !defaultSubs.includes(item.subtype) && item.subtype!=='Others';
+    const defaultSubs = CATEGORY_MAP[item.category] || [];
+    const isCustom    = item.subtype && !defaultSubs.includes(item.subtype) && item.subtype !== 'Others';
     setCustomSubtype(isCustom ? item.subtype : '');
     closeModal();
-    setForm({ ...item, mediaFiles: getMediaFiles(item) });
+    const existingMedia = getMediaFiles(item).map(mf => ({
+      file: null, url: mf.url, type: mf.type,
+      name: mf.url.split('/').pop(), isExisting: true,
+    }));
+    setForm({ ...item, price: String(item.price), mediaFiles: existingMedia });
     setSelected(item); setErrors({}); setModal('edit');
   };
 
+  const ErrMsg = ({ field }) => errors[field]
+    ? <span className="inv-field-error"><AlertCircle size={11}/> {errors[field]}</span>
+    : null;
+
+  // Subtype dropdown — always show all CATEGORY_MAP defaults
+  const _subtypeVisible = form.category ? [...(CATEGORY_MAP[form.category] || [])] : [];
+  if (form.category) {
+    items
+      .filter(i => i.category === form.category && i.subtype && i.subtype !== 'Others')
+      .forEach(i => {
+        if (!_subtypeVisible.includes(i.subtype)) {
+          const oi = _subtypeVisible.indexOf('Others');
+          oi >= 0 ? _subtypeVisible.splice(oi, 0, i.subtype) : _subtypeVisible.push(i.subtype);
+        }
+      });
+  }
+  if (selected?.subtype && selected.subtype !== 'Others' && !_subtypeVisible.includes(selected.subtype)) {
+    const _idx = _subtypeVisible.indexOf('Others');
+    _idx >= 0 ? _subtypeVisible.splice(_idx, 0, selected.subtype) : _subtypeVisible.push(selected.subtype);
+  }
+  const _subtypeSelectVal  = _subtypeVisible.includes(form.subtype) ? form.subtype : (form.subtype && form.subtype !== 'Others' ? 'Others' : (form.subtype || ''));
+  const _subtypeShowCustom = form.subtype === 'Others';
+
+  // Show error state if needed, otherwise render content immediately
+  if (loadError && isInitialized) return (
+    <div className="inv-root inv-error-state">
+      <AlertCircle size={28} color="#dc2626"/>
+      <p>{loadError}</p>
+      <button className="inv-btn-primary" onClick={() => window.location.reload()}>Retry</button>
+    </div>
+  );
+
+  // Always render content - no loading spinner
   return (
     <div className="inv-root">
 
@@ -691,7 +873,7 @@ export default function InventoryFragment() {
           { label:'Maintenance',  value:stats.maintenance, icon:Wrench,      color:'#9a3412' },
         ].map(({ label,value,icon:Icon,color }) => (
           <div className="inv-stat-card" key={label}>
-            <div className="inv-stat-icon" style={{ background:`${color}18`,color }}><Icon size={18}/></div>
+            <div className="inv-stat-icon" style={{ background:`${color}18`, color }}><Icon size={18}/></div>
             <div><div className="inv-stat-value">{value}</div><div className="inv-stat-label">{label}</div></div>
           </div>
         ))}
@@ -707,7 +889,6 @@ export default function InventoryFragment() {
       {/* ════ ITEMS TAB ════ */}
       {tab==='items' && (
         <div className="inv-card">
-          {/* Toolbar */}
           <div className="inv-toolbar">
             <div className="inv-search-wrap">
               <Search size={13} className="inv-search-icon"/>
@@ -735,37 +916,56 @@ export default function InventoryFragment() {
             </div>
           </div>
 
-          {/* Grid */}
+          {/* ── GRID VIEW ── */}
           {viewMode==='grid' && (
             <div className="inv-grid">
               {displayed.length===0 && <div className="inv-empty-grid">No items found.</div>}
               {displayed.map(item => {
-                const promo=activePromo(item), disc=discPrice(item);
-                const mFiles=getMediaFiles(item);
+                const promo  = activePromo(item);
+                const disc   = discPrice(item);
+                const mFiles = getMediaFiles(item);
                 return (
-                  <div key={item.id} className="inv-grid-card">
+                  <div key={item.id} className={`inv-grid-card${promo?' has-promo':''}`}>
                     <div className="inv-grid-media" onClick={()=>mFiles.length&&setGallery({item,startIndex:0})}>
                       <MediaThumb item={item} className="inv-grid-media-inner"/>
-                      {mFiles.length>0&&<div className="inv-grid-media-overlay"><Eye size={16}/> View</div>}
-                      {mFiles.length>1&&<span className="inv-grid-photo-count"><Image size={9}/> {mFiles.length}</span>}
+                      {mFiles.length>0 && <div className="inv-grid-media-overlay"><Eye size={16}/> View {mFiles.length>1?`(${mFiles.length})`:''}</div>}
+                      {mFiles.length>1 && <span className="inv-grid-photo-count"><Image size={9}/> {mFiles.length}</span>}
+                      {/* Status — top-right */}
                       <div className="inv-grid-status-pin"><StatusBadge status={item.status}/></div>
-                      {promo&&<div className="inv-grid-promo-pin"><Tag size={9}/> {promo.code}</div>}
+                      {/* Promo ribbon — bottom-left */}
+                      {promo && (
+                        <div className="inv-grid-promo-ribbon">
+                          <Sparkles size={9}/>
+                          {promo.type==='percentage' ? `${promo.value}% OFF` : `₱${promo.value} OFF`}
+                        </div>
+                      )}
                     </div>
                     <div className="inv-grid-info">
                       <div className="inv-grid-name">{item.name}</div>
                       <div className="inv-grid-meta">
                         <span className="inv-cat-tag">{item.category}</span>
-                        {item.subtype&&<span className="inv-subtype-tag">{item.subtype}</span>}
+                        {item.subtype && <span className="inv-subtype-tag">{item.subtype}</span>}
                         <span className="inv-grid-size">{item.size}</span>
                       </div>
                       <div className="inv-grid-price-row">
-                        {promo?<><span className="inv-price-old">₱{item.price.toLocaleString()}</span><span className="inv-price-new">₱{Math.round(disc).toLocaleString()}</span></>:<span className="inv-price">₱{item.price.toLocaleString()}</span>}
+                        {promo ? (
+                          <><span className="inv-price-old">₱{item.price.toLocaleString()}</span><span className="inv-price-new">₱{Math.round(disc).toLocaleString()}</span></>
+                        ) : (
+                          <span className="inv-price">₱{item.price.toLocaleString()}</span>
+                        )}
                       </div>
+                      {promo && (
+                        <div className="inv-promo-code-pill">
+                          <Sparkles size={9}/>
+                          <span>{promo.code}</span>
+                          <span className="inv-promo-code-pill-disc">{promo.type==='percentage'?`${promo.value}% off`:`₱${promo.value} off`}</span>
+                        </div>
+                      )}
                     </div>
                     <div className="inv-grid-actions">
                       <button className="inv-icon-btn" title="View"   onClick={()=>{ setSelected(item); setModal('view'); }}><Eye size={13}/></button>
                       <button className="inv-icon-btn" title="Edit"   onClick={()=>openEdit(item)}><Edit2 size={13}/></button>
-                      <button className="inv-icon-btn danger" title="Delete" onClick={()=>deleteItem(item.id)}><Trash2 size={13}/></button>
+                      <button className="inv-icon-btn danger" title="Delete" onClick={()=>askDeleteItem(item)}><Trash2 size={13}/></button>
                     </div>
                   </div>
                 );
@@ -773,48 +973,68 @@ export default function InventoryFragment() {
             </div>
           )}
 
-          {/* List */}
+          {/* ── LIST VIEW ── */}
           {viewMode==='list' && (
             <div className="inv-table-wrap">
               <table className="inv-table">
                 <thead>
                   <tr>
-                    <th style={{width:68}}>Media</th>
+                    <th style={{width:72}}>Photo</th>
                     <th className="inv-th-sort" onClick={()=>toggleSort('name')}>Name {sortBy==='name'?(sortDir==='asc'?'↑':'↓'):<span style={{opacity:0.3}}>↕</span>}</th>
                     <th className="inv-th-sort" onClick={()=>toggleSort('category')}>Category {sortBy==='category'?(sortDir==='asc'?'↑':'↓'):<span style={{opacity:0.3}}>↕</span>}</th>
                     <th>Type</th><th>Size</th>
                     <th className="inv-th-sort" onClick={()=>toggleSort('price')}>Price {sortBy==='price'?(sortDir==='asc'?'↑':'↓'):<span style={{opacity:0.3}}>↕</span>}</th>
-                    <th>Status</th><th style={{width:100}}>Actions</th>
+                    <th>Status</th>
+                    <th style={{width:100}}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {displayed.length===0&&<tr><td colSpan={8} className="inv-empty">No items found.</td></tr>}
+                  {displayed.length===0 && <tr><td colSpan={8} className="inv-empty">No items found.</td></tr>}
                   {displayed.map(item => {
-                    const promo=activePromo(item),disc=discPrice(item);
-                    const mFiles=getMediaFiles(item);
+                    const promo  = activePromo(item);
+                    const disc   = discPrice(item);
+                    const mFiles = getMediaFiles(item);
                     return (
-                      <tr key={item.id} className="inv-tr">
+                      <tr key={item.id} className={`inv-tr${promo?' inv-tr-promo':''}`}>
                         <td>
                           <div className="inv-list-thumb" onClick={()=>mFiles.length&&setGallery({item,startIndex:0})}>
                             <MediaThumb item={item} className="inv-list-thumb-inner"/>
-                            {mFiles.length>0&&<div className="inv-list-thumb-overlay"><Eye size={12}/></div>}
-                            {mFiles.length>1&&<span className="inv-list-photo-count">{mFiles.length}</span>}
+                            {mFiles.length>0 && <div className="inv-list-thumb-overlay"><Eye size={12}/></div>}
+                            {mFiles.length>1 && <span className="inv-list-photo-count">{mFiles.length}</span>}
                           </div>
                         </td>
                         <td>
                           <div className="inv-item-name">{item.name}</div>
-                          {promo&&<span className="inv-promo-tag"><Tag size={9}/> {promo.code}</span>}
+                          {promo && (
+                            <div className="inv-list-promo-badge">
+                              <Sparkles size={9}/>
+                              <span>{promo.code}</span>
+                              <span>·</span>
+                              <span>{promo.type==='percentage'?`${promo.value}% off`:`₱${promo.value} off`}</span>
+                            </div>
+                          )}
                         </td>
                         <td><span className="inv-cat-tag">{item.category}</span></td>
                         <td><span className="inv-subtype-tag">{item.subtype}</span></td>
                         <td>{item.size}</td>
-                        <td>{promo?<div><div className="inv-price-old">₱{item.price.toLocaleString()}</div><div className="inv-price-new">₱{Math.round(disc).toLocaleString()}</div></div>:<span className="inv-price">₱{item.price.toLocaleString()}</span>}</td>
+                        <td>
+                          {promo ? (
+                            <div>
+                              <div className="inv-price-old">₱{item.price.toLocaleString()}</div>
+                              <div className="inv-price-new">₱{Math.round(disc).toLocaleString()}</div>
+                            </div>
+                          ) : (
+                            <span className="inv-price">₱{item.price.toLocaleString()}</span>
+                          )}
+                        </td>
                         <td><StatusBadge status={item.status}/></td>
-                        <td><div className="inv-row-actions">
-                          <button className="inv-icon-btn" onClick={()=>{ setSelected(item); setModal('view'); }}><Eye size={13}/></button>
-                          <button className="inv-icon-btn" onClick={()=>openEdit(item)}><Edit2 size={13}/></button>
-                          <button className="inv-icon-btn danger" onClick={()=>deleteItem(item.id)}><Trash2 size={13}/></button>
-                        </div></td>
+                        <td>
+                          <div className="inv-row-actions">
+                            <button className="inv-icon-btn" onClick={()=>{ setSelected(item); setModal('view'); }}><Eye size={13}/></button>
+                            <button className="inv-icon-btn" onClick={()=>openEdit(item)}><Edit2 size={13}/></button>
+                            <button className="inv-icon-btn danger" onClick={()=>askDeleteItem(item)}><Trash2 size={13}/></button>
+                          </div>
+                        </td>
                       </tr>
                     );
                   })}
@@ -828,25 +1048,39 @@ export default function InventoryFragment() {
       {/* ════ PROMOS TAB ════ */}
       {tab==='promos' && (
         <div className="inv-card">
-          {promos.length===0&&<div className="inv-empty">No promotions yet.</div>}
+          {promos.length===0 && <div className="inv-empty">No promotions yet.</div>}
           <div className="inv-promo-grid">
             {promos.map(promo => {
-              const applicable=items.filter(i=>promo.items.includes(i.id));
+              const applicable = items.filter(i => promo.items.includes(i.id));
+              const now = todayStr();
+              const isLive = promo.active && promo.start <= now && promo.end >= now;
               return (
-                <div key={promo.id} className="inv-promo-card">
+                <div key={promo.id} className={`inv-promo-card${isLive?' inv-promo-card-live':''}`}>
                   <div className="inv-promo-card-header">
                     <div className="inv-promo-icon">{promo.type==='percentage'?<Percent size={15}/>:<DollarSign size={15}/>}</div>
                     <div>
                       <div className="inv-promo-code">{promo.code}</div>
                       <div className="inv-promo-value">{promo.type==='percentage'?`${promo.value}% off`:`₱${promo.value} off`}</div>
                     </div>
-                    <span className={`inv-promo-active ${promo.active?'on':'off'}`}>{promo.active?'Active':'Off'}</span>
+                    <span className={`inv-promo-active ${isLive?'on':'off'}`}>{isLive?'Live':'Off'}</span>
                   </div>
                   <div className="inv-promo-dates">{fmtDate(promo.start)} — {fmtDate(promo.end)}</div>
-                  <div className="inv-promo-items">{applicable.map(i=><span key={i.id} className="inv-promo-item-tag">{i.name}</span>)}</div>
+                  {applicable.length > 0 && (
+                    <div className="inv-promo-item-thumbs">
+                      {applicable.slice(0,5).map(i => (
+                        <div key={i.id} className="inv-promo-item-thumb-wrap" title={i.name}>
+                          <MediaThumb item={i} className="inv-promo-item-thumb-img"/>
+                        </div>
+                      ))}
+                      {applicable.length > 5 && <div className="inv-promo-item-thumb-more">+{applicable.length-5}</div>}
+                    </div>
+                  )}
+                  <div className="inv-promo-items">
+                    {applicable.map(i=><span key={i.id} className="inv-promo-item-tag">{i.name}</span>)}
+                  </div>
                   <div className="inv-promo-card-actions">
                     <button className="inv-btn-sm outline" onClick={()=>{ setSelected(promo); setPromoForm({...promo}); setErrors({}); setModal('promo'); }}><Edit2 size={10}/> Edit</button>
-                    <button className="inv-btn-sm danger"  onClick={()=>{ setPromos(p=>p.filter(x=>x.id!==promo.id)); showToast('success','Promo deleted.'); }}><Trash2 size={10}/> Delete</button>
+                    <button className="inv-btn-sm danger"  onClick={()=>askDeletePromo(promo)}><Trash2 size={10}/> Delete</button>
                   </div>
                 </div>
               );
@@ -861,11 +1095,9 @@ export default function InventoryFragment() {
           <div className="inv-modal" onClick={e=>e.stopPropagation()}>
             <div className="inv-modal-header">
               <h3>{modal==='add'?'Add New Item':'Edit Item'}</h3>
-              <button className="inv-modal-close" onClick={closeModal}><X size={15}/></button>
+              <button className="inv-modal-close" onClick={closeModal} disabled={saving}><X size={15}/></button>
             </div>
             <div className="inv-modal-body">
-
-              {/* Multi-photo upload */}
               <div className="inv-field">
                 <label className="inv-field-label">Photos / Videos <span className="inv-required">*</span></label>
                 <MediaDropZone
@@ -873,182 +1105,206 @@ export default function InventoryFragment() {
                   hasError={!!errors.media}
                   onChange={files=>{ setF({mediaFiles:files}); setErrors(p=>({...p,media:undefined})); }}
                 />
-                {errors.media&&<span className="inv-field-error"><AlertCircle size={11}/> {errors.media}</span>}
+                {errors.media && <span className="inv-field-error"><AlertCircle size={11}/> {errors.media}</span>}
               </div>
-
               <p className="inv-required-note"><span className="inv-required">*</span> Required fields</p>
-
               <div className="inv-modal-grid">
-                {/* Name */}
                 <div className="inv-field inv-field-full">
                   <label className="inv-field-label">Item Name <span className="inv-required">*</span></label>
-                  <input className={`inv-input${errors.name?' inv-input-err':''}`} value={form.name} onChange={e=>setF({name:e.target.value})} placeholder="e.g. Ivory Lace Ballgown"/>
+                  <input className={`inv-input${errors.name?' inv-input-err':''}`} value={form.name}
+                    onChange={e=>{ setF({name:e.target.value}); setErrors(p=>({...p,name:undefined})); }}
+                    placeholder="e.g. Ivory Lace Ballgown" disabled={saving}/>
                   <ErrMsg field="name"/>
                 </div>
-
-                {/* Category + Subtype */}
                 <div className="inv-field-full inv-modal-grid" style={{gap:'0.75rem'}}>
                   <div className="inv-field">
                     <label className="inv-field-label">Category <span className="inv-required">*</span></label>
                     <select className={`inv-input${errors.category?' inv-input-err':''}`} value={form.category}
-                      onChange={e=>{ setF({category:e.target.value,subtype:''}); setErrors(p=>({...p,category:undefined,subtype:undefined})); }}>
+                      onChange={e=>{ 
+                        setF({category:e.target.value, subtype:''}); 
+                        setErrors(p=>({...p,category:undefined,subtype:undefined}));
+                      }}
+                      disabled={saving}>
                       <option value="">— Select category —</option>
                       {CATEGORIES.map(c=><option key={c}>{c}</option>)}
                     </select>
                     <ErrMsg field="category"/>
+                    {!form.category && (
+                      <span className="inv-field-hint" style={{color:'#c4717f', marginTop:'0.25rem'}}>
+                        ⚠ Please select a category first to see available types
+                      </span>
+                    )}
                   </div>
-                  {form.category&&(
+                  {form.category && form.category !== '' && (
                     <div className="inv-field">
                       <label className="inv-field-label">Type / Subtype <span className="inv-required">*</span></label>
                       <select className={`inv-input${errors.subtype?' inv-input-err':''}`} value={_subtypeSelectVal}
-                        onChange={e=>{ setF({subtype:e.target.value}); setCustomSubtype(''); setErrors(p=>({...p,subtype:undefined})); }}>
+                        onChange={e=>{ 
+                          setF({subtype:e.target.value}); 
+                          setCustomSubtype(''); 
+                          setErrors(p=>({...p,subtype:undefined}));
+                        }}
+                        disabled={saving}>
                         <option value="">— Select type —</option>
                         {_subtypeVisible.map(s=><option key={s}>{s}</option>)}
                       </select>
-                      {_subtypeShowCustom&&(
+                      {_subtypeShowCustom && (
                         <input className="inv-input" style={{marginTop:'0.5rem'}} value={customSubtype}
-                          onChange={e=>setCustomSubtype(e.target.value)} placeholder="Type new subtype…"/>
+                          onChange={e=>setCustomSubtype(e.target.value)} 
+                          placeholder="Type new subtype…" 
+                          disabled={saving}/>
                       )}
                       <ErrMsg field="subtype"/>
+                      <span className="inv-field-hint">
+                        Select a type or choose "Others" to add a new one
+                      </span>
                     </div>
                   )}
                 </div>
-
-                {/* Size */}
                 <div className="inv-field">
                   <label className="inv-field-label">Size <span className="inv-required">*</span></label>
                   <select className={`inv-input${errors.size?' inv-input-err':''}`} value={form.size}
-                    onChange={e=>{ setF({size:e.target.value}); setErrors(p=>({...p,size:undefined})); }}>
+                    onChange={e=>{ setF({size:e.target.value}); setErrors(p=>({...p,size:undefined})); }}
+                    disabled={saving}>
                     <option value="">— Select size —</option>
                     {SIZES.map(s=><option key={s}>{s}</option>)}
                   </select>
                   <ErrMsg field="size"/>
                 </div>
-
-                {/* Color */}
                 <div className="inv-field">
                   <label className="inv-field-label">Color</label>
                   <div className="inv-color-wrap">
                     <div className="inv-color-swatches">
                       {COLORS.map(c => {
-                        const sw={Ivory:'#fffff0',Black:'#1a1a1a',Navy:'#001f5b',Burgundy:'#6b2d39',Champagne:'#f7e7ce',Emerald:'#50c878','Rose Gold':'#b76e79',Silver:'#c0c0c0'}[c]||'#ccc';
+                        const sw = COLOR_SWATCHES[c] || '#ccc';
+                        const isLight = LIGHT_COLORS.includes(c);
                         return (
-                          <button key={c} type="button" className={`inv-swatch${form.color===c?' active':''}`}
-                            style={{background:sw,border:['Ivory','Champagne','Silver'].includes(c)?'1.5px solid #e4e2df':'1.5px solid transparent'}}
-                            title={c} onClick={()=>setF({color:c})}>
-                            {form.color===c&&<span className="inv-swatch-check" style={{color:['Ivory','Champagne','Silver'].includes(c)?'#555':'#fff'}}>✓</span>}
+                          <button key={c} type="button"
+                            className={`inv-swatch${form.color===c?' active':''}`}
+                            style={{ background:sw, border: isLight ? '1.5px solid #e4e2df' : '1.5px solid transparent' }}
+                            title={c} onClick={()=>setF({color:c})} disabled={saving}>
+                            {form.color===c && <span className="inv-swatch-check" style={{color: isLight ? '#555' : '#fff'}}>✓</span>}
                           </button>
                         );
                       })}
                     </div>
-                    <input className="inv-input inv-color-input" value={form.color} onChange={e=>setF({color:e.target.value})} placeholder="Or type a color…"/>
+                    <input className="inv-input inv-color-input" value={form.color}
+                      onChange={e=>setF({color:e.target.value})} placeholder="Or type a color…" disabled={saving}/>
                   </div>
                 </div>
-
-                {/* Price */}
                 <div className="inv-field">
                   <label className="inv-field-label">Rental Price (₱) <span className="inv-required">*</span></label>
                   <input className={`inv-input${errors.price?' inv-input-err':''}`} type="number" min="0" value={form.price}
-                    onChange={e=>{ setF({price:e.target.value}); setErrors(p=>({...p,price:undefined})); }} placeholder="0"/>
+                    onChange={e=>{ setF({price:e.target.value}); setErrors(p=>({...p,price:undefined})); }}
+                    placeholder="0" disabled={saving}/>
                   <ErrMsg field="price"/>
                 </div>
-
-                {/* Status */}
                 <div className="inv-field">
                   <label className="inv-field-label">Status</label>
-                  <select className="inv-input" value={form.status} onChange={e=>setF({status:e.target.value})}>
+                  <select className="inv-input" value={form.status} onChange={e=>setF({status:e.target.value})} disabled={saving}>
                     {MANUAL_ITEM_STATUSES.map(s=><option key={s}>{s}</option>)}
                   </select>
                   <span className="inv-field-hint">Note: "Ready for Rental" is set automatically after inspection.</span>
                 </div>
-
-                {/* Estimated Age Range — optional */}
                 <div className="inv-field">
                   <label className="inv-field-label">
                     Estimated Age Range
                     <span className="inv-optional-tag">optional</span>
                   </label>
                   <div className="inv-age-range-wrap">
-                    <input
-                      className="inv-input inv-age-input"
-                      type="number" min="0" max="120"
+                    <input className="inv-input inv-age-input" type="number" min="0" max="120"
                       value={form.ageRange?.split('–')[0] || ''}
-                      onChange={e => {
-                        const from = e.target.value;
-                        const to   = form.ageRange?.split('–')[1] || '';
-                        setF({ ageRange: from || to ? `${from}–${to}` : '' });
-                      }}
-                      placeholder="From"
-                    />
+                      onChange={e => { const from=e.target.value; const to=form.ageRange?.split('–')[1]||''; setF({ageRange:from||to?`${from}–${to}`:''}); }}
+                      placeholder="From" disabled={saving}/>
                     <span className="inv-age-sep">–</span>
-                    <input
-                      className="inv-input inv-age-input"
-                      type="number" min="0" max="120"
+                    <input className="inv-input inv-age-input" type="number" min="0" max="120"
                       value={form.ageRange?.split('–')[1] || ''}
-                      onChange={e => {
-                        const to   = e.target.value;
-                        const from = form.ageRange?.split('–')[0] || '';
-                        setF({ ageRange: from || to ? `${from}–${to}` : '' });
-                      }}
-                      placeholder="To"
-                    />
+                      onChange={e => { const to=e.target.value; const from=form.ageRange?.split('–')[0]||''; setF({ageRange:from||to?`${from}–${to}`:''}); }}
+                      placeholder="To" disabled={saving}/>
                     <span className="inv-age-unit">yrs</span>
                   </div>
                   <span className="inv-field-hint">e.g. 18–35 yrs — helps clients find the right fit</span>
                 </div>
-
-                {/* Description */}
                 <div className="inv-field inv-field-full">
                   <label className="inv-field-label">Description</label>
-                  <textarea className="inv-textarea" rows={3} value={form.description} onChange={e=>setF({description:e.target.value})} placeholder="Describe the item…"/>
+                  <textarea className="inv-textarea" rows={3} value={form.description}
+                    onChange={e=>setF({description:e.target.value})}
+                    placeholder="Describe the item…" disabled={saving}/>
                 </div>
               </div>
             </div>
             <div className="inv-modal-footer">
-              <button className="inv-btn-ghost" onClick={closeModal}>Cancel</button>
-              <button className="inv-btn-primary" onClick={saveItem}>{modal==='add'?'Add Item':'Save Changes'}</button>
+              <button className="inv-btn-ghost" onClick={closeModal} disabled={saving}>Cancel</button>
+              <button className="inv-btn-primary" onClick={saveItem} disabled={saving}>
+                {saving ? <><Loader2 size={13} className="inv-spinner-inline"/> Saving…</> : (modal==='add'?'Add Item':'Save Changes')}
+              </button>
             </div>
           </div>
         </div>
       )}
 
       {/* ══ MODAL: View Item ══ */}
-      {modal==='view' && selected && (
-        <div className="inv-overlay" onClick={closeModal}>
-          <div className="inv-modal inv-modal-view" onClick={e=>e.stopPropagation()}>
-            <div className="inv-modal-header">
-              <h3>Item Details</h3>
-              <button className="inv-modal-close" onClick={closeModal}><X size={15}/></button>
-            </div>
-            <div className="inv-modal-body">
-              {/* Swipeable inline gallery */}
-              <InlineGallery
-                item={selected}
-                onOpenFullscreen={idx => setGallery({ item: selected, startIndex: idx })}
-              />
-              <div className="inv-view-details">
-                <div style={{display:'flex',alignItems:'center',gap:'0.75rem',flexWrap:'wrap'}}>
-                  <h4 className="inv-view-name">{selected.name}</h4>
-                  <StatusBadge status={selected.status}/>
+      {modal==='view' && selected && (() => {
+        const promo = activePromo(selected);
+        const disc  = discPrice(selected);
+        return (
+          <div className="inv-overlay" onClick={closeModal}>
+            <div className="inv-modal inv-modal-view" onClick={e=>e.stopPropagation()}>
+              <div className="inv-modal-header">
+                <h3>Item Details</h3>
+                <button className="inv-modal-close" onClick={closeModal}><X size={15}/></button>
+              </div>
+              <div className="inv-modal-body">
+                <InlineGallery item={selected} onOpenFullscreen={idx=>setGallery({item:selected,startIndex:idx})}/>
+                <div className="inv-view-details">
+                  <div style={{display:'flex',alignItems:'center',gap:'0.75rem',flexWrap:'wrap'}}>
+                    <h4 className="inv-view-name">{selected.name}</h4>
+                    <StatusBadge status={selected.status}/>
+                  </div>
+                  {promo && (
+                    <div className="inv-view-promo-banner">
+                      <Sparkles size={14}/>
+                      <div>
+                        <div className="inv-view-promo-banner-title">Promo Active: <strong>{promo.code}</strong></div>
+                        <div className="inv-view-promo-banner-sub">
+                          {promo.type==='percentage' ? `${promo.value}% discount applied` : `₱${promo.value} flat discount applied`}
+                          {' · '}Valid until {fmtDate(promo.end)}
+                        </div>
+                      </div>
+                      <div className="inv-view-promo-banner-price">
+                        <span className="inv-view-promo-was">₱{selected.price.toLocaleString()}</span>
+                        <span className="inv-view-promo-now">₱{Math.round(disc).toLocaleString()}</span>
+                      </div>
+                    </div>
+                  )}
+                  <div className="inv-view-grid">
+                    {[
+                      ['Category',     selected.category],
+                      ['Type',         selected.subtype],
+                      ['Size',         selected.size],
+                      ['Color',        selected.color],
+                      ['Age Range',    selected.ageRange],
+                      ['Rental Price', promo
+                        ? <><span style={{textDecoration:'line-through',color:'#bbb',marginRight:'0.4rem'}}>₱{selected.price.toLocaleString()}</span><strong style={{color:'#15803d'}}>₱{Math.round(disc).toLocaleString()}</strong></>
+                        : `₱${selected.price.toLocaleString()}`],
+                    ].map(([k,v])=>v?(
+                      <div key={k} className="inv-view-row">
+                        <span className="inv-view-key">{k}</span>
+                        <span className="inv-view-val">{v}</span>
+                      </div>
+                    ):null)}
+                  </div>
+                  {selected.description && <p className="inv-view-desc">{selected.description}</p>}
                 </div>
-                <div className="inv-view-grid">
-                  {[['Category',selected.category],['Type',selected.subtype],['Size',selected.size],['Color',selected.color],['Age Range',selected.ageRange],['Rental Price',`₱${selected.price.toLocaleString()}`]].map(([k,v])=>v?(
-                    <div key={k} className="inv-view-row"><span className="inv-view-key">{k}</span><span className="inv-view-val">{v}</span></div>
-                  ):null)}
-                </div>
-                {selected.description&&<p className="inv-view-desc">{selected.description}</p>}
-                {activePromo(selected)&&(
-                  <div className="inv-view-promo"><Gift size={12}/><span>Promo <strong>{activePromo(selected).code}</strong> — <strong>₱{Math.round(discPrice(selected)).toLocaleString()}</strong> after discount</span></div>
-                )}
+              </div>
+              <div className="inv-modal-footer">
+                <button className="inv-btn-ghost" onClick={closeModal}>Close</button>
+                <button className="inv-btn-primary" onClick={()=>openEdit(selected)}><Edit2 size={13}/> Edit</button>
               </div>
             </div>
-            <div className="inv-modal-footer">
-              <button className="inv-btn-ghost" onClick={closeModal}>Close</button>
-              <button className="inv-btn-primary" onClick={()=>openEdit(selected)}><Edit2 size={13}/> Edit</button>
-            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ══ MODAL: Promo ══ */}
       {modal==='promo' && (
@@ -1056,7 +1312,7 @@ export default function InventoryFragment() {
           <div className="inv-modal" onClick={e=>e.stopPropagation()}>
             <div className="inv-modal-header">
               <h3>{selected?'Edit Promotion':'New Promotion'}</h3>
-              <button className="inv-modal-close" onClick={closeModal}><X size={15}/></button>
+              <button className="inv-modal-close" onClick={closeModal} disabled={saving}><X size={15}/></button>
             </div>
             <div className="inv-modal-body">
               <p className="inv-required-note"><span className="inv-required">*</span> Required fields</p>
@@ -1064,12 +1320,13 @@ export default function InventoryFragment() {
                 <div className="inv-field">
                   <label className="inv-field-label">Promo Code <span className="inv-required">*</span></label>
                   <input className={`inv-input${errors.code?' inv-input-err':''}`} value={promoForm.code}
-                    onChange={e=>{ setPF({code:e.target.value.toUpperCase()}); setErrors(p=>({...p,code:undefined})); }} placeholder="e.g. SUMMER20"/>
+                    onChange={e=>{ setPF({code:e.target.value.toUpperCase()}); setErrors(p=>({...p,code:undefined})); }}
+                    placeholder="e.g. SUMMER20" disabled={saving}/>
                   <ErrMsg field="code"/>
                 </div>
                 <div className="inv-field">
                   <label className="inv-field-label">Discount Type <span className="inv-required">*</span></label>
-                  <select className="inv-input" value={promoForm.type} onChange={e=>setPF({type:e.target.value})}>
+                  <select className="inv-input" value={promoForm.type} onChange={e=>setPF({type:e.target.value})} disabled={saving}>
                     <option value="percentage">Percentage (%)</option>
                     <option value="flat">Flat Amount (₱)</option>
                   </select>
@@ -1078,12 +1335,12 @@ export default function InventoryFragment() {
                   <label className="inv-field-label">Value <span className="inv-required">*</span></label>
                   <input className={`inv-input${errors.value?' inv-input-err':''}`} type="number" min="0" value={promoForm.value}
                     onChange={e=>{ setPF({value:e.target.value}); setErrors(p=>({...p,value:undefined})); }}
-                    placeholder={promoForm.type==='percentage'?'e.g. 20':'e.g. 500'}/>
+                    placeholder={promoForm.type==='percentage'?'e.g. 20':'e.g. 500'} disabled={saving}/>
                   <ErrMsg field="value"/>
                 </div>
                 <div className="inv-field">
                   <label className="inv-field-label">Status <span className="inv-required">*</span></label>
-                  <select className="inv-input" value={String(promoForm.active)} onChange={e=>setPF({active:e.target.value==='true'})}>
+                  <select className="inv-input" value={String(promoForm.active)} onChange={e=>setPF({active:e.target.value==='true'})} disabled={saving}>
                     <option value="true">Active</option>
                     <option value="false">Inactive</option>
                   </select>
@@ -1092,13 +1349,13 @@ export default function InventoryFragment() {
                 <div className="inv-field">
                   <label className="inv-field-label">Valid From <span className="inv-required">*</span></label>
                   <input className={`inv-input${errors.start?' inv-input-err':''}`} type="date" value={promoForm.start}
-                    onChange={e=>{ setPF({start:e.target.value}); setErrors(p=>({...p,start:undefined})); }}/>
+                    onChange={e=>{ setPF({start:e.target.value}); setErrors(p=>({...p,start:undefined})); }} disabled={saving}/>
                   <ErrMsg field="start"/>
                 </div>
                 <div className="inv-field">
                   <label className="inv-field-label">Valid Until <span className="inv-required">*</span></label>
                   <input className={`inv-input${errors.end?' inv-input-err':''}`} type="date" min={promoForm.start} value={promoForm.end}
-                    onChange={e=>{ setPF({end:e.target.value}); setErrors(p=>({...p,end:undefined})); }}/>
+                    onChange={e=>{ setPF({end:e.target.value}); setErrors(p=>({...p,end:undefined})); }} disabled={saving}/>
                   <ErrMsg field="end"/>
                 </div>
                 <div className="inv-field inv-field-full">
@@ -1107,23 +1364,66 @@ export default function InventoryFragment() {
                     Expand a category to select specific items. Select the category checkbox to toggle all.
                   </span>
                   <GroupedItemCheckboxes items={items} selected={promoForm.items} onChange={ids=>setPF({items:ids})}/>
-                  {promoForm.items.length>0&&(
-                    <div className="inv-promo-selected-count">
-                      <CheckCircle size={11}/> {promoForm.items.length} item{promoForm.items.length!==1?'s':''} selected
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
             <div className="inv-modal-footer">
-              <button className="inv-btn-ghost" onClick={closeModal}>Cancel</button>
-              <button className="inv-btn-primary" onClick={savePromo}>{selected?'Save Changes':'Create Promo'}</button>
+              <button className="inv-btn-ghost" onClick={closeModal} disabled={saving}>Cancel</button>
+              <button className="inv-btn-primary" onClick={savePromo} disabled={saving}>
+                {saving ? <><Loader2 size={13} className="inv-spinner-inline"/> Saving…</> : (selected?'Save Changes':'Create Promo')}
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Fullscreen gallery */}
+      {/* ══ MODAL: Confirm Delete ══ */}
+      {confirmDelete && (
+        <div className="inv-overlay" onClick={() => setConfirmDelete(null)}>
+          <div className="inv-modal inv-modal-sm" onClick={e => e.stopPropagation()}>
+            <div className="inv-modal-header">
+              <h3>Confirm Delete</h3>
+              <button className="inv-modal-close" onClick={() => setConfirmDelete(null)}><X size={15}/></button>
+            </div>
+            <div className="inv-modal-body">
+              <div className="inv-confirm-delete-body">
+                <div className="inv-confirm-delete-icon">
+                  <Trash2 size={28}/>
+                </div>
+                <p className="inv-confirm-delete-msg">
+                  Are you sure you want to delete <strong>"{confirmDelete.name}"</strong>?
+                </p>
+                <p className="inv-confirm-delete-sub">
+                  {confirmDelete.type === 'item'
+                    ? 'This will permanently remove the item and all its photos from storage. This cannot be undone.'
+                    : 'This will permanently remove the promotion. This cannot be undone.'}
+                </p>
+              </div>
+            </div>
+            <div className="inv-modal-footer">
+              <button 
+                className="inv-btn-ghost" 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setConfirmDelete(null);
+                }}
+              >
+                Cancel
+              </button>
+              <button 
+                className="inv-btn-delete-confirm" 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleConfirmedDelete();
+                }}
+              >
+                <Trash2 size={13}/> Yes, Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {gallery && <MediaGallery item={gallery.item} startIndex={gallery.startIndex} onClose={()=>setGallery(null)}/>}
       <Toast toast={toast}/>
     </div>
