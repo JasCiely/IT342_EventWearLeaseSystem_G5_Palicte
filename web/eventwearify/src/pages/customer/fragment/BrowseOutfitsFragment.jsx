@@ -1,5 +1,5 @@
-// BrowseOutfitsFragment.jsx (updated - remove login, fix filters)
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+// BrowseOutfitsFragment.jsx - Ultra-optimized for immediate display
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   Search, ChevronDown, LayoutGrid, List, Eye, Calendar,
   CheckCircle, AlertCircle, X, ChevronLeft, ChevronRight,
@@ -7,6 +7,7 @@ import {
   Loader2, ShoppingBag
 } from 'lucide-react';
 import '../../../components/css/customerDashboard/BrowseOutfitsFragment.css';
+import { fetchItems, fetchPromotions, bookFitting, getUserBookings } from '../../../services/inventoryApi';
 
 // ────────────────────────────────────────────────────────────
 // Shared Data
@@ -18,34 +19,18 @@ const ITEM_STATUS_META = {
   'Reserved': { color: '#1d4ed8', bg: 'rgba(29,78,216,0.1)', dot: '#3b82f6' }
 };
 
-const CAT_COLORS = { 'Gown': '#c4717f', 'Suit': '#6b2d39', 'Traditional': '#b45309', 'Accessories': '#486581' };
+const CAT_COLORS = { 
+  'Gown': '#c4717f', 
+  'Suit': '#6b2d39', 
+  'Traditional': '#b45309', 
+  'Accessories': '#486581' 
+};
 
 const todayStr = () => new Date().toISOString().split('T')[0];
 const fmtDate = (date) => date ? new Date(date).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' }) : '';
 const fmtDateTime = (date, time) => {
   if (!date) return '';
   return `${new Date(date).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })} at ${time}`;
-};
-
-// Mock API
-const fetchItems = async () => {
-  await new Promise(resolve => setTimeout(resolve, 500));
-  return [
-    { id: 1, name: "Ivory Lace Ballgown", category: "Gown", subtype: "Wedding Gown", size: "M", color: "Ivory", price: 4500, status: "Available", ageRange: "20-35", description: "Elegant ivory lace ballgown with sweetheart neckline and chapel train.", mediaFiles: [{ url: "https://images.unsplash.com/photo-1539008835657-9e8e9680c956?w=400", type: "image" }] },
-    { id: 2, name: "Navy Blue Tuxedo", category: "Suit", subtype: "Tuxedo", size: "L", color: "Navy", price: 8000, status: "Available", ageRange: "25-45", description: "Classic navy blue tuxedo with satin lapels.", mediaFiles: [{ url: "https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=400", type: "image" }] },
-    { id: 3, name: "Champagne Off-Shoulder", category: "Gown", subtype: "Ball Gown", size: "S", color: "Champagne", price: 5000, status: "Reserved", ageRange: "18-30", description: "Champagne colored off-shoulder gown with ruffled details.", mediaFiles: [{ url: "https://images.unsplash.com/photo-1566174053879-31528523f8ae?w=400", type: "image" }] },
-    { id: 4, name: "Barong Tagalog", category: "Traditional", subtype: "Barong", size: "M", color: "White", price: 3500, status: "Available", ageRange: "20-60", description: "Hand-embroidered barong tagalog made from piña fabric.", mediaFiles: [{ url: "https://images.unsplash.com/photo-1615044736721-8b4f92faffd7?w=400", type: "image" }] },
-    { id: 5, name: "Corset Wedding Gown", category: "Gown", subtype: "Wedding Gown", size: "XS", color: "Ivory", price: 6200, status: "Available", ageRange: "20-35", description: "Romantic corset wedding gown with 3D floral appliqués.", mediaFiles: [{ url: "https://images.unsplash.com/photo-1594552072238-0d5f7f025d2c?w=400", type: "image" }] },
-    { id: 6, name: "Gray Three-Piece Suit", category: "Suit", subtype: "Business", size: "XL", color: "Gray", price: 5500, status: "Maintenance", ageRange: "30-50", description: "Sharp gray three-piece suit for formal business events.", mediaFiles: [{ url: "https://images.unsplash.com/photo-1594938298603-c8148c4dae35?w=400", type: "image" }] },
-  ];
-};
-
-const fetchPromotions = async () => {
-  await new Promise(resolve => setTimeout(resolve, 300));
-  return [
-    { id: 1, code: "WEDDING15", type: "percentage", value: 15, items: [1, 3, 5], start: "2026-01-01", end: "2026-12-31", active: true },
-    { id: 2, code: "SUIT10", type: "percentage", value: 10, items: [2, 4], start: "2026-01-01", end: "2026-12-31", active: true },
-  ];
 };
 
 // ────────────────────────────────────────────────────────────
@@ -144,8 +129,15 @@ function MediaGallery({ item, startIndex = 0, onClose }) {
 }
 
 function Toast({ toast, onClose }) {
+  useEffect(() => {
+    if (toast.show) {
+      const timer = setTimeout(() => onClose(), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast.show, onClose]);
+  
   if (!toast.show) return null;
-  setTimeout(() => onClose(), 4000);
+  
   return (
     <div className={`dashboard-toast ${toast.type}`}>
       {toast.type === 'success' ? <CheckCircle size={15} /> : <AlertCircle size={15} />}
@@ -154,18 +146,54 @@ function Toast({ toast, onClose }) {
   );
 }
 
+// Ultra-fast skeleton component - no animations, just static placeholders
+function FastSkeletonCard() {
+  return (
+    <div className="inv-grid-card skeleton-fast">
+      <div className="inv-grid-media skeleton-media-fast"></div>
+      <div className="inv-grid-info">
+        <div className="skeleton-text-fast" style={{ width: '70%', height: '16px', marginBottom: '8px' }}></div>
+        <div className="skeleton-text-fast" style={{ width: '85%', height: '12px', marginBottom: '6px' }}></div>
+        <div className="skeleton-text-fast" style={{ width: '40%', height: '14px' }}></div>
+      </div>
+      <div className="inv-grid-actions">
+        <div className="skeleton-btn-fast"></div>
+        <div className="skeleton-btn-fast" style={{ width: '100px' }}></div>
+      </div>
+    </div>
+  );
+}
+
+function FastSkeletonRow() {
+  return (
+    <tr className="skeleton-row-fast">
+      <td><div className="skeleton-thumb-fast"></div></td>
+      <td><div className="skeleton-text-fast" style={{ width: '120px', height: '14px' }}></div></td>
+      <td><div className="skeleton-text-fast" style={{ width: '60px', height: '12px' }}></div></td>
+      <td><div className="skeleton-text-fast" style={{ width: '80px', height: '12px' }}></div></td>
+      <td><div className="skeleton-text-fast" style={{ width: '40px', height: '12px' }}></div></td>
+      <td><div className="skeleton-text-fast" style={{ width: '60px', height: '12px' }}></div></td>
+      <td><div className="skeleton-badge-fast"></div></td>
+      <td><div className="skeleton-btn-fast"></div><div className="skeleton-btn-fast"></div></td>
+    </tr>
+  );
+}
+
 // ────────────────────────────────────────────────────────────
-// Main Component
+// Main Component - Ultra-optimized
 // ────────────────────────────────────────────────────────────
 export default function BrowseOutfitsFragment() {
   const [items, setItems] = useState([]);
   const [promos, setPromos] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [userBookings, setUserBookings] = useState([]);
+  const [isItemsLoaded, setIsItemsLoaded] = useState(false);
+  const [isPromosLoaded, setIsPromosLoaded] = useState(false);
   const [loadError, setLoadError] = useState('');
 
   const [viewMode, setViewMode] = useState('grid');
   const [search, setSearch] = useState('');
   const [filterCat, setFilterCat] = useState('All');
+  const [filterSubcat, setFilterSubcat] = useState('All');
   const [filterSize, setFilterSize] = useState('All');
 
   const [selectedItem, setSelectedItem] = useState(null);
@@ -173,12 +201,17 @@ export default function BrowseOutfitsFragment() {
   const [gallery, setGallery] = useState(null);
   const [toast, setToast] = useState({ show: false, type: 'success', message: '' });
   
-  // Fitting booking form
+  // Get current user from localStorage - synchronous, happens immediately
+  const currentUser = useMemo(() => JSON.parse(localStorage.getItem('user') || '{}'), []);
+  const authToken = useMemo(() => localStorage.getItem('accessToken') || localStorage.getItem('token'), []);
+  const isLoggedIn = !!authToken;
+  
+  // Fitting booking form - initialized immediately
   const [booking, setBooking] = useState({
     fittingDate: '',
     fittingTime: '10:00 AM',
-    name: '',
-    email: '',
+    name: currentUser.name || '',
+    email: currentUser.email || '',
     phone: '',
     preferredSize: '',
     notes: ''
@@ -186,24 +219,42 @@ export default function BrowseOutfitsFragment() {
   const [bookingConfirmed, setBookingConfirmed] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // Load data
+  // Load data from backend - non-blocking, parallel loading
   useEffect(() => {
-    const load = async () => {
-      try {
-        const [itemsData, promosData] = await Promise.all([fetchItems(), fetchPromotions()]);
+    // Load items
+    fetchItems()
+      .then(itemsData => {
         setItems(itemsData);
+        setIsItemsLoaded(true);
+      })
+      .catch(err => {
+        console.error('Error loading items:', err);
+        setLoadError(err.message || 'Failed to load items.');
+        setIsItemsLoaded(true);
+      });
+    
+    // Load promotions in parallel
+    fetchPromotions()
+      .then(promosData => {
         setPromos(promosData);
-      } catch (err) {
-        setLoadError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-  }, []);
+        setIsPromosLoaded(true);
+      })
+      .catch(err => {
+        console.error('Error loading promotions:', err);
+        setIsPromosLoaded(true);
+      });
+    
+    // Load user bookings if logged in
+    if (isLoggedIn) {
+      getUserBookings()
+        .then(bookings => setUserBookings(bookings))
+        .catch(err => console.error('Error loading user bookings:', err));
+    }
+  }, [isLoggedIn]);
 
   const showToast = (type, message) => setToast({ show: true, type, message });
   const closeToast = () => setToast({ show: false, type: 'success', message: '' });
+  
   const closeModal = () => {
     setModal(null);
     setSelectedItem(null);
@@ -211,41 +262,126 @@ export default function BrowseOutfitsFragment() {
     setBooking({
       fittingDate: '',
       fittingTime: '10:00 AM',
-      name: '',
-      email: '',
+      name: currentUser.name || '',
+      email: currentUser.email || '',
       phone: '',
       preferredSize: '',
       notes: ''
     });
   };
 
-  // Promo helpers
-  const activePromo = useCallback(item => {
-    const now = todayStr();
-    return promos.find(p => p.active && p.items.includes(item.id) && p.start <= now && p.end >= now);
-  }, [promos]);
+  // Check if user has already booked this item - memoized for performance
+  const hasUserBookedItem = useCallback((itemId) => {
+    if (!userBookings.length) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    return userBookings.some(booking => 
+      String(booking.itemId) === String(itemId) && 
+      booking.status === 'CONFIRMED' &&
+      new Date(booking.fittingDate) >= today
+    );
+  }, [userBookings]);
 
-  const discPrice = item => {
+  // Get user's booking for a specific item - memoized
+  const getUserBookingForItem = useCallback((itemId) => {
+    if (!userBookings.length) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    return userBookings.find(booking => 
+      String(booking.itemId) === String(itemId) && 
+      booking.status === 'CONFIRMED' &&
+      new Date(booking.fittingDate) >= today
+    );
+  }, [userBookings]);
+
+  // Promo helpers - memoized for performance
+  const activePromo = useCallback(item => {
+    if (!isPromosLoaded || promos.length === 0) return null;
+    const now = todayStr();
+    const itemId = typeof item.id === 'string' ? parseInt(item.id) : item.id;
+    
+    const promo = promos.find(p => {
+      if (!p.active) return false;
+      if (!p.items || !p.items.length) return false;
+      
+      const promoItemIds = p.items.map(id => typeof id === 'string' ? parseInt(id) : id);
+      const itemMatches = promoItemIds.includes(itemId);
+      const dateValid = p.start <= now && p.end >= now;
+      
+      return itemMatches && dateValid;
+    });
+    
+    return promo;
+  }, [promos, isPromosLoaded]);
+
+  const discPrice = useCallback(item => {
     const p = activePromo(item);
     if (!p) return item.price;
-    return p.type === 'percentage' ? item.price * (1 - p.value / 100) : item.price - p.value;
-  };
+    
+    let discountedPrice = item.price;
+    if (p.type === 'percentage') {
+      discountedPrice = item.price * (1 - p.value / 100);
+    } else if (p.type === 'fixed' || p.type === 'amount') {
+      discountedPrice = item.price - p.value;
+    }
+    
+    return Math.max(0, discountedPrice);
+  }, [activePromo]);
 
-  // Filter items
-  const visibleItems = items
-    .filter(i => i.status === 'Available' || i.status === 'Reserved')
-    .filter(i => {
+  // Get available items for filtering - memoized
+  const availableItems = useMemo(() => 
+    items.filter(i => i.status === 'Available' || i.status === 'Reserved'),
+    [items]
+  );
+  
+  // Get unique categories - memoized
+  const categories = useMemo(() => 
+    [...new Set(availableItems.map(i => i.category))],
+    [availableItems]
+  );
+  
+  // Get unique subcategories based on selected category - memoized
+  const subcategories = useMemo(() => {
+    if (filterCat === 'All') return [];
+    return [...new Set(
+      availableItems
+        .filter(i => i.category === filterCat)
+        .map(i => i.subtype)
+        .filter(Boolean)
+    )].sort();
+  }, [availableItems, filterCat]);
+  
+  // Reset subcategory filter when category changes
+  useEffect(() => {
+    setFilterSubcat('All');
+  }, [filterCat]);
+  
+  // Get unique sizes - memoized
+  const sizes = useMemo(() => 
+    [...new Set(availableItems.map(i => i.size))].sort(),
+    [availableItems]
+  );
+
+  // Filter items - memoized for performance
+  const visibleItems = useMemo(() => {
+    return availableItems.filter(i => {
       const q = search.toLowerCase();
       return (!q || i.name.toLowerCase().includes(q) || i.category.toLowerCase().includes(q) || (i.subtype || '').toLowerCase().includes(q))
         && (filterCat === 'All' || i.category === filterCat)
+        && (filterSubcat === 'All' || i.subtype === filterSubcat)
         && (filterSize === 'All' || i.size === filterSize);
     });
-
-  const categories = [...new Set(visibleItems.map(i => i.category))];
-  const sizes = [...new Set(visibleItems.map(i => i.size))].sort();
+  }, [availableItems, search, filterCat, filterSubcat, filterSize]);
 
   // Handle fitting booking submission
   const handleBookingSubmit = async () => {
+    if (!isLoggedIn) {
+      showToast('error', 'Please login first to book a fitting.');
+      return;
+    }
+    
     if (!booking.fittingDate || !booking.fittingTime) {
       showToast('error', 'Please select a fitting date and time.');
       return;
@@ -256,46 +392,75 @@ export default function BrowseOutfitsFragment() {
     }
     
     const selectedDate = new Date(booking.fittingDate);
-    if (selectedDate < new Date(todayStr())) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    if (selectedDate < today) {
       showToast('error', 'Fitting date cannot be in the past.');
+      return;
+    }
+    
+    if (hasUserBookedItem(selectedItem.id)) {
+      const existingBooking = getUserBookingForItem(selectedItem.id);
+      showToast('error', `You already have a fitting booked for ${selectedItem.name} on ${fmtDate(existingBooking.fittingDate)}.`);
       return;
     }
 
     setSubmitting(true);
-    await new Promise(resolve => setTimeout(resolve, 1500));
     
-    // Generate booking confirmation
-    const confirmation = {
-      id: Math.floor(Math.random() * 10000),
-      item: selectedItem,
-      date: booking.fittingDate,
-      time: booking.fittingTime,
-      customerName: booking.name,
-      customerEmail: booking.email,
-      customerPhone: booking.phone,
-      preferredSize: booking.preferredSize || selectedItem.size,
-      notes: booking.notes,
-      status: 'confirmed',
-      createdAt: new Date().toISOString()
-    };
-    
-    setBookingConfirmed(confirmation);
-    setSubmitting(false);
-    showToast('success', 'Fitting booked successfully! Check your email for confirmation.');
+    try {
+      const bookingData = {
+        itemId: selectedItem.id,
+        itemName: selectedItem.name,
+        fittingDate: booking.fittingDate,
+        fittingTime: booking.fittingTime,
+        customerName: booking.name,
+        customerEmail: booking.email,
+        customerPhone: booking.phone,
+        preferredSize: booking.preferredSize || selectedItem.size,
+        notes: booking.notes,
+        userId: currentUser.id || null
+      };
+      
+      const response = await bookFitting(bookingData);
+      
+      const confirmation = {
+        id: response.bookingId || Math.floor(Math.random() * 10000),
+        item: selectedItem,
+        date: booking.fittingDate,
+        time: booking.fittingTime,
+        customerName: booking.name,
+        customerEmail: booking.email,
+        customerPhone: booking.phone,
+        preferredSize: booking.preferredSize || selectedItem.size,
+        notes: booking.notes,
+        status: 'confirmed',
+        createdAt: new Date().toISOString()
+      };
+      
+      setBookingConfirmed(confirmation);
+      
+      const newBooking = {
+        id: confirmation.id,
+        itemId: selectedItem.id,
+        itemName: selectedItem.name,
+        fittingDate: booking.fittingDate,
+        fittingTime: booking.fittingTime,
+        status: 'CONFIRMED'
+      };
+      setUserBookings(prev => [newBooking, ...prev]);
+      
+      showToast('success', 'Fitting booked successfully! Check your email for confirmation.');
+    } catch (error) {
+      console.error('Booking error:', error);
+      showToast('error', error.message || 'Failed to book fitting. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  if (loading) {
-    return (
-      <div className="inv-root">
-        <div className="inv-loading-state">
-          <Loader2 size={32} className="inv-spinner" />
-          <p>Loading our collection...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (loadError) {
+  // Show error state if needed
+  if (loadError && isItemsLoaded) {
     return (
       <div className="inv-root">
         <div className="inv-error-state">
@@ -307,72 +472,90 @@ export default function BrowseOutfitsFragment() {
     );
   }
 
+  // Show skeletons only for the items grid/table, not the whole page
+  const showSkeletons = !isItemsLoaded;
+
   return (
     <div className="inv-root">
-      {/* Header */}
+      {/* Header - displays immediately */}
       <div className="inv-top">
         <div>
           <h2 className="inv-title">Browse Our Collection</h2>
           <p className="inv-subtitle">Find the perfect attire for your upcoming events</p>
         </div>
+        {!isLoggedIn && (
+          <div className="inv-login-warning">
+            <AlertCircle size={14} />
+            <span>Please login to book a fitting</span>
+          </div>
+        )}
       </div>
 
-      {/* Stats */}
-      <div className="inv-stats">
-        <div className="inv-stat-card">
-          <div className="inv-stat-icon" style={{ background: '#6b2d3918', color: '#6b2d39' }}><ShoppingBag size={18} /></div>
-          <div><div className="inv-stat-value">{visibleItems.length}</div><div className="inv-stat-label">Available Items</div></div>
-        </div>
-        <div className="inv-stat-card">
-          <div className="inv-stat-icon" style={{ background: '#15803d18', color: '#15803d' }}><CheckCircle size={18} /></div>
-          <div><div className="inv-stat-value">{items.filter(i => i.status === 'Available').length}</div><div className="inv-stat-label">Ready to Rent</div></div>
-        </div>
-        <div className="inv-stat-card">
-          <div className="inv-stat-icon" style={{ background: '#1d4ed818', color: '#1d4ed8' }}><Calendar size={18} /></div>
-          <div><div className="inv-stat-value">{items.filter(i => i.status === 'Reserved').length}</div><div className="inv-stat-label">Reserved</div></div>
-        </div>
-        <div className="inv-stat-card">
-          <div className="inv-stat-icon" style={{ background: '#b4530918', color: '#b45309' }}><Clock size={18} /></div>
-          <div><div className="inv-stat-value">{categories.length}</div><div className="inv-stat-label">Categories</div></div>
-        </div>
-      </div>
-
-      {/* Toolbar - Filters side by side */}
+      {/* Filters and Toolbar - displays immediately */}
       <div className="inv-card">
         <div className="inv-toolbar">
           <div className="inv-search-wrap">
             <Search size={13} className="inv-search-icon" />
-            <input className="inv-search" placeholder="Search items…" value={search} onChange={e => setSearch(e.target.value)} />
+            <input 
+              className="inv-search" 
+              placeholder="Search items…" 
+              value={search} 
+              onChange={e => setSearch(e.target.value)} 
+            />
           </div>
           <div className="inv-filters">
             <select className="inv-select" value={filterCat} onChange={e => setFilterCat(e.target.value)}>
               <option value="All">All Categories</option>
               {categories.map(c => <option key={c}>{c}</option>)}
             </select>
+            
+            {filterCat !== 'All' && subcategories.length > 0 && (
+              <select className="inv-select" value={filterSubcat} onChange={e => setFilterSubcat(e.target.value)}>
+                <option value="All">All {filterCat}</option>
+                {subcategories.map(s => <option key={s}>{s}</option>)}
+              </select>
+            )}
+            
             <select className="inv-select" value={filterSize} onChange={e => setFilterSize(e.target.value)}>
               <option value="All">All Sizes</option>
               {sizes.map(s => <option key={s}>{s}</option>)}
             </select>
           </div>
           <div className="inv-view-toggle">
-            <button className={`inv-view-btn${viewMode === 'grid' ? ' active' : ''}`} onClick={() => setViewMode('grid')}><LayoutGrid size={15} /></button>
-            <button className={`inv-view-btn${viewMode === 'list' ? ' active' : ''}`} onClick={() => setViewMode('list')}><List size={15} /></button>
+            <button className={`inv-view-btn${viewMode === 'grid' ? ' active' : ''}`} onClick={() => setViewMode('grid')}>
+              <LayoutGrid size={15} />
+            </button>
+            <button className={`inv-view-btn${viewMode === 'list' ? ' active' : ''}`} onClick={() => setViewMode('list')}>
+              <List size={15} />
+            </button>
           </div>
         </div>
 
-        {/* GRID VIEW */}
+        {/* GRID VIEW - with ultra-fast skeletons */}
         {viewMode === 'grid' && (
           <div className="inv-grid">
-            {visibleItems.length === 0 && <div className="inv-empty-grid">No items found.</div>}
-            {visibleItems.map(item => {
+            {showSkeletons && (
+              <>
+                {[...Array(12)].map((_, i) => <FastSkeletonCard key={i} />)}
+              </>
+            )}
+            
+            {!showSkeletons && visibleItems.length === 0 && (
+              <div className="inv-empty-grid">No items found.</div>
+            )}
+            
+            {!showSkeletons && visibleItems.map(item => {
               const promo = activePromo(item);
               const price = discPrice(item);
               const files = item.mediaFiles?.length || 0;
+              const alreadyBooked = hasUserBookedItem(item.id);
+              const userBooking = getUserBookingForItem(item.id);
+              
               return (
                 <div key={item.id} className="inv-grid-card">
                   <div className="inv-grid-media" onClick={() => files && setGallery({ item, startIndex: 0 })}>
                     <MediaThumb item={item} />
-                    <div className="inv-grid-media-overlay"><Eye size={16} /> View {files > 1 ? `(${files})` : ''}</div>
+                    <div className="inv-grid-media-overlay"><Eye size={16} /> View</div>
                     <div className="inv-grid-status-pin"><StatusBadge status={item.status} /></div>
                     {promo && (
                       <div className="inv-grid-promo-ribbon">
@@ -380,7 +563,11 @@ export default function BrowseOutfitsFragment() {
                         {promo.type === 'percentage' ? `${promo.value}% OFF` : `₱${promo.value} OFF`}
                       </div>
                     )}
-                    {files > 1 && <span className="inv-grid-photo-count"><Image size={9} /> {files}</span>}
+                    {alreadyBooked && (
+                      <div className="inv-grid-booked-badge">
+                        <CheckCircle size={10} /> Booked for {fmtDate(userBooking.fittingDate)}
+                      </div>
+                    )}
                   </div>
                   <div className="inv-grid-info">
                     <div className="inv-grid-name">{item.name}</div>
@@ -391,7 +578,10 @@ export default function BrowseOutfitsFragment() {
                     </div>
                     <div className="inv-grid-price-row">
                       {promo ? (
-                        <><span className="inv-price-old">₱{item.price.toLocaleString()}</span><span className="inv-price-new">₱{Math.round(price).toLocaleString()}</span></>
+                        <>
+                          <span className="inv-price-old">₱{item.price.toLocaleString()}</span>
+                          <span className="inv-price-new">₱{Math.round(price).toLocaleString()}</span>
+                        </>
                       ) : (
                         <span className="inv-price">₱{item.price.toLocaleString()}</span>
                       )}
@@ -400,18 +590,25 @@ export default function BrowseOutfitsFragment() {
                       <div className="inv-promo-code-pill">
                         <Sparkles size={9} />
                         <span>{promo.code}</span>
-                        <span className="inv-promo-code-pill-disc">{promo.type === 'percentage' ? `${promo.value}% off` : `₱${promo.value} off`}</span>
                       </div>
                     )}
                   </div>
                   <div className="inv-grid-actions">
                     <button className="inv-icon-btn" onClick={() => { setSelectedItem(item); setModal('view'); }}><Eye size={13} /></button>
                     <button 
-                      className="inv-btn-book" 
-                      onClick={() => { setSelectedItem(item); setModal('booking'); }} 
-                      disabled={item.status !== 'Available'}
+                      className={`inv-btn-book ${alreadyBooked ? 'inv-btn-booked' : ''}`}
+                      onClick={() => { 
+                        if (alreadyBooked) {
+                          showToast('error', `You already have a fitting booked for this item on ${fmtDate(userBooking.fittingDate)}.`);
+                        } else {
+                          setSelectedItem(item); 
+                          setModal('booking');
+                        }
+                      }} 
+                      disabled={item.status !== 'Available' || alreadyBooked || !isLoggedIn}
                     >
-                      <Calendar size={13} /> Book Fitting
+                      <Calendar size={13} /> 
+                      {alreadyBooked ? 'Already Booked' : 'Book Fitting'}
                     </button>
                   </div>
                 </div>
@@ -420,7 +617,7 @@ export default function BrowseOutfitsFragment() {
           </div>
         )}
 
-        {/* LIST VIEW */}
+        {/* LIST VIEW - FIXED VERSION */}
         {viewMode === 'list' && (
           <div className="inv-table-wrap">
             <table className="inv-table">
@@ -433,26 +630,33 @@ export default function BrowseOutfitsFragment() {
                   <th>Size</th>
                   <th>Price</th>
                   <th>Status</th>
-                  <th style={{ width: 140 }}>Action</th>
+                  <th style={{ width: 160 }}>Action</th>
                 </tr>
               </thead>
               <tbody>
-                {visibleItems.length === 0 && (
-                    <tr>
-                        <td colSpan={8} className="inv-empty">No items found.</td>
-                    </tr>
+                {showSkeletons && (
+                  <>
+                    {[...Array(8)].map((_, i) => <FastSkeletonRow key={i} />)}
+                  </>
                 )}
-                {visibleItems.map(item => {
+                
+                {!showSkeletons && visibleItems.length === 0 && (
+                  <tr>
+                    <td colSpan={8} className="inv-empty">No items found.</td>
+                  </tr>
+                )}
+                
+                {!showSkeletons && visibleItems.map(item => {
                   const promo = activePromo(item);
                   const price = discPrice(item);
-                  const files = item.mediaFiles?.length || 0;
+                  const alreadyBooked = hasUserBookedItem(item.id);
+                  const userBooking = getUserBookingForItem(item.id);
+                  
                   return (
                     <tr key={item.id} className={`inv-tr${promo ? ' inv-tr-promo' : ''}`}>
                       <td>
-                        <div className="inv-list-thumb" onClick={() => files && setGallery({ item, startIndex: 0 })}>
+                        <div className="inv-list-thumb" onClick={() => setGallery({ item, startIndex: 0 })}>
                           <MediaThumb item={item} />
-                          <div className="inv-list-thumb-overlay"><Eye size={12} /></div>
-                          {files > 1 && <span className="inv-list-photo-count">{files}</span>}
                         </div>
                       </td>
                       <td>
@@ -461,8 +665,11 @@ export default function BrowseOutfitsFragment() {
                           <div className="inv-list-promo-badge">
                             <Sparkles size={9} />
                             <span>{promo.code}</span>
-                            <span>·</span>
-                            <span>{promo.type === 'percentage' ? `${promo.value}% off` : `₱${promo.value} off`}</span>
+                          </div>
+                        )}
+                        {alreadyBooked && (
+                          <div className="inv-list-booked-badge">
+                            <CheckCircle size={10} /> Booked for {fmtDate(userBooking.fittingDate)}
                           </div>
                         )}
                       </td>
@@ -478,20 +685,27 @@ export default function BrowseOutfitsFragment() {
                         ) : (
                           <span className="inv-price">₱{item.price.toLocaleString()}</span>
                         )}
-                       </td>
+                      </td>
                       <td><StatusBadge status={item.status} /></td>
                       <td>
                         <div className="inv-row-actions">
                           <button className="inv-icon-btn" onClick={() => { setSelectedItem(item); setModal('view'); }}><Eye size={13} /></button>
                           <button 
-                            className="inv-btn-book-sm" 
-                            onClick={() => { setSelectedItem(item); setModal('booking'); }} 
-                            disabled={item.status !== 'Available'}
+                            className={`inv-btn-book-sm ${alreadyBooked ? 'inv-btn-booked' : ''}`}
+                            onClick={() => {
+                              if (alreadyBooked) {
+                                showToast('error', `You already have a fitting booked for this item on ${fmtDate(userBooking.fittingDate)}.`);
+                              } else {
+                                setSelectedItem(item); 
+                                setModal('booking');
+                              }
+                            }} 
+                            disabled={item.status !== 'Available' || alreadyBooked || !isLoggedIn}
                           >
-                            <Calendar size={12} /> Book Fitting
+                            <Calendar size={12} /> {alreadyBooked ? 'Booked' : 'Book Fitting'}
                           </button>
                         </div>
-                       </td>
+                      </td>
                     </tr>
                   );
                 })}
@@ -505,6 +719,9 @@ export default function BrowseOutfitsFragment() {
       {modal === 'view' && selectedItem && (() => {
         const promo = activePromo(selectedItem);
         const price = discPrice(selectedItem);
+        const alreadyBooked = hasUserBookedItem(selectedItem.id);
+        const userBooking = getUserBookingForItem(selectedItem.id);
+        
         return (
           <div className="inv-overlay" onClick={closeModal}>
             <div className="inv-modal inv-modal-view" onClick={e => e.stopPropagation()}>
@@ -527,12 +744,20 @@ export default function BrowseOutfitsFragment() {
                       <Sparkles size={14} />
                       <div>
                         <div className="inv-view-promo-banner-title">Promo Active: <strong>{promo.code}</strong></div>
-                        <div className="inv-view-promo-banner-sub">{promo.type === 'percentage' ? `${promo.value}% discount applied` : `₱${promo.value} flat discount applied`} · Valid until {fmtDate(promo.end)}</div>
+                        <div className="inv-view-promo-banner-sub">
+                          {promo.type === 'percentage' ? `${promo.value}% discount applied` : `₱${promo.value} flat discount applied`}
+                        </div>
                       </div>
                       <div className="inv-view-promo-banner-price">
                         <span className="inv-view-promo-was">₱{selectedItem.price.toLocaleString()}</span>
                         <span className="inv-view-promo-now">₱{Math.round(price).toLocaleString()}</span>
                       </div>
+                    </div>
+                  )}
+                  {alreadyBooked && (
+                    <div className="inv-view-booked-warning">
+                      <CheckCircle size={14} />
+                      <span>You have already booked a fitting for this item on <strong>{fmtDate(userBooking.fittingDate)}</strong>.</span>
                     </div>
                   )}
                   <div className="inv-view-grid">
@@ -542,7 +767,11 @@ export default function BrowseOutfitsFragment() {
                       ['Size', selectedItem.size],
                       ['Color', selectedItem.color],
                       ['Age Range', selectedItem.ageRange],
-                      ['Daily Rate', promo ? <><span style={{ textDecoration: 'line-through', color: '#bbb', marginRight: '0.4rem' }}>₱{selectedItem.price.toLocaleString()}</span><strong style={{ color: '#15803d' }}>₱{Math.round(price).toLocaleString()}</strong></> : `₱${selectedItem.price.toLocaleString()}`],
+                      ['Daily Rate', promo ? 
+                        <><span style={{ textDecoration: 'line-through', color: '#bbb', marginRight: '0.4rem' }}>₱{selectedItem.price.toLocaleString()}</span>
+                        <strong style={{ color: '#15803d' }}>₱{Math.round(price).toLocaleString()}</strong></> : 
+                        `₱${selectedItem.price.toLocaleString()}`
+                      ],
                     ].map(([k, v]) => v && (
                       <div key={k} className="inv-view-row">
                         <span className="inv-view-key">{k}</span>
@@ -557,10 +786,18 @@ export default function BrowseOutfitsFragment() {
                 <button className="inv-btn-ghost" onClick={closeModal}>Close</button>
                 <button 
                   className="inv-btn-primary" 
-                  onClick={() => setModal('booking')} 
-                  disabled={selectedItem.status !== 'Available'}
+                  onClick={() => {
+                    if (alreadyBooked) {
+                      showToast('error', `You already have a fitting booked for this item on ${fmtDate(userBooking.fittingDate)}.`);
+                      closeModal();
+                    } else {
+                      setModal('booking');
+                    }
+                  }} 
+                  disabled={selectedItem.status !== 'Available' || alreadyBooked || !isLoggedIn}
                 >
-                  <Calendar size={14} /> Book Fitting
+                  <Calendar size={14} /> 
+                  {alreadyBooked ? 'Already Booked' : 'Book Fitting'}
                 </button>
               </div>
             </div>
@@ -570,7 +807,19 @@ export default function BrowseOutfitsFragment() {
 
       {/* BOOKING FITTING MODAL */}
       {modal === 'booking' && selectedItem && !bookingConfirmed && (() => {
+        const alreadyBooked = hasUserBookedItem(selectedItem.id);
+        
+        if (alreadyBooked) {
+          const userBooking = getUserBookingForItem(selectedItem.id);
+          setTimeout(() => {
+            closeModal();
+            showToast('error', `You already have a fitting booked for ${selectedItem.name} on ${fmtDate(userBooking.fittingDate)}.`);
+          }, 100);
+          return null;
+        }
+        
         const promo = activePromo(selectedItem);
+        
         return (
           <div className="inv-overlay" onClick={closeModal}>
             <div className="inv-modal" style={{ maxWidth: '560px' }} onClick={e => e.stopPropagation()}>
@@ -580,7 +829,6 @@ export default function BrowseOutfitsFragment() {
               </div>
               
               <div className="inv-modal-body">
-                {/* Selected item preview */}
                 <div className="inv-lease-item-preview">
                   <div className="inv-lease-preview-thumb">
                     <MediaThumb item={selectedItem} />
@@ -596,18 +844,17 @@ export default function BrowseOutfitsFragment() {
                           ₱{Math.round(discPrice(selectedItem)).toLocaleString()}/day
                         </>
                       ) : (
-                        `₱{selectedItem.price.toLocaleString()}/day`
+                        `₱${selectedItem.price.toLocaleString()}/day`
                       )}
                     </div>
                     {promo && (
                       <div className="inv-promo-code-pill" style={{ marginTop: '0.25rem' }}>
-                        <Sparkles size={8} /> {promo.code} - {promo.type === 'percentage' ? `${promo.value}% off` : `₱${promo.value} off`}
+                        <Sparkles size={8} /> {promo.code}
                       </div>
                     )}
                   </div>
                 </div>
 
-                {/* Cancellation Warning */}
                 <div className="inv-warning-box">
                   <AlertTriangle size={16} />
                   <div>
@@ -616,7 +863,6 @@ export default function BrowseOutfitsFragment() {
                   </div>
                 </div>
 
-                {/* Fitting Date & Time */}
                 <div className="inv-modal-grid">
                   <div className="inv-field">
                     <label className="inv-field-label">Fitting Date <span className="inv-required">*</span></label>
@@ -648,7 +894,6 @@ export default function BrowseOutfitsFragment() {
                   </div>
                 </div>
 
-                {/* Customer Information */}
                 <div className="inv-field">
                   <label className="inv-field-label">Full Name <span className="inv-required">*</span></label>
                   <input
@@ -686,7 +931,6 @@ export default function BrowseOutfitsFragment() {
                   </div>
                 </div>
 
-                {/* Preferred Size Only */}
                 <div className="inv-field">
                   <label className="inv-field-label">Preferred Size</label>
                   <select
@@ -703,7 +947,6 @@ export default function BrowseOutfitsFragment() {
                     <option value="XL">XL</option>
                     <option value="XXL">XXL</option>
                   </select>
-                  <span className="inv-field-hint">We'll prepare your preferred size if available</span>
                 </div>
                 
                 <div className="inv-field">
@@ -718,7 +961,6 @@ export default function BrowseOutfitsFragment() {
                   />
                 </div>
 
-                {/* Booking Summary Preview */}
                 <div className="bk-payment-summary">
                   <div className="bk-ps-row total" style={{ borderBottom: 'none', marginBottom: 0, paddingBottom: 0 }}>
                     <span><strong>Fitting Summary</strong></span>

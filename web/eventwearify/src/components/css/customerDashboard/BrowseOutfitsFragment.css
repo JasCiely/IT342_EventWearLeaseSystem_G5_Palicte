@@ -35,65 +35,6 @@
   margin: 0;
 }
 
-/* ─── Stat cards ─────────────────────────────────────────── */
-.inv-stats {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 1rem;
-}
-
-@media (max-width: 860px) {
-  .inv-stats {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (max-width: 500px) {
-  .inv-stats {
-    grid-template-columns: 1fr;
-  }
-}
-
-.inv-stat-card {
-  background: #fff;
-  border: 1px solid #eeecea;
-  border-radius: 12px;
-  padding: 1rem 1.25rem;
-  display: flex;
-  align-items: center;
-  gap: 0.9rem;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
-  transition: box-shadow 0.2s;
-}
-
-.inv-stat-card:hover {
-  box-shadow: 0 4px 12px rgba(107, 45, 57, 0.07);
-}
-
-.inv-stat-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.inv-stat-value {
-  font-family: 'Playfair Display', Georgia, serif;
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: #1a1a1a;
-  line-height: 1;
-}
-
-.inv-stat-label {
-  font-size: 0.75rem;
-  color: #999;
-  margin-top: 0.2rem;
-}
-
 /* ─── Card ───────────────────────────────────────────────── */
 .inv-card {
   background: #fff;
@@ -272,15 +213,6 @@
   flex-shrink: 0;
 }
 
-.inv-grid-media-inner {
-  position: absolute !important;
-  inset: 0;
-  width: 100% !important;
-  height: 100% !important;
-  object-fit: cover;
-  object-position: center top;
-}
-
 .inv-grid-media-overlay {
   position: absolute;
   inset: 0;
@@ -324,22 +256,6 @@
   letter-spacing: 0.04em;
   border-radius: 0 20px 20px 0;
   box-shadow: 0 2px 8px rgba(107, 45, 57, 0.35);
-}
-
-.inv-grid-photo-count {
-  position: absolute;
-  bottom: 8px;
-  right: 8px;
-  z-index: 2;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.2rem;
-  padding: 0.18rem 0.45rem;
-  border-radius: 20px;
-  background: rgba(0, 0, 0, 0.55);
-  color: #fff;
-  font-size: 0.66rem;
-  font-weight: 700;
 }
 
 .inv-grid-info {
@@ -430,11 +346,6 @@
   font-size: 0.69rem;
   font-weight: 700;
   color: #0e7490;
-}
-
-.inv-promo-code-pill-disc {
-  font-weight: 500;
-  opacity: 0.8;
 }
 
 .inv-grid-actions {
@@ -578,44 +489,6 @@
   border: 1px solid #eeecea;
 }
 
-.inv-list-thumb-inner {
-  position: absolute !important;
-  inset: 0;
-  width: 100% !important;
-  height: 100% !important;
-  object-fit: cover;
-  object-position: center top;
-}
-
-.inv-list-thumb-overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(107, 45, 57, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-
-.inv-list-thumb:hover .inv-list-thumb-overlay {
-  opacity: 1;
-}
-
-.inv-list-photo-count {
-  position: absolute;
-  bottom: 3px;
-  right: 3px;
-  background: rgba(0, 0, 0, 0.55);
-  color: #fff;
-  font-size: 0.6rem;
-  font-weight: 700;
-  padding: 0.1rem 0.35rem;
-  border-radius: 10px;
-  line-height: 1;
-}
-
 .inv-item-name {
   font-weight: 600;
   color: #1a1a1a;
@@ -634,11 +507,6 @@
   font-size: 0.68rem;
   font-weight: 700;
   color: #0e7490;
-}
-
-.inv-tr-promo {
-  background: rgba(196, 113, 127, 0.03) !important;
-  border-left: 3px solid rgba(196, 113, 127, 0.4);
 }
 
 .inv-row-actions {
@@ -676,11 +544,6 @@
   padding: 4rem 2rem;
   color: #aaa;
   font-size: 0.875rem;
-}
-
-.inv-spinner {
-  animation: spin 0.9s linear infinite;
-  color: #c4717f;
 }
 
 .inv-spinner-inline {
@@ -737,10 +600,6 @@
   overflow-y: auto;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
   animation: slideUp 0.2s ease;
-}
-
-.inv-modal-sm {
-  max-width: 420px;
 }
 
 .inv-modal-view {
@@ -889,15 +748,6 @@
   background: #faf9f7;
   border: 1px solid #eeecea;
   flex-shrink: 0;
-}
-
-.inv-view-media-inner {
-  position: absolute !important;
-  inset: 0;
-  width: 100% !important;
-  height: 100% !important;
-  object-fit: cover;
-  object-position: center top;
 }
 
 .inv-view-media-overlay {
@@ -1092,10 +942,6 @@
   gap: 0.4rem;
 }
 
-.inv-field-full {
-  grid-column: 1 / -1;
-}
-
 .inv-field-label {
   font-size: 0.7rem;
   font-weight: 700;
@@ -1174,12 +1020,6 @@
 .inv-textarea:focus {
   border-color: #c4717f;
   box-shadow: 0 0 0 3px rgba(196, 113, 127, 0.1);
-}
-
-.inv-field-hint {
-  font-size: 0.7rem;
-  color: #aaa;
-  margin-top: 0.2rem;
 }
 
 /* Booking Summary Box */
@@ -1560,4 +1400,11 @@
     min-width: 0;
     flex: 1;
   }
+}
+
+/* Fix for any broken closing tags in list view */
+.inv-table td > div:first-child {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
