@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -38,7 +39,7 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthFilter;
     private final UserDetailsService userDetailsService;
     private final OAuth2SuccessHandler oAuth2SuccessHandler;
-    private final OAuth2FailureHandler oAuth2FailureHandler; // ← NEW
+    private final OAuth2FailureHandler oAuth2FailureHandler;
     private final PasswordEncoder passwordEncoder;
     private final ClientRegistrationRepository clientRegistrationRepository;
 
@@ -53,10 +54,12 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/inventory/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/inventory/items", "/api/inventory/promotions")
+                        .permitAll()
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .anyRequest().authenticated())
                 .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
+                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .oauth2Login(oauth2 -> oauth2
@@ -64,14 +67,21 @@ public class SecurityConfig {
                                 .authorizationRequestResolver(
                                         new SmartPromptResolver(clientRegistrationRepository)))
                         .successHandler(oAuth2SuccessHandler)
-                        .failureHandler(oAuth2FailureHandler)); // ← NEW
+                        .failureHandler(oAuth2FailureHandler))
+                // Return JSON for authentication errors instead of HTML
+                .exceptionHandling(exceptions -> exceptions
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            response.setContentType("application/json");
+                            response.setStatus(HttpStatus.UNAUTHORIZED.value());
+                            response.getWriter().write(String.format(
+                                    "{\"status\":%d,\"error\":\"Unauthorized\",\"message\":\"%s\"}",
+                                    HttpStatus.UNAUTHORIZED.value(),
+                                    authException.getMessage()));
+                        }));
 
         return http.build();
     }
 
-    // Checks the request path to decide which prompt to use:
-    // /oauth2/authorization/google → select_account only (returning users)
-    // /oauth2/authorization/google-register → select_account + consent (new users)
     static class SmartPromptResolver implements OAuth2AuthorizationRequestResolver {
 
         private final DefaultOAuth2AuthorizationRequestResolver defaultResolver;
@@ -98,9 +108,7 @@ public class SecurityConfig {
                 return null;
 
             String uri = request.getRequestURI();
-            // If coming from the register flow, add consent prompt
             boolean isRegister = uri.contains("google-register");
-
             String prompt = isRegister ? "select_account consent" : "select_account";
 
             return OAuth2AuthorizationRequest.from(req)
@@ -114,8 +122,9 @@ public class SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(List.of(corsOrigin));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type"));
+        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Accept"));
         configuration.setAllowCredentials(true);
+        configuration.setExposedHeaders(List.of("Authorization"));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
