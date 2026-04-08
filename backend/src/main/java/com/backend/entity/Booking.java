@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import org.hibernate.annotations.CreationTimestamp;
 import java.time.LocalDateTime;
 
@@ -12,6 +13,7 @@ import java.time.LocalDateTime;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class Booking {
 
     @Id
@@ -28,7 +30,7 @@ public class Booking {
     private String itemName;
 
     @Column(nullable = false)
-    private String fittingDate; // Keep as String, not Date
+    private String fittingDate;
 
     @Column(nullable = false)
     private String fittingTime;

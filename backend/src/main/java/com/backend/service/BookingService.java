@@ -34,11 +34,7 @@ public class BookingService {
 
         if (hasExisting) {
             log.warn("User {} already has active booking for item {}", request.getCustomerEmail(), request.getItemId());
-            FittingBookingResponse response = new FittingBookingResponse();
-            response.setBookingId(null);
-            response.setStatus("FAILED");
-            response.setMessage("You already have an active booking for this item");
-            return response;
+            return FittingBookingResponse.failed("You already have an active booking for this item");
         }
 
         // Check time slot availability (max 5 per time slot)
@@ -46,27 +42,24 @@ public class BookingService {
                 request.getFittingDate(), request.getFittingTime(), "CONFIRMED");
         if (slotCount >= 5) {
             log.warn("Time slot {} at {} is fully booked", request.getFittingDate(), request.getFittingTime());
-            FittingBookingResponse response = new FittingBookingResponse();
-            response.setBookingId(null);
-            response.setStatus("FAILED");
-            response.setMessage("This time slot is fully booked. Please choose another time.");
-            return response;
+            return FittingBookingResponse.failed("This time slot is fully booked. Please choose another time.");
         }
 
-        // Create and save booking
-        Booking booking = new Booking();
-        booking.setBookingId(bookingId);
-        booking.setItemId(request.getItemId());
-        booking.setItemName(request.getItemName());
-        booking.setFittingDate(request.getFittingDate());
-        booking.setFittingTime(request.getFittingTime());
-        booking.setCustomerName(request.getCustomerName());
-        booking.setCustomerEmail(request.getCustomerEmail());
-        booking.setCustomerPhone(request.getCustomerPhone());
-        booking.setPreferredSize(request.getPreferredSize());
-        booking.setNotes(request.getNotes());
-        booking.setUserId(request.getUserId());
-        booking.setStatus("CONFIRMED");
+        // Create booking using BUILDER pattern
+        Booking booking = Booking.builder()
+                .bookingId(bookingId)
+                .itemId(request.getItemId())
+                .itemName(request.getItemName())
+                .fittingDate(request.getFittingDate())
+                .fittingTime(request.getFittingTime())
+                .customerName(request.getCustomerName())
+                .customerEmail(request.getCustomerEmail())
+                .customerPhone(request.getCustomerPhone())
+                .preferredSize(request.getPreferredSize())
+                .notes(request.getNotes())
+                .userId(request.getUserId())
+                .status("CONFIRMED")
+                .build();
 
         Booking savedBooking = bookingRepository.save(booking);
         log.info("Booking saved to database: {} for customer: {}", bookingId, request.getCustomerEmail());
@@ -85,12 +78,7 @@ public class BookingService {
             log.error("Failed to send email: {}", e.getMessage());
         }
 
-        FittingBookingResponse response = new FittingBookingResponse();
-        response.setBookingId(bookingId);
-        response.setStatus("CONFIRMED");
-        response.setMessage("Fitting booked successfully");
-
-        return response;
+        return FittingBookingResponse.success(bookingId);
     }
 
     public List<Booking> getBookingsByEmail(String email) {
