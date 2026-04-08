@@ -12,6 +12,8 @@ public class ItemResponse {
     private String size;
     private String color;
     private Double price;
+    private Double finalPrice;
+    private String discountApplied;
     private String status;
     private String ageRange;
     private String description;

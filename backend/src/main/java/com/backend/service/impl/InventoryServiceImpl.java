@@ -12,7 +12,7 @@ import com.backend.repository.ItemRepository;
 import com.backend.repository.PromotionRepository;
 import com.backend.service.InventoryService;
 import com.backend.service.InventorySupabaseService;
-import lombok.RequiredArgsConstructor;
+import com.backend.service.promotion.PromotionService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -30,18 +30,21 @@ public class InventoryServiceImpl implements InventoryService {
     private final InventorySupabaseService supabaseService;
     private final ItemFactoryRegistry factoryRegistry;
     private final BasicInfoDecorator basicInfoDecorator;
+    private final PromotionService promotionService;
 
     public InventoryServiceImpl(
             ItemRepository itemRepository,
             PromotionRepository promotionRepository,
             InventorySupabaseService supabaseService,
             ItemFactoryRegistry factoryRegistry,
-            BasicInfoDecorator basicInfoDecorator) {
+            BasicInfoDecorator basicInfoDecorator,
+            PromotionService promotionService) {
         this.itemRepository = itemRepository;
         this.promotionRepository = promotionRepository;
         this.supabaseService = supabaseService;
         this.factoryRegistry = factoryRegistry;
         this.basicInfoDecorator = basicInfoDecorator;
+        this.promotionService = promotionService;
     }
 
     @Override
@@ -180,7 +183,69 @@ public class InventoryServiceImpl implements InventoryService {
 
     private ItemResponse toItemResponse(Item item) {
         ItemResponse response = new ItemResponse();
-        return basicInfoDecorator.decorate(item, response);
+        response = basicInfoDecorator.decorate(item, response);
+
+        PromotionResult promotionResult = calculateBestPromotion(item);
+        response.setFinalPrice(promotionResult.finalPrice);
+        response.setDiscountApplied(promotionResult.promotionCode);
+
+        return response;
+    }
+
+    private PromotionResult calculateBestPromotion(Item item) {
+        LocalDate today = LocalDate.now();
+
+        List<Promotion> applicablePromotions = promotionRepository.findAll().stream()
+                .filter(promo -> promo.isActive())
+                .filter(promo -> !today.isBefore(promo.getStartDate()))
+                .filter(promo -> !today.isAfter(promo.getEndDate()))
+                .filter(promo -> isPromotionApplicableToItem(promo, item))
+                .collect(Collectors.toList());
+
+        if (applicablePromotions.isEmpty()) {
+            return new PromotionResult(item.getPrice(), null);
+        }
+
+        Double bestPrice = item.getPrice();
+        String bestPromoCode = null;
+
+        for (Promotion promo : applicablePromotions) {
+            try {
+                Double calculatedPrice = promotionService.applyPromotion(promo.getCode(), item.getPrice());
+                if (calculatedPrice < bestPrice) {
+                    bestPrice = calculatedPrice;
+                    bestPromoCode = promo.getCode();
+                }
+            } catch (Exception e) {
+                log.warn("Failed to apply promotion {}: {}", promo.getCode(), e.getMessage());
+            }
+        }
+
+        if (bestPromoCode != null) {
+            log.debug("Applied promotion {} to item {}, price: {} -> {}",
+                    bestPromoCode, item.getName(), item.getPrice(), bestPrice);
+        }
+
+        return new PromotionResult(bestPrice, bestPromoCode);
+    }
+
+    private boolean isPromotionApplicableToItem(Promotion promotion, Item item) {
+        if (promotion.getItemIds() == null || promotion.getItemIds().isBlank()) {
+            return true;
+        }
+
+        List<String> applicableItemIds = Arrays.asList(promotion.getItemIds().split(","));
+        return applicableItemIds.contains(item.getId());
+    }
+
+    private static class PromotionResult {
+        Double finalPrice;
+        String promotionCode;
+
+        PromotionResult(Double finalPrice, String promotionCode) {
+            this.finalPrice = finalPrice;
+            this.promotionCode = promotionCode;
+        }
     }
 
     private PromotionResponse toPromoResponse(Promotion p) {

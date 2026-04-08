@@ -23,7 +23,6 @@ const authFetch = async (endpoint, options = {}) => {
     ...options.headers,
   };
   
-  // Only add auth header if token exists and user is authenticated
   if (isAuthenticated() && token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
@@ -37,33 +36,25 @@ const authFetch = async (endpoint, options = {}) => {
       headers,
     });
     
-    // For 401 Unauthorized, clear invalid token
     if (response.status === 401) {
       console.warn('Received 401 Unauthorized, clearing auth token');
       localStorage.removeItem('accessToken');
       localStorage.removeItem('token');
     }
     
-    // Try to parse response as JSON
     const contentType = response.headers.get('content-type');
     if (contentType && contentType.includes('application/json')) {
       const data = await response.json();
-      
       if (!response.ok) {
         throw new Error(data.message || data.error || `API Error: ${response.status}`);
       }
-      
       return data;
     } else {
-      // If not JSON, get text for debugging
       const text = await response.text();
       console.error('Non-JSON response:', text.substring(0, 200));
-      
       if (!response.ok) {
         throw new Error(`Server error (${response.status}). Please check if backend is running.`);
       }
-      
-      // Try to parse as JSON anyway (in case content-type is wrong)
       try {
         return JSON.parse(text);
       } catch {
@@ -83,7 +74,6 @@ const authFetch = async (endpoint, options = {}) => {
 export const fetchItems = async () => {
   try {
     const response = await authFetch('/inventory/items');
-    // Handle both array and paginated responses
     const itemsArray = Array.isArray(response) ? response : (response.content || response.items || []);
     return itemsArray.map(item => ({
       id: item.id,
@@ -93,6 +83,8 @@ export const fetchItems = async () => {
       size: item.size,
       color: item.color,
       price: item.price,
+      finalPrice: item.finalPrice || item.price,
+      discountApplied: item.promotionApplied !== 'None' ? item.promotionApplied : null,
       status: item.status,
       ageRange: item.ageRange || '',
       description: item.description || '',
@@ -104,7 +96,7 @@ export const fetchItems = async () => {
   }
 };
 
-// Fetch single item by ID
+// Fetch single item by ID with price calculation (uses backend Decorator pattern)
 export const fetchItemById = async (id) => {
   try {
     const response = await authFetch(`/inventory/items/${id}`);
@@ -116,6 +108,10 @@ export const fetchItemById = async (id) => {
       size: response.size,
       color: response.color,
       price: response.price,
+      finalPrice: response.finalPrice || response.price,
+      discountApplied: response.promotionApplied !== 'None' ? response.promotionApplied : null,
+      priceDescription: response.priceDescription || null,
+      savings: response.savings || 0,
       status: response.status,
       ageRange: response.ageRange || '',
       description: response.description || '',
@@ -124,6 +120,25 @@ export const fetchItemById = async (id) => {
   } catch (error) {
     console.error('Error fetching item:', error);
     throw error;
+  }
+};
+
+// Fetch item with calculated price (uses Decorator pattern on backend)
+export const fetchItemPrice = async (id) => {
+  try {
+    const response = await authFetch(`/inventory/items/${id}/price`);
+    return {
+      itemId: response.itemId,
+      itemName: response.itemName,
+      originalPrice: response.originalPrice,
+      finalPrice: response.finalPrice,
+      promotionApplied: response.promotionApplied,
+      priceDescription: response.priceDescription,
+      savings: response.savings,
+    };
+  } catch (error) {
+    console.error('Error fetching item price:', error);
+    return null;
   }
 };
 
@@ -144,8 +159,21 @@ export const fetchPromotions = async () => {
     }));
   } catch (error) {
     console.error('Error fetching promotions:', error);
-    // Return empty array if promotions endpoint fails
     return [];
+  }
+};
+
+// Apply promotion to price (uses backend Adapter pattern)
+export const applyPromotion = async (promotionCode, originalPrice) => {
+  try {
+    const response = await authFetch('/inventory/promotions/apply', {
+      method: 'POST',
+      body: JSON.stringify({ code: promotionCode, originalPrice }),
+    });
+    return response;
+  } catch (error) {
+    console.error('Error applying promotion:', error);
+    return { finalPrice: originalPrice };
   }
 };
 

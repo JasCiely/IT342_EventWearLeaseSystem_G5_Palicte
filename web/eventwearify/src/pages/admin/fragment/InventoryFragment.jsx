@@ -39,16 +39,6 @@ export function StatusBadge({ status, meta = ITEM_STATUS_META }) {
   );
 }
 
-export function PromoBadge({ promo }) {
-  if (!promo) return null;
-  const savings = promo.type === 'percentage' ? `${promo.value}% off` : `₱${promo.value} off`;
-  return (
-    <span className="inv-promo-badge">
-      <Sparkles size={9}/> {promo.code} · {savings}
-    </span>
-  );
-}
-
 export function MediaThumb({ item, className = '' }) {
   const bg    = CAT_COLORS[item.category] || '#6b2d39';
   const files = getMediaFiles(item);
@@ -344,23 +334,21 @@ function MediaDropZone({ files, onChange, hasError }) {
 }
 
 // ────────────────────────────────────────────────────────────
-// Grouped Item Checkboxes (promo modal) - COMPLETE FIXED VERSION
+// Grouped Item Checkboxes (promo modal)
 // ────────────────────────────────────────────────────────────
 function GroupedItemCheckboxes({ items, selected, onChange }) {
-  // Initialize with ALL categories OPEN by default, subcategories CLOSED initially
   const [openCats, setOpenCats] = useState(() => {
     const initial = {};
     CATEGORIES.forEach(cat => {
-      initial[cat] = true; // Categories open by default
+      initial[cat] = true;
     });
     return initial;
   });
   
   const [openSubtypes, setOpenSubtypes] = useState(() => {
-    return {}; // All subcategories start CLOSED
+    return {};
   });
 
-  // Group items by category and subtype
   const grouped = CATEGORIES.reduce((acc, cat) => {
     const ci = items.filter(i => i.category === cat);
     if (!ci.length) return acc;
@@ -419,7 +407,6 @@ function GroupedItemCheckboxes({ items, selected, onChange }) {
   const toggleCatOpen = cat => setOpenCats(p => ({ ...p, [cat]: !p[cat] }));
   const toggleStOpen = key => setOpenSubtypes(p => ({ ...p, [key]: !p[key] }));
 
-  // Calculate total selected items count
   const totalSelected = selected.length;
 
   return (
@@ -534,21 +521,20 @@ function GroupedItemCheckboxes({ items, selected, onChange }) {
 }
 
 // ════════════════════════════════════════════════════════════
-// MAIN FRAGMENT - Optimized with instant rendering
+// MAIN FRAGMENT
 // ════════════════════════════════════════════════════════════
 export default function InventoryFragment() {
-  const [items,     setItems]     = useState([]);
-  const [promos,    setPromos]    = useState([]);
+  const [items, setItems] = useState([]);
+  const [promos, setPromos] = useState([]);
   const [isInitialized, setIsInitialized] = useState(false);
   const [loadError, setLoadError] = useState('');
 
   const [categoryMap, setCategoryMap] = useState(() => {
     const map = {};
-    CATEGORIES.forEach(cat => { map[cat] = [...(CATEGORY_MAP[cat]||[])]; });
+    CATEGORIES.forEach(cat => { map[cat] = [...(CATEGORY_MAP[cat] || [])]; });
     return map;
   });
 
-  // Use useEffect with immediate data fetching but no loading state
   useEffect(() => {
     const load = async () => {
       setLoadError('');
@@ -574,11 +560,21 @@ export default function InventoryFragment() {
         setIsInitialized(true);
       } catch (err) {
         setLoadError(err.message || 'Failed to load inventory data.');
-        setIsInitialized(true); // Still mark as initialized to show error state
+        setIsInitialized(true);
       }
     };
     load();
   }, []);
+
+  const refreshData = async () => {
+    try {
+      const [itemsData, promosData] = await Promise.all([fetchItems(), fetchPromotions()]);
+      setItems(itemsData);
+      setPromos(promosData);
+    } catch (err) {
+      console.error('Failed to refresh data:', err);
+    }
+  };
 
   const registerSubtype = (category, subtype) => {
     if (!subtype || subtype === 'Others') return;
@@ -592,36 +588,34 @@ export default function InventoryFragment() {
     });
   };
 
-  const activeCats     = CATEGORIES.filter(cat => items.some(i => i.category === cat));
+  const activeCats = CATEGORIES.filter(cat => items.some(i => i.category === cat));
   const activeSubtypes = cat => {
-    const used    = [...new Set(items.filter(i=>i.category===cat).map(i=>i.subtype).filter(Boolean))];
-    const ordered = (categoryMap[cat]||[]).filter(s=>used.includes(s));
-    used.forEach(s=>{ if(!ordered.includes(s)) ordered.push(s); });
+    const used = [...new Set(items.filter(i => i.category === cat).map(i => i.subtype).filter(Boolean))];
+    const ordered = (categoryMap[cat] || []).filter(s => used.includes(s));
+    used.forEach(s => { if (!ordered.includes(s)) ordered.push(s); });
     return ordered;
   };
 
-  const [tab,           setTab]           = useState('items');
-  const [viewMode,      setViewMode]      = useState('grid');
-  const [search,        setSearch]        = useState('');
-  const [filterCat,     setFilterCat]     = useState('All');
+  const [tab, setTab] = useState('items');
+  const [viewMode, setViewMode] = useState('grid');
+  const [search, setSearch] = useState('');
+  const [filterCat, setFilterCat] = useState('All');
   const [filterSubtype, setFilterSubtype] = useState('All');
-  const [filterStat,    setFilterStat]    = useState('All');
-  const [sortBy,        setSortBy]        = useState('name');
-  const [sortDir,       setSortDir]       = useState('asc');
-  const [modal,         setModal]         = useState(null);
-  const [selected,      setSelected]      = useState(null);
-  const [gallery,       setGallery]       = useState(null);
-  const [toast,         setToast]         = useState({ show:false, type:'success', message:'' });
-  const [errors,        setErrors]        = useState({});
+  const [filterStat, setFilterStat] = useState('All');
+  const [sortBy, setSortBy] = useState('name');
+  const [sortDir, setSortDir] = useState('asc');
+  const [modal, setModal] = useState(null);
+  const [selected, setSelected] = useState(null);
+  const [gallery, setGallery] = useState(null);
+  const [toast, setToast] = useState({ show: false, type: 'success', message: '' });
+  const [errors, setErrors] = useState({});
   const [customSubtype, setCustomSubtype] = useState('');
-  const [saving,        setSaving]        = useState(false);
-
-  // ── Confirm delete state ──────────────────────────────────
+  const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null);
 
-  const blank      = { name:'', category:'', subtype:'', size:'', color:'Ivory', price:'', status:'Available', mediaFiles:[], ageRange:'', description:'' };
-  const blankPromo = { code:'', type:'percentage', value:'', items:[], start:'', end:'', active:true };
-  const [form,      setForm]      = useState(blank);
+  const blank = { name: '', category: '', subtype: '', size: '', color: 'Ivory', price: '', status: 'Available', mediaFiles: [], ageRange: '', description: '' };
+  const blankPromo = { code: '', type: 'percentage', value: '', items: [], start: '', end: '', active: true };
+  const [form, setForm] = useState(blank);
   const [promoForm, setPromoForm] = useState(blankPromo);
 
   const showToast = useCallback((type, msg) => {
@@ -633,60 +627,73 @@ export default function InventoryFragment() {
   }, []);
 
   const closeModal = () => { setModal(null); setSelected(null); setErrors({}); setCustomSubtype(''); setSaving(false); };
-  const setF  = v => setForm(p=>({...p,...v}));
-  const setPF = v => setPromoForm(p=>({...p,...v}));
+  const setF = v => setForm(p => ({ ...p, ...v }));
+  const setPF = v => setPromoForm(p => ({ ...p, ...v }));
 
-  const filterSubtypes  = filterCat !== 'All' ? activeSubtypes(filterCat) : [];
+  const filterSubtypes = filterCat !== 'All' ? activeSubtypes(filterCat) : [];
   const handleFilterCat = cat => { setFilterCat(cat); setFilterSubtype('All'); };
 
   useEffect(() => {
-    if (filterSubtype!=='All' && filterCat!=='All') {
-      if (!items.some(i=>i.category===filterCat&&i.subtype===filterSubtype)) setFilterSubtype('All');
+    if (filterSubtype !== 'All' && filterCat !== 'All') {
+      if (!items.some(i => i.category === filterCat && i.subtype === filterSubtype)) setFilterSubtype('All');
     }
-    if (filterCat!=='All' && !activeCats.includes(filterCat)) { setFilterCat('All'); setFilterSubtype('All'); }
+    if (filterCat !== 'All' && !activeCats.includes(filterCat)) { setFilterCat('All'); setFilterSubtype('All'); }
   }, [items]);
 
   const validatePromo = () => {
     const e = {};
-    if (!promoForm.code.trim())                                        e.code  = 'Promo code is required.';
-    if (!promoForm.value || Number(promoForm.value) <= 0)             e.value = 'Value is required.';
-    if (!promoForm.start)                                              e.start = 'Valid From date is required.';
-    if (!promoForm.end)                                                e.end   = 'Valid Until date is required.';
-    if (promoForm.start&&promoForm.end&&promoForm.end<promoForm.start) e.end   = 'End date must be after start date.';
+    if (!promoForm.code.trim()) e.code = 'Promo code is required.';
+    if (!promoForm.value || Number(promoForm.value) <= 0) e.value = 'Value is required.';
+    if (!promoForm.start) e.start = 'Valid From date is required.';
+    if (!promoForm.end) e.end = 'Valid Until date is required.';
+    if (promoForm.start && promoForm.end && promoForm.end < promoForm.start) e.end = 'End date must be after start date.';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
-  // ── Active promo helpers ──────────────────────────────────
-  const activePromo = useCallback(item => {
-    const now = todayStr();
-    return promos.find(p =>
-      p.active &&
-      Array.isArray(p.items) &&
-      p.items.includes(item.id) &&
-      p.start <= now &&
-      p.end   >= now
-    );
-  }, [promos]);
-
-  const discPrice = item => {
-    const p = activePromo(item);
-    if (!p) return item.price;
-    return p.type === 'percentage' ? item.price * (1 - p.value / 100) : item.price - p.value;
+  const getDisplayPrice = (item) => {
+    return item.finalPrice || item.price;
   };
 
-  // ── Save Item ─────────────────────────────────────────────
+  const getOriginalPrice = (item) => {
+    return item.price;
+  };
+
+  const hasDiscount = (item) => {
+    return item.discountApplied !== null && item.discountApplied !== undefined && item.discountApplied !== 'None';
+  };
+
+  const getDiscountInfo = (item) => {
+    return item.discountApplied;
+  };
+
+  const getSavings = (item) => {
+    return (item.price - (item.finalPrice || item.price));
+  };
+
+  // Helper function to get discount value text (for ribbon/badge)
+  const getDiscountValueText = (discountCode) => {
+    if (!discountCode) return '';
+    const promo = promos.find(p => p.code === discountCode);
+    if (!promo) return discountCode;
+    if (promo.type === 'percentage') {
+      return `${promo.value}% off`;
+    } else {
+      return `₱${promo.value} off`;
+    }
+  };
+
   const saveItem = async () => {
     const finalSubtype = form.subtype === 'Others' ? (customSubtype.trim() || 'Others') : form.subtype;
-    const finalForm    = { ...form, subtype: finalSubtype };
+    const finalForm = { ...form, subtype: finalSubtype };
 
     const e = {};
-    if (!finalForm.mediaFiles?.length)                        e.media    = 'At least one photo or video is required.';
-    if (!finalForm.name.trim())                               e.name     = 'Item name is required.';
-    if (!finalForm.category)                                  e.category = 'Category is required.';
-    if (!finalForm.subtype || finalForm.subtype === 'Others') e.subtype  = 'Please specify the type.';
-    if (!finalForm.size)                                      e.size     = 'Size is required.';
-    if (!finalForm.price || Number(finalForm.price) <= 0)    e.price    = 'Valid price is required.';
+    if (!finalForm.mediaFiles?.length) e.media = 'At least one photo or video is required.';
+    if (!finalForm.name.trim()) e.name = 'Item name is required.';
+    if (!finalForm.category) e.category = 'Category is required.';
+    if (!finalForm.subtype || finalForm.subtype === 'Others') e.subtype = 'Please specify the type.';
+    if (!finalForm.size) e.size = 'Size is required.';
+    if (!finalForm.price || Number(finalForm.price) <= 0) e.price = 'Valid price is required.';
     if (Object.keys(e).length) { setErrors(e); return; }
 
     setSaving(true);
@@ -703,14 +710,13 @@ export default function InventoryFragment() {
 
     try {
       if (modal === 'add') {
-        const created = await apiCreateItem(itemData, newFiles);
-        setItems(p => [...p, created]);
+        await apiCreateItem(itemData, newFiles);
         showToast('success', 'Item added!');
       } else {
-        const updated = await apiUpdateItem(selected.id, itemData, newFiles, keepUrls);
-        setItems(p => p.map(i => i.id === selected.id ? updated : i));
+        await apiUpdateItem(selected.id, itemData, newFiles, keepUrls);
         showToast('success', 'Item updated!');
       }
+      await refreshData();
       const defaultSubs = CATEGORY_MAP[finalForm.category] || [];
       if (finalSubtype && finalSubtype !== 'Others' && !defaultSubs.includes(finalSubtype))
         registerSubtype(finalForm.category, finalSubtype);
@@ -722,40 +728,26 @@ export default function InventoryFragment() {
     }
   };
 
-  // ── Delete helpers with immediate UI update ───────────────
-  const askDeleteItem  = item  => setConfirmDelete({ type: 'item',  id: item.id,   name: item.name });
-  const askDeletePromo = promo => setConfirmDelete({ type: 'promo', id: promo.id,  name: promo.code });
+  const askDeleteItem = item => setConfirmDelete({ type: 'item', id: item.id, name: item.name });
+  const askDeletePromo = promo => setConfirmDelete({ type: 'promo', id: promo.id, name: promo.code });
 
   const handleConfirmedDelete = async () => {
     if (!confirmDelete) return;
     const { type, id, name } = confirmDelete;
-    
-    // Close modal immediately
     setConfirmDelete(null);
-    
+
     try {
       if (type === 'item') {
-        // Optimistically update UI first
-        setItems(prev => prev.filter(i => i.id !== id));
         await apiDeleteItem(id);
         showToast('success', `"${name}" deleted successfully.`);
       } else {
-        // Optimistically update UI first
-        setPromos(prev => prev.filter(p => p.id !== id));
         await apiDeletePromotion(id);
         showToast('success', `Promo "${name}" deleted successfully.`);
       }
+      await refreshData();
     } catch (err) {
-      // If deletion fails, revert the optimistic update
       showToast('error', err.message || 'Failed to delete.');
-      // Refresh data to ensure consistency
-      try {
-        const [itemsData, promosData] = await Promise.all([fetchItems(), fetchPromotions()]);
-        setItems(itemsData);
-        setPromos(promosData);
-      } catch (refreshErr) {
-        console.error('Failed to refresh data:', refreshErr);
-      }
+      await refreshData();
     }
   };
 
@@ -764,15 +756,14 @@ export default function InventoryFragment() {
     setSaving(true);
     try {
       if (selected) {
-        const updated = await apiUpdatePromotion(selected.id, promoForm);
-        setPromos(p => p.map(x => x.id === selected.id ? updated : x));
+        await apiUpdatePromotion(selected.id, promoForm);
         showToast('success', 'Promo updated!');
       } else {
-        const created = await apiCreatePromotion(promoForm);
-        setPromos(p => [...p, created]);
+        await apiCreatePromotion(promoForm);
         showToast('success', 'Promo created!');
       }
       closeModal();
+      await refreshData();
     } catch (err) {
       showToast('error', err.message || 'Failed to save promo.');
     } finally {
@@ -783,10 +774,10 @@ export default function InventoryFragment() {
   const displayed = items
     .filter(i => {
       const q = search.toLowerCase();
-      return (!q || i.name.toLowerCase().includes(q) || i.category.toLowerCase().includes(q) || (i.subtype||'').toLowerCase().includes(q))
-        && (filterCat     === 'All' || i.category === filterCat)
-        && (filterSubtype === 'All' || i.subtype  === filterSubtype)
-        && (filterStat    === 'All' || i.status   === filterStat);
+      return (!q || i.name.toLowerCase().includes(q) || i.category.toLowerCase().includes(q) || (i.subtype || '').toLowerCase().includes(q))
+        && (filterCat === 'All' || i.category === filterCat)
+        && (filterSubtype === 'All' || i.subtype === filterSubtype)
+        && (filterStat === 'All' || i.status === filterStat);
     })
     .sort((a, b) => {
       let va = a[sortBy], vb = b[sortBy];
@@ -794,18 +785,18 @@ export default function InventoryFragment() {
       return sortDir === 'asc' ? (va > vb ? 1 : -1) : (va < vb ? 1 : -1);
     });
 
-  const toggleSort = col => { if(sortBy===col) setSortDir(d=>d==='asc'?'desc':'asc'); else{setSortBy(col);setSortDir('asc');} };
+  const toggleSort = col => { if (sortBy === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortBy(col); setSortDir('asc'); } };
 
   const stats = {
-    total:       items.length,
-    available:   items.filter(i=>i.status==='Available').length,
-    leased:      items.filter(i=>i.status==='Leased').length,
-    maintenance: items.filter(i=>i.status==='Maintenance').length,
+    total: items.length,
+    available: items.filter(i => i.status === 'Available').length,
+    leased: items.filter(i => i.status === 'Leased').length,
+    maintenance: items.filter(i => i.status === 'Maintenance').length,
   };
 
   const openEdit = item => {
     const defaultSubs = CATEGORY_MAP[item.category] || [];
-    const isCustom    = item.subtype && !defaultSubs.includes(item.subtype) && item.subtype !== 'Others';
+    const isCustom = item.subtype && !defaultSubs.includes(item.subtype) && item.subtype !== 'Others';
     setCustomSubtype(isCustom ? item.subtype : '');
     closeModal();
     const existingMedia = getMediaFiles(item).map(mf => ({
@@ -817,10 +808,9 @@ export default function InventoryFragment() {
   };
 
   const ErrMsg = ({ field }) => errors[field]
-    ? <span className="inv-field-error"><AlertCircle size={11}/> {errors[field]}</span>
+    ? <span className="inv-field-error"><AlertCircle size={11} /> {errors[field]}</span>
     : null;
 
-  // Subtype dropdown — always show all CATEGORY_MAP defaults
   const _subtypeVisible = form.category ? [...(CATEGORY_MAP[form.category] || [])] : [];
   if (form.category) {
     items
@@ -836,107 +826,101 @@ export default function InventoryFragment() {
     const _idx = _subtypeVisible.indexOf('Others');
     _idx >= 0 ? _subtypeVisible.splice(_idx, 0, selected.subtype) : _subtypeVisible.push(selected.subtype);
   }
-  const _subtypeSelectVal  = _subtypeVisible.includes(form.subtype) ? form.subtype : (form.subtype && form.subtype !== 'Others' ? 'Others' : (form.subtype || ''));
+  const _subtypeSelectVal = _subtypeVisible.includes(form.subtype) ? form.subtype : (form.subtype && form.subtype !== 'Others' ? 'Others' : (form.subtype || ''));
   const _subtypeShowCustom = form.subtype === 'Others';
 
-  // Show error state if needed, otherwise render content immediately
   if (loadError && isInitialized) return (
     <div className="inv-root inv-error-state">
-      <AlertCircle size={28} color="#dc2626"/>
+      <AlertCircle size={28} color="#dc2626" />
       <p>{loadError}</p>
       <button className="inv-btn-primary" onClick={() => window.location.reload()}>Retry</button>
     </div>
   );
 
-  // Always render content - no loading spinner
   return (
     <div className="inv-root">
 
-      {/* ── Header ── */}
       <div className="inv-top">
         <div>
           <h2 className="inv-title">Inventory</h2>
           <p className="inv-subtitle">Manage event wear items and active promotions</p>
         </div>
         <div className="inv-header-actions">
-          {tab==='items'  && <button className="inv-btn-primary" onClick={()=>{ setForm(blank); setErrors({}); setModal('add'); }}><Plus size={14}/> Add Item</button>}
-          {tab==='promos' && <button className="inv-btn-primary" onClick={()=>{ setSelected(null); setPromoForm(blankPromo); setErrors({}); setModal('promo'); }}><Plus size={14}/> New Promo</button>}
+          {tab === 'items' && <button className="inv-btn-primary" onClick={() => { setForm(blank); setErrors({}); setModal('add'); }}><Plus size={14} /> Add Item</button>}
+          {tab === 'promos' && <button className="inv-btn-primary" onClick={() => { setSelected(null); setPromoForm(blankPromo); setErrors({}); setModal('promo'); }}><Plus size={14} /> New Promo</button>}
         </div>
       </div>
 
-      {/* ── Stats ── */}
       <div className="inv-stats">
         {[
-          { label:'Total Items',  value:stats.total,       icon:Package,     color:'#6b2d39' },
-          { label:'Available',    value:stats.available,   icon:CheckCircle, color:'#15803d' },
-          { label:'Out on Lease', value:stats.leased,      icon:Tag,         color:'#b45309' },
-          { label:'Maintenance',  value:stats.maintenance, icon:Wrench,      color:'#9a3412' },
-        ].map(({ label,value,icon:Icon,color }) => (
+          { label: 'Total Items', value: stats.total, icon: Package, color: '#6b2d39' },
+          { label: 'Available', value: stats.available, icon: CheckCircle, color: '#15803d' },
+          { label: 'Out on Lease', value: stats.leased, icon: Tag, color: '#b45309' },
+          { label: 'Maintenance', value: stats.maintenance, icon: Wrench, color: '#9a3412' },
+        ].map(({ label, value, icon: Icon, color }) => (
           <div className="inv-stat-card" key={label}>
-            <div className="inv-stat-icon" style={{ background:`${color}18`, color }}><Icon size={18}/></div>
+            <div className="inv-stat-icon" style={{ background: `${color}18`, color }}><Icon size={18} /></div>
             <div><div className="inv-stat-value">{value}</div><div className="inv-stat-label">{label}</div></div>
           </div>
         ))}
       </div>
 
-      {/* ── Tabs ── */}
       <div className="inv-tabs">
-        {[{key:'items',label:'Items',icon:Package},{key:'promos',label:'Promotions',icon:Gift}].map(({key,label,icon:Icon})=>(
-          <button key={key} className={`inv-tab${tab===key?' active':''}`} onClick={()=>setTab(key)}><Icon size={13}/> {label}</button>
+        {[{ key: 'items', label: 'Items', icon: Package }, { key: 'promos', label: 'Promotions', icon: Gift }].map(({ key, label, icon: Icon }) => (
+          <button key={key} className={`inv-tab${tab === key ? ' active' : ''}`} onClick={() => setTab(key)}><Icon size={13} /> {label}</button>
         ))}
       </div>
 
-      {/* ════ ITEMS TAB ════ */}
-      {tab==='items' && (
+      {tab === 'items' && (
         <div className="inv-card">
           <div className="inv-toolbar">
             <div className="inv-search-wrap">
-              <Search size={13} className="inv-search-icon"/>
-              <input className="inv-search" placeholder="Search items…" value={search} onChange={e=>setSearch(e.target.value)}/>
+              <Search size={13} className="inv-search-icon" />
+              <input className="inv-search" placeholder="Search items…" value={search} onChange={e => setSearch(e.target.value)} />
             </div>
             <div className="inv-filters">
-              <select className="inv-select" value={filterCat} onChange={e=>handleFilterCat(e.target.value)}>
+              <select className="inv-select" value={filterCat} onChange={e => handleFilterCat(e.target.value)}>
                 <option value="All">All Categories</option>
-                {activeCats.map(c=><option key={c}>{c}</option>)}
+                {activeCats.map(c => <option key={c}>{c}</option>)}
               </select>
-              {filterCat!=='All'&&filterSubtypes.length>0&&(
-                <select className="inv-select" value={filterSubtype} onChange={e=>setFilterSubtype(e.target.value)}>
+              {filterCat !== 'All' && filterSubtypes.length > 0 && (
+                <select className="inv-select" value={filterSubtype} onChange={e => setFilterSubtype(e.target.value)}>
                   <option value="All">All {filterCat}</option>
-                  {filterSubtypes.map(s=><option key={s} value={s}>{s}</option>)}
+                  {filterSubtypes.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               )}
-              <select className="inv-select" value={filterStat} onChange={e=>setFilterStat(e.target.value)}>
+              <select className="inv-select" value={filterStat} onChange={e => setFilterStat(e.target.value)}>
                 <option value="All">All Statuses</option>
-                {Object.keys(ITEM_STATUS_META).map(s=><option key={s}>{s}</option>)}
+                {Object.keys(ITEM_STATUS_META).map(s => <option key={s}>{s}</option>)}
               </select>
             </div>
             <div className="inv-view-toggle">
-              <button className={`inv-view-btn${viewMode==='grid'?' active':''}`} onClick={()=>setViewMode('grid')} title="Grid"><LayoutGrid size={15}/></button>
-              <button className={`inv-view-btn${viewMode==='list'?' active':''}`} onClick={()=>setViewMode('list')} title="List"><List size={15}/></button>
+              <button className={`inv-view-btn${viewMode === 'grid' ? ' active' : ''}`} onClick={() => setViewMode('grid')} title="Grid"><LayoutGrid size={15} /></button>
+              <button className={`inv-view-btn${viewMode === 'list' ? ' active' : ''}`} onClick={() => setViewMode('list')} title="List"><List size={15} /></button>
             </div>
           </div>
 
-          {/* ── GRID VIEW ── */}
-          {viewMode==='grid' && (
+          {viewMode === 'grid' && (
             <div className="inv-grid">
-              {displayed.length===0 && <div className="inv-empty-grid">No items found.</div>}
+              {displayed.length === 0 && <div className="inv-empty-grid">No items found.</div>}
               {displayed.map(item => {
-                const promo  = activePromo(item);
-                const disc   = discPrice(item);
+                const finalPrice = getDisplayPrice(item);
+                const originalPrice = getOriginalPrice(item);
+                const discount = hasDiscount(item);
+                const discountCode = getDiscountInfo(item);
+                const discountValueText = getDiscountValueText(discountCode);
                 const mFiles = getMediaFiles(item);
                 return (
-                  <div key={item.id} className={`inv-grid-card${promo?' has-promo':''}`}>
-                    <div className="inv-grid-media" onClick={()=>mFiles.length&&setGallery({item,startIndex:0})}>
-                      <MediaThumb item={item} className="inv-grid-media-inner"/>
-                      {mFiles.length>0 && <div className="inv-grid-media-overlay"><Eye size={16}/> View {mFiles.length>1?`(${mFiles.length})`:''}</div>}
-                      {mFiles.length>1 && <span className="inv-grid-photo-count"><Image size={9}/> {mFiles.length}</span>}
-                      {/* Status — top-right */}
-                      <div className="inv-grid-status-pin"><StatusBadge status={item.status}/></div>
-                      {/* Promo ribbon — bottom-left */}
-                      {promo && (
+                  <div key={item.id} className={`inv-grid-card${discount ? ' has-promo' : ''}`}>
+                    <div className="inv-grid-media" onClick={() => mFiles.length && setGallery({ item, startIndex: 0 })}>
+                      <MediaThumb item={item} className="inv-grid-media-inner" />
+                      {mFiles.length > 0 && <div className="inv-grid-media-overlay"><Eye size={16} /> View {mFiles.length > 1 ? `(${mFiles.length})` : ''}</div>}
+                      {mFiles.length > 1 && <span className="inv-grid-photo-count"><Image size={9} /> {mFiles.length}</span>}
+                      <div className="inv-grid-status-pin"><StatusBadge status={item.status} /></div>
+                      {discount && discountValueText && (
                         <div className="inv-grid-promo-ribbon">
-                          <Sparkles size={9}/>
-                          {promo.type==='percentage' ? `${promo.value}% OFF` : `₱${promo.value} OFF`}
+                          <Sparkles size={9} />
+                          {discountValueText}
                         </div>
                       )}
                     </div>
@@ -948,24 +932,23 @@ export default function InventoryFragment() {
                         <span className="inv-grid-size">{item.size}</span>
                       </div>
                       <div className="inv-grid-price-row">
-                        {promo ? (
-                          <><span className="inv-price-old">₱{item.price.toLocaleString()}</span><span className="inv-price-new">₱{Math.round(disc).toLocaleString()}</span></>
+                        {discount ? (
+                          <><span className="inv-price-old">₱{originalPrice.toLocaleString()}</span><span className="inv-price-new">₱{Math.round(finalPrice).toLocaleString()}</span></>
                         ) : (
-                          <span className="inv-price">₱{item.price.toLocaleString()}</span>
+                          <span className="inv-price">₱{originalPrice.toLocaleString()}</span>
                         )}
                       </div>
-                      {promo && (
+                      {discount && discountCode && (
                         <div className="inv-promo-code-pill">
-                          <Sparkles size={9}/>
-                          <span>{promo.code}</span>
-                          <span className="inv-promo-code-pill-disc">{promo.type==='percentage'?`${promo.value}% off`:`₱${promo.value} off`}</span>
+                          <Sparkles size={9} />
+                          <span>{discountCode}</span>
                         </div>
                       )}
                     </div>
                     <div className="inv-grid-actions">
-                      <button className="inv-icon-btn" title="View"   onClick={()=>{ setSelected(item); setModal('view'); }}><Eye size={13}/></button>
-                      <button className="inv-icon-btn" title="Edit"   onClick={()=>openEdit(item)}><Edit2 size={13}/></button>
-                      <button className="inv-icon-btn danger" title="Delete" onClick={()=>askDeleteItem(item)}><Trash2 size={13}/></button>
+                      <button className="inv-icon-btn" title="View" onClick={() => { setSelected(item); setModal('view'); }}><Eye size={13} /></button>
+                      <button className="inv-icon-btn" title="Edit" onClick={() => openEdit(item)}><Edit2 size={13} /></button>
+                      <button className="inv-icon-btn danger" title="Delete" onClick={() => askDeleteItem(item)}><Trash2 size={13} /></button>
                     </div>
                   </div>
                 );
@@ -973,44 +956,46 @@ export default function InventoryFragment() {
             </div>
           )}
 
-          {/* ── LIST VIEW ── */}
-          {viewMode==='list' && (
+          {viewMode === 'list' && (
             <div className="inv-table-wrap">
               <table className="inv-table">
                 <thead>
                   <tr>
-                    <th style={{width:72}}>Photo</th>
-                    <th className="inv-th-sort" onClick={()=>toggleSort('name')}>Name {sortBy==='name'?(sortDir==='asc'?'↑':'↓'):<span style={{opacity:0.3}}>↕</span>}</th>
-                    <th className="inv-th-sort" onClick={()=>toggleSort('category')}>Category {sortBy==='category'?(sortDir==='asc'?'↑':'↓'):<span style={{opacity:0.3}}>↕</span>}</th>
+                    <th style={{ width: 72 }}>Photo</th>
+                    <th className="inv-th-sort" onClick={() => toggleSort('name')}>Name {sortBy === 'name' ? (sortDir === 'asc' ? '↑' : '↓') : <span style={{ opacity: 0.3 }}>↕</span>}</th>
+                    <th className="inv-th-sort" onClick={() => toggleSort('category')}>Category {sortBy === 'category' ? (sortDir === 'asc' ? '↑' : '↓') : <span style={{ opacity: 0.3 }}>↕</span>}</th>
                     <th>Type</th><th>Size</th>
-                    <th className="inv-th-sort" onClick={()=>toggleSort('price')}>Price {sortBy==='price'?(sortDir==='asc'?'↑':'↓'):<span style={{opacity:0.3}}>↕</span>}</th>
+                    <th className="inv-th-sort" onClick={() => toggleSort('price')}>Price {sortBy === 'price' ? (sortDir === 'asc' ? '↑' : '↓') : <span style={{ opacity: 0.3 }}>↕</span>}</th>
                     <th>Status</th>
-                    <th style={{width:100}}>Actions</th>
+                    <th style={{ width: 100 }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {displayed.length===0 && <tr><td colSpan={8} className="inv-empty">No items found.</td></tr>}
+                  {displayed.length === 0 && (
+                    <tr><td colSpan={8} className="inv-empty">No items found.</td></tr>
+                  )}
                   {displayed.map(item => {
-                    const promo  = activePromo(item);
-                    const disc   = discPrice(item);
+                    const finalPrice = getDisplayPrice(item);
+                    const originalPrice = getOriginalPrice(item);
+                    const discount = hasDiscount(item);
+                    const discountCode = getDiscountInfo(item);
+                    const discountValueText = getDiscountValueText(discountCode);
                     const mFiles = getMediaFiles(item);
                     return (
-                      <tr key={item.id} className={`inv-tr${promo?' inv-tr-promo':''}`}>
+                      <tr key={item.id} className={`inv-tr${discount ? ' inv-tr-promo' : ''}`}>
                         <td>
-                          <div className="inv-list-thumb" onClick={()=>mFiles.length&&setGallery({item,startIndex:0})}>
-                            <MediaThumb item={item} className="inv-list-thumb-inner"/>
-                            {mFiles.length>0 && <div className="inv-list-thumb-overlay"><Eye size={12}/></div>}
-                            {mFiles.length>1 && <span className="inv-list-photo-count">{mFiles.length}</span>}
+                          <div className="inv-list-thumb" onClick={() => mFiles.length && setGallery({ item, startIndex: 0 })}>
+                            <MediaThumb item={item} className="inv-list-thumb-inner" />
+                            {mFiles.length > 0 && <div className="inv-list-thumb-overlay"><Eye size={12} /></div>}
+                            {mFiles.length > 1 && <span className="inv-list-photo-count">{mFiles.length}</span>}
                           </div>
                         </td>
                         <td>
                           <div className="inv-item-name">{item.name}</div>
-                          {promo && (
+                          {discount && discountCode && (
                             <div className="inv-list-promo-badge">
-                              <Sparkles size={9}/>
-                              <span>{promo.code}</span>
-                              <span>·</span>
-                              <span>{promo.type==='percentage'?`${promo.value}% off`:`₱${promo.value} off`}</span>
+                              <Sparkles size={9} />
+                              <span>{discountCode}</span>
                             </div>
                           )}
                         </td>
@@ -1018,21 +1003,21 @@ export default function InventoryFragment() {
                         <td><span className="inv-subtype-tag">{item.subtype}</span></td>
                         <td>{item.size}</td>
                         <td>
-                          {promo ? (
+                          {discount ? (
                             <div>
-                              <div className="inv-price-old">₱{item.price.toLocaleString()}</div>
-                              <div className="inv-price-new">₱{Math.round(disc).toLocaleString()}</div>
+                              <div className="inv-price-old">₱{originalPrice.toLocaleString()}</div>
+                              <div className="inv-price-new">₱{Math.round(finalPrice).toLocaleString()}</div>
                             </div>
                           ) : (
-                            <span className="inv-price">₱{item.price.toLocaleString()}</span>
+                            <span className="inv-price">₱{originalPrice.toLocaleString()}</span>
                           )}
                         </td>
-                        <td><StatusBadge status={item.status}/></td>
+                        <td><StatusBadge status={item.status} /></td>
                         <td>
                           <div className="inv-row-actions">
-                            <button className="inv-icon-btn" onClick={()=>{ setSelected(item); setModal('view'); }}><Eye size={13}/></button>
-                            <button className="inv-icon-btn" onClick={()=>openEdit(item)}><Edit2 size={13}/></button>
-                            <button className="inv-icon-btn danger" onClick={()=>askDeleteItem(item)}><Trash2 size={13}/></button>
+                            <button className="inv-icon-btn" onClick={() => { setSelected(item); setModal('view'); }}><Eye size={13} /></button>
+                            <button className="inv-icon-btn" onClick={() => openEdit(item)}><Edit2 size={13} /></button>
+                            <button className="inv-icon-btn danger" onClick={() => askDeleteItem(item)}><Trash2 size={13} /></button>
                           </div>
                         </td>
                       </tr>
@@ -1045,42 +1030,41 @@ export default function InventoryFragment() {
         </div>
       )}
 
-      {/* ════ PROMOS TAB ════ */}
-      {tab==='promos' && (
+      {tab === 'promos' && (
         <div className="inv-card">
-          {promos.length===0 && <div className="inv-empty">No promotions yet.</div>}
+          {promos.length === 0 && <div className="inv-empty">No promotions yet.</div>}
           <div className="inv-promo-grid">
             {promos.map(promo => {
               const applicable = items.filter(i => promo.items.includes(i.id));
               const now = todayStr();
               const isLive = promo.active && promo.start <= now && promo.end >= now;
               return (
-                <div key={promo.id} className={`inv-promo-card${isLive?' inv-promo-card-live':''}`}>
+                <div key={promo.id} className={`inv-promo-card${isLive ? ' inv-promo-card-live' : ''}`}>
                   <div className="inv-promo-card-header">
-                    <div className="inv-promo-icon">{promo.type==='percentage'?<Percent size={15}/>:<DollarSign size={15}/>}</div>
+                    <div className="inv-promo-icon">{promo.type === 'percentage' ? <Percent size={15} /> : <DollarSign size={15} />}</div>
                     <div>
                       <div className="inv-promo-code">{promo.code}</div>
-                      <div className="inv-promo-value">{promo.type==='percentage'?`${promo.value}% off`:`₱${promo.value} off`}</div>
+                      <div className="inv-promo-value">{promo.type === 'percentage' ? `${promo.value}% off` : `₱${promo.value} off`}</div>
                     </div>
-                    <span className={`inv-promo-active ${isLive?'on':'off'}`}>{isLive?'Live':'Off'}</span>
+                    <span className={`inv-promo-active ${isLive ? 'on' : 'off'}`}>{isLive ? 'Live' : 'Off'}</span>
                   </div>
                   <div className="inv-promo-dates">{fmtDate(promo.start)} — {fmtDate(promo.end)}</div>
                   {applicable.length > 0 && (
                     <div className="inv-promo-item-thumbs">
-                      {applicable.slice(0,5).map(i => (
+                      {applicable.slice(0, 5).map(i => (
                         <div key={i.id} className="inv-promo-item-thumb-wrap" title={i.name}>
-                          <MediaThumb item={i} className="inv-promo-item-thumb-img"/>
+                          <MediaThumb item={i} className="inv-promo-item-thumb-img" />
                         </div>
                       ))}
-                      {applicable.length > 5 && <div className="inv-promo-item-thumb-more">+{applicable.length-5}</div>}
+                      {applicable.length > 5 && <div className="inv-promo-item-thumb-more">+{applicable.length - 5}</div>}
                     </div>
                   )}
                   <div className="inv-promo-items">
-                    {applicable.map(i=><span key={i.id} className="inv-promo-item-tag">{i.name}</span>)}
+                    {applicable.map(i => <span key={i.id} className="inv-promo-item-tag">{i.name}</span>)}
                   </div>
                   <div className="inv-promo-card-actions">
-                    <button className="inv-btn-sm outline" onClick={()=>{ setSelected(promo); setPromoForm({...promo}); setErrors({}); setModal('promo'); }}><Edit2 size={10}/> Edit</button>
-                    <button className="inv-btn-sm danger"  onClick={()=>askDeletePromo(promo)}><Trash2 size={10}/> Delete</button>
+                    <button className="inv-btn-sm outline" onClick={() => { setSelected(promo); setPromoForm({ ...promo }); setErrors({}); setModal('promo'); }}><Edit2 size={10} /> Edit</button>
+                    <button className="inv-btn-sm danger" onClick={() => askDeletePromo(promo)}><Trash2 size={10} /> Delete</button>
                   </div>
                 </div>
               );
@@ -1089,87 +1073,78 @@ export default function InventoryFragment() {
         </div>
       )}
 
-      {/* ══ MODAL: Add / Edit Item ══ */}
-      {(modal==='add'||modal==='edit') && (
+      {(modal === 'add' || modal === 'edit') && (
         <div className="inv-overlay" onClick={closeModal}>
-          <div className="inv-modal" onClick={e=>e.stopPropagation()}>
+          <div className="inv-modal" onClick={e => e.stopPropagation()}>
             <div className="inv-modal-header">
-              <h3>{modal==='add'?'Add New Item':'Edit Item'}</h3>
-              <button className="inv-modal-close" onClick={closeModal} disabled={saving}><X size={15}/></button>
+              <h3>{modal === 'add' ? 'Add New Item' : 'Edit Item'}</h3>
+              <button className="inv-modal-close" onClick={closeModal} disabled={saving}><X size={15} /></button>
             </div>
             <div className="inv-modal-body">
               <div className="inv-field">
                 <label className="inv-field-label">Photos / Videos <span className="inv-required">*</span></label>
                 <MediaDropZone
-                  files={form.mediaFiles||[]}
+                  files={form.mediaFiles || []}
                   hasError={!!errors.media}
-                  onChange={files=>{ setF({mediaFiles:files}); setErrors(p=>({...p,media:undefined})); }}
+                  onChange={files => { setF({ mediaFiles: files }); setErrors(p => ({ ...p, media: undefined })); }}
                 />
-                {errors.media && <span className="inv-field-error"><AlertCircle size={11}/> {errors.media}</span>}
+                {errors.media && <span className="inv-field-error"><AlertCircle size={11} /> {errors.media}</span>}
               </div>
               <p className="inv-required-note"><span className="inv-required">*</span> Required fields</p>
               <div className="inv-modal-grid">
                 <div className="inv-field inv-field-full">
                   <label className="inv-field-label">Item Name <span className="inv-required">*</span></label>
-                  <input className={`inv-input${errors.name?' inv-input-err':''}`} value={form.name}
-                    onChange={e=>{ setF({name:e.target.value}); setErrors(p=>({...p,name:undefined})); }}
-                    placeholder="e.g. Ivory Lace Ballgown" disabled={saving}/>
-                  <ErrMsg field="name"/>
+                  <input className={`inv-input${errors.name ? ' inv-input-err' : ''}`} value={form.name}
+                    onChange={e => { setF({ name: e.target.value }); setErrors(p => ({ ...p, name: undefined })); }}
+                    placeholder="e.g. Ivory Lace Ballgown" disabled={saving} />
+                  <ErrMsg field="name" />
                 </div>
-                <div className="inv-field-full inv-modal-grid" style={{gap:'0.75rem'}}>
+                <div className="inv-field-full inv-modal-grid" style={{ gap: '0.75rem' }}>
                   <div className="inv-field">
                     <label className="inv-field-label">Category <span className="inv-required">*</span></label>
-                    <select className={`inv-input${errors.category?' inv-input-err':''}`} value={form.category}
-                      onChange={e=>{ 
-                        setF({category:e.target.value, subtype:''}); 
-                        setErrors(p=>({...p,category:undefined,subtype:undefined}));
+                    <select className={`inv-input${errors.category ? ' inv-input-err' : ''}`} value={form.category}
+                      onChange={e => {
+                        setF({ category: e.target.value, subtype: '' });
+                        setErrors(p => ({ ...p, category: undefined, subtype: undefined }));
                       }}
                       disabled={saving}>
                       <option value="">— Select category —</option>
-                      {CATEGORIES.map(c=><option key={c}>{c}</option>)}
+                      {CATEGORIES.map(c => <option key={c}>{c}</option>)}
                     </select>
-                    <ErrMsg field="category"/>
-                    {!form.category && (
-                      <span className="inv-field-hint" style={{color:'#c4717f', marginTop:'0.25rem'}}>
-                        ⚠ Please select a category first to see available types
-                      </span>
-                    )}
+                    <ErrMsg field="category" />
                   </div>
                   {form.category && form.category !== '' && (
                     <div className="inv-field">
                       <label className="inv-field-label">Type / Subtype <span className="inv-required">*</span></label>
-                      <select className={`inv-input${errors.subtype?' inv-input-err':''}`} value={_subtypeSelectVal}
-                        onChange={e=>{ 
-                          setF({subtype:e.target.value}); 
-                          setCustomSubtype(''); 
-                          setErrors(p=>({...p,subtype:undefined}));
+                      <select className={`inv-input${errors.subtype ? ' inv-input-err' : ''}`} value={_subtypeSelectVal}
+                        onChange={e => {
+                          setF({ subtype: e.target.value });
+                          setCustomSubtype('');
+                          setErrors(p => ({ ...p, subtype: undefined }));
                         }}
                         disabled={saving}>
                         <option value="">— Select type —</option>
-                        {_subtypeVisible.map(s=><option key={s}>{s}</option>)}
+                        {_subtypeVisible.map(s => <option key={s}>{s}</option>)}
                       </select>
                       {_subtypeShowCustom && (
-                        <input className="inv-input" style={{marginTop:'0.5rem'}} value={customSubtype}
-                          onChange={e=>setCustomSubtype(e.target.value)} 
-                          placeholder="Type new subtype…" 
-                          disabled={saving}/>
+                        <input className="inv-input" style={{ marginTop: '0.5rem' }} value={customSubtype}
+                          onChange={e => setCustomSubtype(e.target.value)}
+                          placeholder="Type new subtype…"
+                          disabled={saving} />
                       )}
-                      <ErrMsg field="subtype"/>
-                      <span className="inv-field-hint">
-                        Select a type or choose "Others" to add a new one
-                      </span>
+                      <ErrMsg field="subtype" />
                     </div>
                   )}
                 </div>
                 <div className="inv-field">
                   <label className="inv-field-label">Size <span className="inv-required">*</span></label>
-                  <select className={`inv-input${errors.size?' inv-input-err':''}`} value={form.size}
-                    onChange={e=>{ setF({size:e.target.value}); setErrors(p=>({...p,size:undefined})); }}
+                  <select className={`inv-input${errors.size ? ' inv-input-err' : ''}`} value={form.size}
+                    onChange={e => { setF({ size: e.target.value }); setErrors(p => ({ ...p, size: undefined })); }}
                     disabled={saving}>
                     <option value="">— Select size —</option>
-                    {SIZES.map(s=><option key={s}>{s}</option>)}
+                    {SIZES.map(s => <option key={s}>{s}</option>)}
                   </select>
-                  <ErrMsg field="size"/>
+                  <ErrMsg field="size" />
                 </div>
                 <div className="inv-field">
                   <label className="inv-field-label">Color</label>
@@ -1180,215 +1155,208 @@ export default function InventoryFragment() {
                         const isLight = LIGHT_COLORS.includes(c);
                         return (
                           <button key={c} type="button"
-                            className={`inv-swatch${form.color===c?' active':''}`}
-                            style={{ background:sw, border: isLight ? '1.5px solid #e4e2df' : '1.5px solid transparent' }}
-                            title={c} onClick={()=>setF({color:c})} disabled={saving}>
-                            {form.color===c && <span className="inv-swatch-check" style={{color: isLight ? '#555' : '#fff'}}>✓</span>}
+                            className={`inv-swatch${form.color === c ? ' active' : ''}`}
+                            style={{ background: sw, border: isLight ? '1.5px solid #e4e2df' : '1.5px solid transparent' }}
+                            title={c} onClick={() => setF({ color: c })} disabled={saving}>
+                            {form.color === c && <span className="inv-swatch-check" style={{ color: isLight ? '#555' : '#fff' }}>✓</span>}
                           </button>
                         );
                       })}
                     </div>
                     <input className="inv-input inv-color-input" value={form.color}
-                      onChange={e=>setF({color:e.target.value})} placeholder="Or type a color…" disabled={saving}/>
+                      onChange={e => setF({ color: e.target.value })} placeholder="Or type a color…" disabled={saving} />
                   </div>
                 </div>
                 <div className="inv-field">
                   <label className="inv-field-label">Rental Price (₱) <span className="inv-required">*</span></label>
-                  <input className={`inv-input${errors.price?' inv-input-err':''}`} type="number" min="0" value={form.price}
-                    onChange={e=>{ setF({price:e.target.value}); setErrors(p=>({...p,price:undefined})); }}
-                    placeholder="0" disabled={saving}/>
-                  <ErrMsg field="price"/>
+                  <input className={`inv-input${errors.price ? ' inv-input-err' : ''}`} type="number" min="0" value={form.price}
+                    onChange={e => { setF({ price: e.target.value }); setErrors(p => ({ ...p, price: undefined })); }}
+                    placeholder="0" disabled={saving} />
+                  <ErrMsg field="price" />
                 </div>
                 <div className="inv-field">
                   <label className="inv-field-label">Status</label>
-                  <select className="inv-input" value={form.status} onChange={e=>setF({status:e.target.value})} disabled={saving}>
-                    {MANUAL_ITEM_STATUSES.map(s=><option key={s}>{s}</option>)}
+                  <select className="inv-input" value={form.status} onChange={e => setF({ status: e.target.value })} disabled={saving}>
+                    {MANUAL_ITEM_STATUSES.map(s => <option key={s}>{s}</option>)}
                   </select>
-                  <span className="inv-field-hint">Note: "Ready for Rental" is set automatically after inspection.</span>
                 </div>
                 <div className="inv-field">
-                  <label className="inv-field-label">
-                    Estimated Age Range
-                    <span className="inv-optional-tag">optional</span>
-                  </label>
+                  <label className="inv-field-label">Estimated Age Range</label>
                   <div className="inv-age-range-wrap">
                     <input className="inv-input inv-age-input" type="number" min="0" max="120"
                       value={form.ageRange?.split('–')[0] || ''}
-                      onChange={e => { const from=e.target.value; const to=form.ageRange?.split('–')[1]||''; setF({ageRange:from||to?`${from}–${to}`:''}); }}
-                      placeholder="From" disabled={saving}/>
+                      onChange={e => { const from = e.target.value; const to = form.ageRange?.split('–')[1] || ''; setF({ ageRange: from || to ? `${from}–${to}` : '' }); }}
+                      placeholder="From" disabled={saving} />
                     <span className="inv-age-sep">–</span>
                     <input className="inv-input inv-age-input" type="number" min="0" max="120"
                       value={form.ageRange?.split('–')[1] || ''}
-                      onChange={e => { const to=e.target.value; const from=form.ageRange?.split('–')[0]||''; setF({ageRange:from||to?`${from}–${to}`:''}); }}
-                      placeholder="To" disabled={saving}/>
+                      onChange={e => { const to = e.target.value; const from = form.ageRange?.split('–')[0] || ''; setF({ ageRange: from || to ? `${from}–${to}` : '' }); }}
+                      placeholder="To" disabled={saving} />
                     <span className="inv-age-unit">yrs</span>
                   </div>
-                  <span className="inv-field-hint">e.g. 18–35 yrs — helps clients find the right fit</span>
                 </div>
                 <div className="inv-field inv-field-full">
                   <label className="inv-field-label">Description</label>
                   <textarea className="inv-textarea" rows={3} value={form.description}
-                    onChange={e=>setF({description:e.target.value})}
-                    placeholder="Describe the item…" disabled={saving}/>
+                    onChange={e => setF({ description: e.target.value })}
+                    placeholder="Describe the item…" disabled={saving} />
                 </div>
               </div>
             </div>
             <div className="inv-modal-footer">
               <button className="inv-btn-ghost" onClick={closeModal} disabled={saving}>Cancel</button>
               <button className="inv-btn-primary" onClick={saveItem} disabled={saving}>
-                {saving ? <><Loader2 size={13} className="inv-spinner-inline"/> Saving…</> : (modal==='add'?'Add Item':'Save Changes')}
+                {saving ? <><Loader2 size={13} className="inv-spinner-inline" /> Saving…</> : (modal === 'add' ? 'Add Item' : 'Save Changes')}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ══ MODAL: View Item ══ */}
-      {modal==='view' && selected && (() => {
-        const promo = activePromo(selected);
-        const disc  = discPrice(selected);
+      {modal === 'view' && selected && (() => {
+        const finalPrice = getDisplayPrice(selected);
+        const originalPrice = getOriginalPrice(selected);
+        const discount = hasDiscount(selected);
+        const discountCode = getDiscountInfo(selected);
+        const discountValueText = getDiscountValueText(discountCode);
+        const savings = getSavings(selected);
         return (
           <div className="inv-overlay" onClick={closeModal}>
-            <div className="inv-modal inv-modal-view" onClick={e=>e.stopPropagation()}>
+            <div className="inv-modal inv-modal-view" onClick={e => e.stopPropagation()}>
               <div className="inv-modal-header">
                 <h3>Item Details</h3>
-                <button className="inv-modal-close" onClick={closeModal}><X size={15}/></button>
+                <button className="inv-modal-close" onClick={closeModal}><X size={15} /></button>
               </div>
               <div className="inv-modal-body">
-                <InlineGallery item={selected} onOpenFullscreen={idx=>setGallery({item:selected,startIndex:idx})}/>
+                <InlineGallery item={selected} onOpenFullscreen={idx => setGallery({ item: selected, startIndex: idx })} />
                 <div className="inv-view-details">
-                  <div style={{display:'flex',alignItems:'center',gap:'0.75rem',flexWrap:'wrap'}}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
                     <h4 className="inv-view-name">{selected.name}</h4>
-                    <StatusBadge status={selected.status}/>
+                    <StatusBadge status={selected.status} />
                   </div>
-                  {promo && (
+                  {discount && discountValueText && (
                     <div className="inv-view-promo-banner">
-                      <Sparkles size={14}/>
+                      <Sparkles size={14} />
                       <div>
-                        <div className="inv-view-promo-banner-title">Promo Active: <strong>{promo.code}</strong></div>
+                        <div className="inv-view-promo-banner-title">
+                          Promo Active: <strong>{discountValueText}</strong>
+                        </div>
                         <div className="inv-view-promo-banner-sub">
-                          {promo.type==='percentage' ? `${promo.value}% discount applied` : `₱${promo.value} flat discount applied`}
-                          {' · '}Valid until {fmtDate(promo.end)}
+                          Promo Code: {discountCode} · Savings of ₱{Math.round(savings).toLocaleString()}
                         </div>
                       </div>
                       <div className="inv-view-promo-banner-price">
-                        <span className="inv-view-promo-was">₱{selected.price.toLocaleString()}</span>
-                        <span className="inv-view-promo-now">₱{Math.round(disc).toLocaleString()}</span>
+                        <span className="inv-view-promo-was">₱{originalPrice.toLocaleString()}</span>
+                        <span className="inv-view-promo-now">₱{Math.round(finalPrice).toLocaleString()}</span>
                       </div>
                     </div>
                   )}
                   <div className="inv-view-grid">
                     {[
-                      ['Category',     selected.category],
-                      ['Type',         selected.subtype],
-                      ['Size',         selected.size],
-                      ['Color',        selected.color],
-                      ['Age Range',    selected.ageRange],
-                      ['Rental Price', promo
-                        ? <><span style={{textDecoration:'line-through',color:'#bbb',marginRight:'0.4rem'}}>₱{selected.price.toLocaleString()}</span><strong style={{color:'#15803d'}}>₱{Math.round(disc).toLocaleString()}</strong></>
-                        : `₱${selected.price.toLocaleString()}`],
-                    ].map(([k,v])=>v?(
+                      ['Category', selected.category],
+                      ['Type', selected.subtype],
+                      ['Size', selected.size],
+                      ['Color', selected.color],
+                      ['Age Range', selected.ageRange],
+                      ['Rental Price', discount
+                        ? <><span style={{ textDecoration: 'line-through', color: '#bbb', marginRight: '0.4rem' }}>₱{originalPrice.toLocaleString()}</span><strong style={{ color: '#15803d' }}>₱{Math.round(finalPrice).toLocaleString()}</strong></>
+                        : `₱${originalPrice.toLocaleString()}`],
+                    ].map(([k, v]) => v ? (
                       <div key={k} className="inv-view-row">
                         <span className="inv-view-key">{k}</span>
                         <span className="inv-view-val">{v}</span>
                       </div>
-                    ):null)}
+                    ) : null)}
                   </div>
                   {selected.description && <p className="inv-view-desc">{selected.description}</p>}
                 </div>
               </div>
               <div className="inv-modal-footer">
                 <button className="inv-btn-ghost" onClick={closeModal}>Close</button>
-                <button className="inv-btn-primary" onClick={()=>openEdit(selected)}><Edit2 size={13}/> Edit</button>
+                <button className="inv-btn-primary" onClick={() => openEdit(selected)}><Edit2 size={13} /> Edit</button>
               </div>
             </div>
           </div>
         );
       })()}
 
-      {/* ══ MODAL: Promo ══ */}
-      {modal==='promo' && (
+      {modal === 'promo' && (
         <div className="inv-overlay" onClick={closeModal}>
-          <div className="inv-modal" onClick={e=>e.stopPropagation()}>
+          <div className="inv-modal" onClick={e => e.stopPropagation()}>
             <div className="inv-modal-header">
-              <h3>{selected?'Edit Promotion':'New Promotion'}</h3>
-              <button className="inv-modal-close" onClick={closeModal} disabled={saving}><X size={15}/></button>
+              <h3>{selected ? 'Edit Promotion' : 'New Promotion'}</h3>
+              <button className="inv-modal-close" onClick={closeModal} disabled={saving}><X size={15} /></button>
             </div>
             <div className="inv-modal-body">
               <p className="inv-required-note"><span className="inv-required">*</span> Required fields</p>
               <div className="inv-modal-grid">
                 <div className="inv-field">
                   <label className="inv-field-label">Promo Code <span className="inv-required">*</span></label>
-                  <input className={`inv-input${errors.code?' inv-input-err':''}`} value={promoForm.code}
-                    onChange={e=>{ setPF({code:e.target.value.toUpperCase()}); setErrors(p=>({...p,code:undefined})); }}
-                    placeholder="e.g. SUMMER20" disabled={saving}/>
-                  <ErrMsg field="code"/>
+                  <input className={`inv-input${errors.code ? ' inv-input-err' : ''}`} value={promoForm.code}
+                    onChange={e => { setPF({ code: e.target.value.toUpperCase() }); setErrors(p => ({ ...p, code: undefined })); }}
+                    placeholder="e.g. SUMMER20" disabled={saving} />
+                  <ErrMsg field="code" />
                 </div>
                 <div className="inv-field">
                   <label className="inv-field-label">Discount Type <span className="inv-required">*</span></label>
-                  <select className="inv-input" value={promoForm.type} onChange={e=>setPF({type:e.target.value})} disabled={saving}>
+                  <select className="inv-input" value={promoForm.type} onChange={e => setPF({ type: e.target.value })} disabled={saving}>
                     <option value="percentage">Percentage (%)</option>
                     <option value="flat">Flat Amount (₱)</option>
                   </select>
                 </div>
                 <div className="inv-field">
                   <label className="inv-field-label">Value <span className="inv-required">*</span></label>
-                  <input className={`inv-input${errors.value?' inv-input-err':''}`} type="number" min="0" value={promoForm.value}
-                    onChange={e=>{ setPF({value:e.target.value}); setErrors(p=>({...p,value:undefined})); }}
-                    placeholder={promoForm.type==='percentage'?'e.g. 20':'e.g. 500'} disabled={saving}/>
-                  <ErrMsg field="value"/>
+                  <input className={`inv-input${errors.value ? ' inv-input-err' : ''}`} type="number" min="0" value={promoForm.value}
+                    onChange={e => { setPF({ value: e.target.value }); setErrors(p => ({ ...p, value: undefined })); }}
+                    placeholder={promoForm.type === 'percentage' ? 'e.g. 20' : 'e.g. 500'} disabled={saving} />
+                  <ErrMsg field="value" />
                 </div>
                 <div className="inv-field">
                   <label className="inv-field-label">Status <span className="inv-required">*</span></label>
-                  <select className="inv-input" value={String(promoForm.active)} onChange={e=>setPF({active:e.target.value==='true'})} disabled={saving}>
+                  <select className="inv-input" value={String(promoForm.active)} onChange={e => setPF({ active: e.target.value === 'true' })} disabled={saving}>
                     <option value="true">Active</option>
                     <option value="false">Inactive</option>
                   </select>
-                  <span className="inv-field-hint">Inactive promos won't apply even if dates are valid.</span>
                 </div>
                 <div className="inv-field">
                   <label className="inv-field-label">Valid From <span className="inv-required">*</span></label>
-                  <input className={`inv-input${errors.start?' inv-input-err':''}`} type="date" value={promoForm.start}
-                    onChange={e=>{ setPF({start:e.target.value}); setErrors(p=>({...p,start:undefined})); }} disabled={saving}/>
-                  <ErrMsg field="start"/>
+                  <input className={`inv-input${errors.start ? ' inv-input-err' : ''}`} type="date" value={promoForm.start}
+                    onChange={e => { setPF({ start: e.target.value }); setErrors(p => ({ ...p, start: undefined })); }} disabled={saving} />
+                  <ErrMsg field="start" />
                 </div>
                 <div className="inv-field">
                   <label className="inv-field-label">Valid Until <span className="inv-required">*</span></label>
-                  <input className={`inv-input${errors.end?' inv-input-err':''}`} type="date" min={promoForm.start} value={promoForm.end}
-                    onChange={e=>{ setPF({end:e.target.value}); setErrors(p=>({...p,end:undefined})); }} disabled={saving}/>
-                  <ErrMsg field="end"/>
+                  <input className={`inv-input${errors.end ? ' inv-input-err' : ''}`} type="date" min={promoForm.start} value={promoForm.end}
+                    onChange={e => { setPF({ end: e.target.value }); setErrors(p => ({ ...p, end: undefined })); }} disabled={saving} />
+                  <ErrMsg field="end" />
                 </div>
                 <div className="inv-field inv-field-full">
                   <label className="inv-field-label">Applicable Items</label>
-                  <span className="inv-field-hint" style={{marginBottom:'0.5rem',display:'block'}}>
-                    Expand a category to select specific items. Select the category checkbox to toggle all.
-                  </span>
-                  <GroupedItemCheckboxes items={items} selected={promoForm.items} onChange={ids=>setPF({items:ids})}/>
+                  <GroupedItemCheckboxes items={items} selected={promoForm.items} onChange={ids => setPF({ items: ids })} />
                 </div>
               </div>
             </div>
             <div className="inv-modal-footer">
               <button className="inv-btn-ghost" onClick={closeModal} disabled={saving}>Cancel</button>
               <button className="inv-btn-primary" onClick={savePromo} disabled={saving}>
-                {saving ? <><Loader2 size={13} className="inv-spinner-inline"/> Saving…</> : (selected?'Save Changes':'Create Promo')}
+                {saving ? <><Loader2 size={13} className="inv-spinner-inline" /> Saving…</> : (selected ? 'Save Changes' : 'Create Promo')}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ══ MODAL: Confirm Delete ══ */}
       {confirmDelete && (
         <div className="inv-overlay" onClick={() => setConfirmDelete(null)}>
           <div className="inv-modal inv-modal-sm" onClick={e => e.stopPropagation()}>
             <div className="inv-modal-header">
               <h3>Confirm Delete</h3>
-              <button className="inv-modal-close" onClick={() => setConfirmDelete(null)}><X size={15}/></button>
+              <button className="inv-modal-close" onClick={() => setConfirmDelete(null)}><X size={15} /></button>
             </div>
             <div className="inv-modal-body">
               <div className="inv-confirm-delete-body">
                 <div className="inv-confirm-delete-icon">
-                  <Trash2 size={28}/>
+                  <Trash2 size={28} />
                 </div>
                 <p className="inv-confirm-delete-msg">
                   Are you sure you want to delete <strong>"{confirmDelete.name}"</strong>?
@@ -1401,31 +1369,15 @@ export default function InventoryFragment() {
               </div>
             </div>
             <div className="inv-modal-footer">
-              <button 
-                className="inv-btn-ghost" 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setConfirmDelete(null);
-                }}
-              >
-                Cancel
-              </button>
-              <button 
-                className="inv-btn-delete-confirm" 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleConfirmedDelete();
-                }}
-              >
-                <Trash2 size={13}/> Yes, Delete
-              </button>
+              <button className="inv-btn-ghost" onClick={(e) => { e.stopPropagation(); setConfirmDelete(null); }}>Cancel</button>
+              <button className="inv-btn-delete-confirm" onClick={(e) => { e.stopPropagation(); handleConfirmedDelete(); }}><Trash2 size={13} /> Yes, Delete</button>
             </div>
           </div>
         </div>
       )}
 
-      {gallery && <MediaGallery item={gallery.item} startIndex={gallery.startIndex} onClose={()=>setGallery(null)}/>}
-      <Toast toast={toast}/>
+      {gallery && <MediaGallery item={gallery.item} startIndex={gallery.startIndex} onClose={() => setGallery(null)} />}
+      <Toast toast={toast} />
     </div>
   );
 }
