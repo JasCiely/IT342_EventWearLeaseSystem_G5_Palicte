@@ -1,5 +1,6 @@
 package com.backend.service.impl;
 
+import com.backend.decorator.BasicInfoDecorator;
 import com.backend.dto.request.ItemRequest;
 import com.backend.dto.request.PromotionRequest;
 import com.backend.dto.response.ItemResponse;
@@ -22,15 +23,26 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class InventoryServiceImpl implements InventoryService {
 
     private final ItemRepository itemRepository;
     private final PromotionRepository promotionRepository;
     private final InventorySupabaseService supabaseService;
     private final ItemFactoryRegistry factoryRegistry;
+    private final BasicInfoDecorator basicInfoDecorator;
 
-    // ── Items ────────────────────────────────────────────────
+    public InventoryServiceImpl(
+            ItemRepository itemRepository,
+            PromotionRepository promotionRepository,
+            InventorySupabaseService supabaseService,
+            ItemFactoryRegistry factoryRegistry,
+            BasicInfoDecorator basicInfoDecorator) {
+        this.itemRepository = itemRepository;
+        this.promotionRepository = promotionRepository;
+        this.supabaseService = supabaseService;
+        this.factoryRegistry = factoryRegistry;
+        this.basicInfoDecorator = basicInfoDecorator;
+    }
 
     @Override
     public List<ItemResponse> getAllItems() {
@@ -50,10 +62,7 @@ public class InventoryServiceImpl implements InventoryService {
     public ItemResponse createItem(ItemRequest request, List<MultipartFile> files) {
         log.info("Creating item with category: {}", request.getCategory());
 
-        // Get the appropriate factory based on category
         var factory = factoryRegistry.getFactory(request.getCategory());
-
-        // Create item using factory (with category-specific logic)
         Item item = factory.createItem(request);
 
         List<String> urls = new ArrayList<>();
@@ -73,13 +82,11 @@ public class InventoryServiceImpl implements InventoryService {
         Item item = itemRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Item not found: " + id));
 
-        // Delete removed files from Supabase
         List<String> oldUrls = parseList(item.getMediaUrls());
         oldUrls.stream()
                 .filter(url -> !keepUrls.contains(url))
                 .forEach(supabaseService::deleteFile);
 
-        // Start with kept urls + types
         List<String> oldTypes = parseList(item.getMediaTypes());
         List<String> urls = new ArrayList<>();
         List<String> types = new ArrayList<>();
@@ -91,7 +98,6 @@ public class InventoryServiceImpl implements InventoryService {
             }
         }
 
-        // Upload new files
         uploadFiles(newFiles, urls, types);
 
         applyRequest(item, request);
@@ -105,12 +111,9 @@ public class InventoryServiceImpl implements InventoryService {
     public void deleteItem(String id) {
         Item item = itemRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Item not found: " + id));
-        // Delete all media from Supabase
         parseList(item.getMediaUrls()).forEach(supabaseService::deleteFile);
         itemRepository.delete(item);
     }
-
-    // ── Promotions ───────────────────────────────────────────
 
     @Override
     public List<PromotionResponse> getAllPromotions() {
@@ -138,8 +141,6 @@ public class InventoryServiceImpl implements InventoryService {
     public void deletePromotion(String id) {
         promotionRepository.deleteById(id);
     }
-
-    // ── Helpers ──────────────────────────────────────────────
 
     private void applyRequest(Item item, ItemRequest r) {
         item.setName(r.getName());
@@ -178,29 +179,8 @@ public class InventoryServiceImpl implements InventoryService {
     }
 
     private ItemResponse toItemResponse(Item item) {
-        ItemResponse r = new ItemResponse();
-        r.setId(item.getId());
-        r.setName(item.getName());
-        r.setCategory(item.getCategory());
-        r.setSubtype(item.getSubtype());
-        r.setSize(item.getSize());
-        r.setColor(item.getColor());
-        r.setPrice(item.getPrice());
-        r.setStatus(item.getStatus());
-        r.setAgeRange(item.getAgeRange());
-        r.setDescription(item.getDescription());
-
-        List<String> urls = parseList(item.getMediaUrls());
-        List<String> types = parseList(item.getMediaTypes());
-        List<ItemResponse.MediaFile> mediaFiles = new ArrayList<>();
-        for (int i = 0; i < urls.size(); i++) {
-            ItemResponse.MediaFile mf = new ItemResponse.MediaFile();
-            mf.setUrl(urls.get(i));
-            mf.setType(i < types.size() ? types.get(i) : "image");
-            mediaFiles.add(mf);
-        }
-        r.setMediaFiles(mediaFiles);
-        return r;
+        ItemResponse response = new ItemResponse();
+        return basicInfoDecorator.decorate(item, response);
     }
 
     private PromotionResponse toPromoResponse(Promotion p) {
