@@ -1,13 +1,19 @@
-// BrowseOutfitsFragment.jsx - Ultra-optimized for immediate display
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+// BrowseOutfitsFragment.jsx - Integrated with Strategy & Decorator Patterns
+import React, { useState, useEffect, useCallback, useMemo, startTransition } from 'react';
 import {
-  Search, ChevronDown, LayoutGrid, List, Eye, Calendar,
+  Search, LayoutGrid, List, Eye, Calendar,
   CheckCircle, AlertCircle, X, ChevronLeft, ChevronRight,
-  Play, Image, Sparkles, Clock, AlertTriangle,
+  Play, Sparkles, Clock, AlertTriangle, Percent, DollarSign,
   Loader2, ShoppingBag
 } from 'lucide-react';
 import '../../../components/css/customerDashboard/BrowseOutfitsFragment.css';
-import { fetchItems, fetchPromotions, bookFitting, getUserBookings } from '../../../services/inventoryApi';
+import { 
+  fetchItems, 
+  fetchPromotions, 
+  bookFitting, 
+  getUserBookings,
+  calculateRentalPrice 
+} from '../../../services/inventoryApi';
 
 // ────────────────────────────────────────────────────────────
 // Shared Data
@@ -26,6 +32,28 @@ const CAT_COLORS = {
   'Accessories': '#486581' 
 };
 
+// Strategy Pattern: Rental duration options
+const RENTAL_STRATEGIES = {
+  daily: { 
+    name: 'Daily Rate', 
+    discount: 0, 
+    multiplier: 1,
+    description: 'Best for short-term events'
+  },
+  weekly: { 
+    name: 'Weekly Rate', 
+    discount: 15, 
+    multiplier: 7,
+    description: '15% off • Best for week-long events'
+  },
+  monthly: { 
+    name: 'Monthly Rate', 
+    discount: 30, 
+    multiplier: 30,
+    description: '30% off • Best for long-term rentals'
+  }
+};
+
 const todayStr = () => new Date().toISOString().split('T')[0];
 const fmtDate = (date) => date ? new Date(date).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' }) : '';
 const fmtDateTime = (date, time) => {
@@ -33,10 +61,12 @@ const fmtDateTime = (date, time) => {
   return `${new Date(date).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })} at ${time}`;
 };
 
+const EMPTY_ARRAY = [];
+
 // ────────────────────────────────────────────────────────────
-// UI Components
+// Optimized UI Components (memoized)
 // ────────────────────────────────────────────────────────────
-function StatusBadge({ status }) {
+const StatusBadge = React.memo(({ status }) => {
   const m = ITEM_STATUS_META[status] || { color: '#888', bg: 'rgba(0,0,0,0.06)', dot: '#888' };
   return (
     <span className="inv-badge" style={{ color: m.color, background: m.bg }}>
@@ -44,10 +74,10 @@ function StatusBadge({ status }) {
       {status}
     </span>
   );
-}
+});
 
-function MediaThumb({ item, onClick }) {
-  const files = item.mediaFiles?.length ? item.mediaFiles : [];
+const MediaThumb = React.memo(({ item, onClick }) => {
+  const files = item.mediaFiles?.length ? item.mediaFiles : EMPTY_ARRAY;
   const first = files[0] || null;
 
   if (!first) {
@@ -69,64 +99,9 @@ function MediaThumb({ item, onClick }) {
   }
   
   return (
-    <img src={first.url} alt={item.name} className="inv-media-img" onClick={onClick} />
+    <img src={first.url} alt={item.name} className="inv-media-img" onClick={onClick} loading="lazy" />
   );
-}
-
-function MediaGallery({ item, startIndex = 0, onClose }) {
-  const files = item.mediaFiles?.length ? item.mediaFiles : [];
-  const [idx, setIdx] = useState(startIndex);
-
-  const prev = () => setIdx((idx - 1 + files.length) % files.length);
-  const next = () => setIdx((idx + 1) % files.length);
-
-  useEffect(() => {
-    const h = e => {
-      if (e.key === 'ArrowLeft') prev();
-      if (e.key === 'ArrowRight') next();
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', h);
-    return () => window.removeEventListener('keydown', h);
-  }, [idx]);
-
-  if (!files.length) return null;
-
-  const current = files[idx];
-
-  return (
-    <div className="inv-lightbox" onClick={onClose}>
-      <button className="inv-lightbox-close" onClick={onClose}><X size={18} /></button>
-      <div className="inv-lightbox-inner" onClick={e => e.stopPropagation()}>
-        <div className="inv-lightbox-topbar">
-          <span className="inv-lightbox-itemname">{item.name}</span>
-          <span className="inv-lightbox-catnote">{item.category}{item.subtype ? ` · ${item.subtype}` : ''} · Size {item.size}</span>
-        </div>
-        <div className="inv-gallery-stage">
-          {current.type === 'video'
-            ? <video src={current.url} controls autoPlay className="inv-lightbox-media" />
-            : <img src={current.url} alt={item.name} className="inv-lightbox-media" />}
-          {files.length > 1 && (
-            <>
-              <button className="inv-gallery-arrow inv-gallery-arrow-prev" onClick={prev}><ChevronLeft size={22} /></button>
-              <button className="inv-gallery-arrow inv-gallery-arrow-next" onClick={next}><ChevronRight size={22} /></button>
-            </>
-          )}
-        </div>
-        {files.length > 1 && (
-          <div className="inv-lightbox-footer">
-            <span className="inv-gallery-counter">{idx + 1} / {files.length}</span>
-            <div className="inv-gallery-dots">
-              {files.map((_, i) => (
-                <button key={i} className={`inv-gallery-dot${i === idx ? ' active' : ''}`} onClick={() => setIdx(i)} />
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
+});
 
 function Toast({ toast, onClose }) {
   useEffect(() => {
@@ -146,49 +121,254 @@ function Toast({ toast, onClose }) {
   );
 }
 
-// Ultra-fast skeleton component - no animations, just static placeholders
-function FastSkeletonCard() {
+// Ultra-fast skeleton components
+const FastSkeletonCard = () => (
+  <div className="inv-grid-card skeleton-fast">
+    <div className="inv-grid-media skeleton-media-fast"></div>
+    <div className="inv-grid-info">
+      <div className="skeleton-text-fast" style={{ width: '70%', height: '16px', marginBottom: '8px' }}></div>
+      <div className="skeleton-text-fast" style={{ width: '85%', height: '12px', marginBottom: '6px' }}></div>
+      <div className="skeleton-text-fast" style={{ width: '40%', height: '14px' }}></div>
+    </div>
+    <div className="inv-grid-actions">
+      <div className="skeleton-btn-fast"></div>
+      <div className="skeleton-btn-fast" style={{ width: '100px' }}></div>
+    </div>
+  </div>
+);
+
+const FastSkeletonRow = () => (
+  <tr className="skeleton-row-fast">
+    <td><div className="skeleton-thumb-fast"></div></td>
+    <td><div className="skeleton-text-fast" style={{ width: '120px', height: '14px' }}></div></td>
+    <td><div className="skeleton-text-fast" style={{ width: '60px', height: '12px' }}></div></td>
+    <td><div className="skeleton-text-fast" style={{ width: '80px', height: '12px' }}></div></td>
+    <td><div className="skeleton-text-fast" style={{ width: '40px', height: '12px' }}></div></td>
+    <td><div className="skeleton-text-fast" style={{ width: '60px', height: '12px' }}></div></td>
+    <td><div className="skeleton-badge-fast"></div></td>
+    <td><div className="skeleton-btn-fast"></div><div className="skeleton-btn-fast"></div></td>
+  </tr>
+);
+
+// Optimized Grid Card Component
+const GridCard = React.memo(({ 
+  item, promoCode, discountValueText, finalPrice, originalPrice, 
+  discountActive, alreadyBooked, userBooking, rentalStrategy,
+  onView, onBook, onImageClick, onRentalStrategyChange 
+}) => {
+  const files = item.mediaFiles?.length || 0;
+  
+  // Calculate rental price based on selected strategy (Decorator + Strategy combined)
+  const getRentalPrice = () => {
+    let price = originalPrice;
+    
+    // Apply promotion discount first (Decorator pattern)
+    if (discountActive && finalPrice) {
+      price = finalPrice;
+    }
+    
+    // Apply rental duration discount (Strategy pattern)
+    if (rentalStrategy && rentalStrategy !== 'daily') {
+      const strategy = RENTAL_STRATEGIES[rentalStrategy];
+      if (strategy && strategy.discount > 0) {
+        price = price * (1 - strategy.discount / 100);
+      }
+    }
+    
+    return Math.round(price);
+  };
+  
+  const rentalPrice = getRentalPrice();
+  const hasRentalDiscount = rentalStrategy !== 'daily';
+  const rentalStrategyInfo = RENTAL_STRATEGIES[rentalStrategy];
+  
   return (
-    <div className="inv-grid-card skeleton-fast">
-      <div className="inv-grid-media skeleton-media-fast"></div>
+    <div className="inv-grid-card">
+      <div className="inv-grid-media" onClick={() => files && onImageClick(item, 0)}>
+        <MediaThumb item={item} />
+        <div className="inv-grid-media-overlay"><Eye size={16} /> View</div>
+        <div className="inv-grid-status-pin"><StatusBadge status={item.status} /></div>
+        {discountActive && discountValueText && (
+          <div className="inv-grid-promo-ribbon">
+            <Sparkles size={9} />
+            {discountValueText}
+          </div>
+        )}
+        {alreadyBooked && userBooking && (
+          <div className="inv-grid-booked-badge">
+            <CheckCircle size={10} /> Booked for {fmtDate(userBooking.fittingDate)}
+          </div>
+        )}
+      </div>
       <div className="inv-grid-info">
-        <div className="skeleton-text-fast" style={{ width: '70%', height: '16px', marginBottom: '8px' }}></div>
-        <div className="skeleton-text-fast" style={{ width: '85%', height: '12px', marginBottom: '6px' }}></div>
-        <div className="skeleton-text-fast" style={{ width: '40%', height: '14px' }}></div>
+        <div className="inv-grid-name">{item.name}</div>
+        <div className="inv-grid-meta">
+          <span className="inv-cat-tag">{item.category}</span>
+          {item.subtype && <span className="inv-subtype-tag">{item.subtype}</span>}
+          <span className="inv-grid-size">{item.size}</span>
+        </div>
+        
+        {/* Rental Strategy Selector */}
+        <div className="inv-rental-strategy-selector">
+          <select 
+            className="inv-strategy-select"
+            value={rentalStrategy}
+            onChange={(e) => onRentalStrategyChange(item.id, e.target.value)}
+            disabled={alreadyBooked}
+          >
+            <option value="daily">Daily Rate</option>
+            <option value="weekly">Weekly Rate (15% off)</option>
+            <option value="monthly">Monthly Rate (30% off)</option>
+          </select>
+        </div>
+        
+        <div className="inv-grid-price-row">
+          {hasRentalDiscount || discountActive ? (
+            <>
+              <span className="inv-price-old">
+                ₱{Math.round(originalPrice).toLocaleString()}/day
+              </span>
+              <span className="inv-price-new">
+                ₱{rentalPrice.toLocaleString()}/day
+              </span>
+              {hasRentalDiscount && (
+                <span className="inv-rental-badge">
+                  {rentalStrategyInfo?.discount}% off
+                </span>
+              )}
+            </>
+          ) : (
+            <span className="inv-price">₱{Math.round(originalPrice).toLocaleString()}/day</span>
+          )}
+        </div>
+        
+        {promoCode && (
+          <div className="inv-promo-code-pill">
+            <Sparkles size={9} />
+            <span>{promoCode}</span>
+          </div>
+        )}
+        
+        {rentalStrategy !== 'daily' && (
+          <div className="inv-strategy-desc">
+            <Percent size={8} />
+            <span>{rentalStrategyInfo?.description}</span>
+          </div>
+        )}
       </div>
       <div className="inv-grid-actions">
-        <div className="skeleton-btn-fast"></div>
-        <div className="skeleton-btn-fast" style={{ width: '100px' }}></div>
+        <button className="inv-icon-btn" onClick={() => onView(item)}><Eye size={13} /></button>
+        <button 
+          className={`inv-btn-book ${alreadyBooked ? 'inv-btn-booked' : ''}`}
+          onClick={() => onBook(item, rentalStrategy)} 
+          disabled={item.status !== 'Available' || alreadyBooked}
+        >
+          <Calendar size={13} /> 
+          {alreadyBooked ? 'Already Booked' : 'Book Fitting'}
+        </button>
       </div>
     </div>
   );
-}
+});
 
-function FastSkeletonRow() {
+// Optimized List Row Component
+const ListRow = React.memo(({ 
+  item, promoCode, finalPrice, originalPrice, discountActive, 
+  alreadyBooked, userBooking, rentalStrategy,
+  onView, onBook, onImageClick, onRentalStrategyChange 
+}) => {
+  const getRentalPrice = () => {
+    let price = originalPrice;
+    if (discountActive && finalPrice) price = finalPrice;
+    if (rentalStrategy && rentalStrategy !== 'daily') {
+      const strategy = RENTAL_STRATEGIES[rentalStrategy];
+      if (strategy && strategy.discount > 0) {
+        price = price * (1 - strategy.discount / 100);
+      }
+    }
+    return Math.round(price);
+  };
+  
+  const rentalPrice = getRentalPrice();
+  const hasRentalDiscount = rentalStrategy !== 'daily';
+  
   return (
-    <tr className="skeleton-row-fast">
-      <td><div className="skeleton-thumb-fast"></div></td>
-      <td><div className="skeleton-text-fast" style={{ width: '120px', height: '14px' }}></div></td>
-      <td><div className="skeleton-text-fast" style={{ width: '60px', height: '12px' }}></div></td>
-      <td><div className="skeleton-text-fast" style={{ width: '80px', height: '12px' }}></div></td>
-      <td><div className="skeleton-text-fast" style={{ width: '40px', height: '12px' }}></div></td>
-      <td><div className="skeleton-text-fast" style={{ width: '60px', height: '12px' }}></div></td>
-      <td><div className="skeleton-badge-fast"></div></td>
-      <td><div className="skeleton-btn-fast"></div><div className="skeleton-btn-fast"></div></td>
+    <tr className={`inv-tr${discountActive || hasRentalDiscount ? ' inv-tr-promo' : ''}`}>
+      <td>
+        <div className="inv-list-thumb" onClick={() => onImageClick(item, 0)}>
+          <MediaThumb item={item} />
+        </div>
+      </td>
+      <td>
+        <div className="inv-item-name">{item.name}</div>
+        {promoCode && (
+          <div className="inv-list-promo-badge">
+            <Sparkles size={9} />
+            <span>{promoCode}</span>
+          </div>
+        )}
+        {alreadyBooked && userBooking && (
+          <div className="inv-list-booked-badge">
+            <CheckCircle size={10} /> Booked for {fmtDate(userBooking.fittingDate)}
+          </div>
+        )}
+        {/* Rental Strategy Selector for list view */}
+        <div className="inv-list-strategy-selector">
+          <select 
+            className="inv-strategy-select-sm"
+            value={rentalStrategy}
+            onChange={(e) => onRentalStrategyChange(item.id, e.target.value)}
+            disabled={alreadyBooked}
+          >
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly (-15%)</option>
+            <option value="monthly">Monthly (-30%)</option>
+          </select>
+        </div>
+      </td>
+      <td><span className="inv-cat-tag">{item.category}</span></td>
+      <td><span className="inv-subtype-tag">{item.subtype}</span></td>
+      <td>{item.size}</td>
+      <td>
+        {discountActive || hasRentalDiscount ? (
+          <div>
+            <div className="inv-price-old">₱{Math.round(originalPrice).toLocaleString()}/day</div>
+            <div className="inv-price-new">₱{rentalPrice.toLocaleString()}/day</div>
+          </div>
+        ) : (
+          <span className="inv-price">₱{Math.round(originalPrice).toLocaleString()}/day</span>
+        )}
+      </td>
+      <td><StatusBadge status={item.status} /></td>
+      <td>
+        <div className="inv-row-actions">
+          <button className="inv-icon-btn" onClick={() => onView(item)}><Eye size={13} /></button>
+          <button 
+            className={`inv-btn-book-sm ${alreadyBooked ? 'inv-btn-booked' : ''}`}
+            onClick={() => onBook(item, rentalStrategy)} 
+            disabled={item.status !== 'Available' || alreadyBooked}
+          >
+            <Calendar size={12} /> {alreadyBooked ? 'Booked' : 'Book'}
+          </button>
+        </div>
+      </td>
     </tr>
   );
-}
+});
 
 // ────────────────────────────────────────────────────────────
-// Main Component - Ultra-optimized
+// Main Component - Integrated with Strategy & Decorator Patterns
 // ────────────────────────────────────────────────────────────
 export default function BrowseOutfitsFragment() {
+  // State
   const [items, setItems] = useState([]);
   const [promos, setPromos] = useState([]);
   const [userBookings, setUserBookings] = useState([]);
-  const [isItemsLoaded, setIsItemsLoaded] = useState(false);
-  const [isPromosLoaded, setIsPromosLoaded] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(false);
   const [loadError, setLoadError] = useState('');
+  
+  // Strategy Pattern: Store selected rental strategy per item
+  const [rentalStrategies, setRentalStrategies] = useState(() => ({}));
 
   const [viewMode, setViewMode] = useState('grid');
   const [search, setSearch] = useState('');
@@ -197,19 +377,28 @@ export default function BrowseOutfitsFragment() {
   const [filterSize, setFilterSize] = useState('All');
 
   const [selectedItem, setSelectedItem] = useState(null);
+  const [selectedRentalStrategy, setSelectedRentalStrategy] = useState('daily');
   const [modal, setModal] = useState(null);
   const [gallery, setGallery] = useState(null);
   const [toast, setToast] = useState({ show: false, type: 'success', message: '' });
   
-  // Get current user from localStorage - synchronous, happens immediately
-  const currentUser = useMemo(() => JSON.parse(localStorage.getItem('user') || '{}'), []);
+  // Get current user
+  const currentUser = useMemo(() => {
+    try {
+      return JSON.parse(localStorage.getItem('user') || '{}');
+    } catch {
+      return {};
+    }
+  }, []);
   const authToken = useMemo(() => localStorage.getItem('accessToken') || localStorage.getItem('token'), []);
   const isLoggedIn = !!authToken;
   
-  // Fitting booking form - initialized immediately
+  // Booking form state
   const [booking, setBooking] = useState({
     fittingDate: '',
     fittingTime: '10:00 AM',
+    rentalDays: 1,
+    rentalStrategy: 'daily',
     name: currentUser.name || '',
     email: currentUser.email || '',
     phone: '',
@@ -218,77 +407,127 @@ export default function BrowseOutfitsFragment() {
   });
   const [bookingConfirmed, setBookingConfirmed] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [calculatingPrice, setCalculatingPrice] = useState(false);
 
-  // Load data from backend - non-blocking, parallel loading
+  // Create a promo map for O(1) lookup
+  const promoMap = useMemo(() => {
+    const map = new Map();
+    promos.forEach(promo => {
+      map.set(promo.code, promo);
+    });
+    return map;
+  }, [promos]);
+
+  // Pre-process items with computed values
+  const processedItems = useMemo(() => {
+    return items.map(item => {
+      const discountApplied = item.discountApplied;
+      const discountActive = discountApplied !== null && discountApplied !== undefined;
+      const promo = discountActive ? promoMap.get(discountApplied) : null;
+      
+      let discountValueText = null;
+      if (promo) {
+        discountValueText = promo.type === 'percentage' 
+          ? `${promo.value}% off` 
+          : `₱${promo.value} off`;
+      }
+      
+      return {
+        ...item,
+        discountActive,
+        promoCode: discountApplied,
+        discountValueText,
+        finalPrice: item.finalPrice || item.price,
+        originalPrice: item.price,
+      };
+    });
+  }, [items, promoMap]);
+
+  // Load data with Promise.all
   useEffect(() => {
-    // Load items
-    fetchItems()
-      .then(itemsData => {
-        setItems(itemsData);
-        setIsItemsLoaded(true);
+    Promise.all([
+      fetchItems(),
+      fetchPromotions(),
+      isLoggedIn ? getUserBookings() : Promise.resolve([])
+    ])
+      .then(([itemsData, promosData, bookingsData]) => {
+        startTransition(() => {
+          setItems(itemsData);
+          setPromos(promosData);
+          if (isLoggedIn) setUserBookings(bookingsData);
+          setIsLoaded(true);
+        });
       })
       .catch(err => {
-        console.error('Error loading items:', err);
-        setLoadError(err.message || 'Failed to load items.');
-        setIsItemsLoaded(true);
+        console.error('Error loading data:', err);
+        startTransition(() => {
+          setLoadError(err.message || 'Failed to load items.');
+          setIsLoaded(true);
+        });
       });
-    
-    // Load promotions in parallel
-    fetchPromotions()
-      .then(promosData => {
-        setPromos(promosData);
-        setIsPromosLoaded(true);
-      })
-      .catch(err => {
-        console.error('Error loading promotions:', err);
-        setIsPromosLoaded(true);
-      });
-    
-    // Load user bookings if logged in
-    if (isLoggedIn) {
-      getUserBookings()
-        .then(bookings => setUserBookings(bookings))
-        .catch(err => console.error('Error loading user bookings:', err));
-    }
   }, [isLoggedIn]);
 
-  const showToast = (type, message) => setToast({ show: true, type, message });
-  const closeToast = () => setToast({ show: false, type: 'success', message: '' });
-  
-  const closeModal = () => {
-    setModal(null);
-    setSelectedItem(null);
-    setBookingConfirmed(null);
-    setBooking({
-      fittingDate: '',
-      fittingTime: '10:00 AM',
-      name: currentUser.name || '',
-      email: currentUser.email || '',
-      phone: '',
-      preferredSize: '',
-      notes: ''
-    });
-  };
+  // Handle rental strategy change for an item
+  const handleRentalStrategyChange = useCallback(async (itemId, strategy) => {
+    setRentalStrategies(prev => ({ ...prev, [itemId]: strategy }));
+    
+    // Optional: Call backend to get calculated price with Strategy pattern
+    const item = processedItems.find(i => i.id === itemId);
+    if (item) {
+      setCalculatingPrice(true);
+      try {
+        const days = strategy === 'daily' ? 1 : (strategy === 'weekly' ? 7 : 30);
+        const priceResult = await calculateRentalPrice(itemId, strategy, days);
+        console.log(`Strategy ${strategy} price for ${item.name}: ₱${priceResult.finalPrice}/day`);
+      } catch (error) {
+        console.error('Error calculating rental price:', error);
+      } finally {
+        setCalculatingPrice(false);
+      }
+    }
+  }, [processedItems]);
 
-  // Check if user has already booked this item - memoized for performance
-  const hasUserBookedItem = useCallback((itemId) => {
-    if (!userBookings.length) return false;
+  // Get user's rental strategy for an item
+  const getItemRentalStrategy = useCallback((itemId) => {
+    return rentalStrategies[itemId] || 'daily';
+  }, [rentalStrategies]);
+
+  // Calculate total rental price based on strategy and promotion (Decorator + Strategy)
+  const calculateTotalPrice = useCallback((item, rentalDays, rentalStrategy) => {
+    let basePrice = item.finalPrice || item.price;
+    
+    // Apply Strategy pattern discount
+    if (rentalStrategy === 'weekly') {
+      const weeks = Math.ceil(rentalDays / 7);
+      return basePrice * 7 * 0.85 * weeks;
+    } else if (rentalStrategy === 'monthly') {
+      const months = Math.ceil(rentalDays / 30);
+      return basePrice * 30 * 0.70 * months;
+    }
+    
+    return basePrice * rentalDays;
+  }, []);
+
+  // Booked items tracking
+  const bookedItemIds = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
-    return userBookings.some(booking => 
-      String(booking.itemId) === String(itemId) && 
-      booking.status === 'CONFIRMED' &&
-      new Date(booking.fittingDate) >= today
-    );
+    const set = new Set();
+    userBookings.forEach(booking => {
+      if (booking.status === 'CONFIRMED' && new Date(booking.fittingDate) >= today) {
+        set.add(String(booking.itemId));
+      }
+    });
+    return set;
   }, [userBookings]);
 
-  // Get user's booking for a specific item - memoized
+  const hasUserBookedItem = useCallback((itemId) => {
+    return bookedItemIds.has(String(itemId));
+  }, [bookedItemIds]);
+
   const getUserBookingForItem = useCallback((itemId) => {
-    if (!userBookings.length) return null;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
     return userBookings.find(booking => 
       String(booking.itemId) === String(itemId) && 
       booking.status === 'CONFIRMED' &&
@@ -296,87 +535,88 @@ export default function BrowseOutfitsFragment() {
     );
   }, [userBookings]);
 
-  // Promo helpers - memoized for performance
-  const activePromo = useCallback(item => {
-    if (!isPromosLoaded || promos.length === 0) return null;
-    const now = todayStr();
-    const itemId = typeof item.id === 'string' ? parseInt(item.id) : item.id;
-    
-    const promo = promos.find(p => {
-      if (!p.active) return false;
-      if (!p.items || !p.items.length) return false;
-      
-      const promoItemIds = p.items.map(id => typeof id === 'string' ? parseInt(id) : id);
-      const itemMatches = promoItemIds.includes(itemId);
-      const dateValid = p.start <= now && p.end >= now;
-      
-      return itemMatches && dateValid;
+  // Filters
+  const categories = useMemo(() => {
+    const cats = new Set();
+    processedItems.forEach(i => {
+      if (i.status === 'Available' || i.status === 'Reserved') {
+        cats.add(i.category);
+      }
     });
-    
-    return promo;
-  }, [promos, isPromosLoaded]);
+    return ['All', ...Array.from(cats)];
+  }, [processedItems]);
+  
+  const getSubcategories = useCallback((category) => {
+    if (category === 'All') return ['All'];
+    const subs = new Set();
+    processedItems.forEach(i => {
+      if ((i.status === 'Available' || i.status === 'Reserved') && i.category === category && i.subtype) {
+        subs.add(i.subtype);
+      }
+    });
+    return ['All', ...Array.from(subs).sort()];
+  }, [processedItems]);
+  
+  const subcategories = useMemo(() => getSubcategories(filterCat), [getSubcategories, filterCat]);
+  
+  const sizes = useMemo(() => {
+    const sizeSet = new Set();
+    processedItems.forEach(i => {
+      if (i.status === 'Available' || i.status === 'Reserved') {
+        sizeSet.add(i.size);
+      }
+    });
+    return ['All', ...Array.from(sizeSet).sort()];
+  }, [processedItems]);
 
-  const discPrice = useCallback(item => {
-    const p = activePromo(item);
-    if (!p) return item.price;
-    
-    let discountedPrice = item.price;
-    if (p.type === 'percentage') {
-      discountedPrice = item.price * (1 - p.value / 100);
-    } else if (p.type === 'fixed' || p.type === 'amount') {
-      discountedPrice = item.price - p.value;
-    }
-    
-    return Math.max(0, discountedPrice);
-  }, [activePromo]);
-
-  // Get available items for filtering - memoized
-  const availableItems = useMemo(() => 
-    items.filter(i => i.status === 'Available' || i.status === 'Reserved'),
-    [items]
-  );
-  
-  // Get unique categories - memoized
-  const categories = useMemo(() => 
-    [...new Set(availableItems.map(i => i.category))],
-    [availableItems]
-  );
-  
-  // Get unique subcategories based on selected category - memoized
-  const subcategories = useMemo(() => {
-    if (filterCat === 'All') return [];
-    return [...new Set(
-      availableItems
-        .filter(i => i.category === filterCat)
-        .map(i => i.subtype)
-        .filter(Boolean)
-    )].sort();
-  }, [availableItems, filterCat]);
-  
-  // Reset subcategory filter when category changes
-  useEffect(() => {
-    setFilterSubcat('All');
-  }, [filterCat]);
-  
-  // Get unique sizes - memoized
-  const sizes = useMemo(() => 
-    [...new Set(availableItems.map(i => i.size))].sort(),
-    [availableItems]
-  );
-
-  // Filter items - memoized for performance
+  // Filter items
   const visibleItems = useMemo(() => {
-    return availableItems.filter(i => {
-      const q = search.toLowerCase();
-      return (!q || i.name.toLowerCase().includes(q) || i.category.toLowerCase().includes(q) || (i.subtype || '').toLowerCase().includes(q))
-        && (filterCat === 'All' || i.category === filterCat)
-        && (filterSubcat === 'All' || i.subtype === filterSubcat)
-        && (filterSize === 'All' || i.size === filterSize);
+    const searchLower = search.toLowerCase();
+    return processedItems.filter(i => {
+      if (i.status !== 'Available' && i.status !== 'Reserved') return false;
+      
+      if (searchLower) {
+        const matchesSearch = i.name.toLowerCase().includes(searchLower) || 
+                             i.category.toLowerCase().includes(searchLower) || 
+                             (i.subtype || '').toLowerCase().includes(searchLower);
+        if (!matchesSearch) return false;
+      }
+      
+      if (filterCat !== 'All' && i.category !== filterCat) return false;
+      if (filterSubcat !== 'All' && i.subtype !== filterSubcat) return false;
+      if (filterSize !== 'All' && i.size !== filterSize) return false;
+      
+      return true;
     });
-  }, [availableItems, search, filterCat, filterSubcat, filterSize]);
+  }, [processedItems, search, filterCat, filterSubcat, filterSize]);
 
-  // Handle fitting booking submission
-  const handleBookingSubmit = async () => {
+  const showToast = useCallback((type, message) => {
+    setToast({ show: true, type, message });
+  }, []);
+
+  const closeToast = useCallback(() => {
+    setToast({ show: false, type: 'success', message: '' });
+  }, []);
+  
+  const closeModal = useCallback(() => {
+    setModal(null);
+    setSelectedItem(null);
+    setBookingConfirmed(null);
+    setBooking({
+      fittingDate: '',
+      fittingTime: '10:00 AM',
+      rentalDays: 1,
+      rentalStrategy: 'daily',
+      name: currentUser.name || '',
+      email: currentUser.email || '',
+      phone: '',
+      preferredSize: '',
+      notes: ''
+    });
+  }, [currentUser.name, currentUser.email]);
+
+  // Handle booking submission with Strategy pattern
+  const handleBookingSubmit = useCallback(async () => {
     if (!isLoggedIn) {
       showToast('error', 'Please login first to book a fitting.');
       return;
@@ -409,11 +649,20 @@ export default function BrowseOutfitsFragment() {
     setSubmitting(true);
     
     try {
+      // Calculate total price using Strategy pattern
+      const totalPrice = calculateTotalPrice(selectedItem, booking.rentalDays, booking.rentalStrategy);
+      const strategyInfo = RENTAL_STRATEGIES[booking.rentalStrategy];
+      
       const bookingData = {
         itemId: selectedItem.id,
         itemName: selectedItem.name,
         fittingDate: booking.fittingDate,
         fittingTime: booking.fittingTime,
+        rentalDays: booking.rentalDays,
+        rentalStrategy: booking.rentalStrategy,
+        rentalStrategyName: strategyInfo?.name || 'Daily Rate',
+        rentalDiscount: strategyInfo?.discount || 0,
+        totalPrice: totalPrice,
         customerName: booking.name,
         customerEmail: booking.email,
         customerPhone: booking.phone,
@@ -429,6 +678,9 @@ export default function BrowseOutfitsFragment() {
         item: selectedItem,
         date: booking.fittingDate,
         time: booking.fittingTime,
+        rentalDays: booking.rentalDays,
+        rentalStrategy: booking.rentalStrategy,
+        totalPrice: totalPrice,
         customerName: booking.name,
         customerEmail: booking.email,
         customerPhone: booking.phone,
@@ -450,17 +702,35 @@ export default function BrowseOutfitsFragment() {
       };
       setUserBookings(prev => [newBooking, ...prev]);
       
-      showToast('success', 'Fitting booked successfully! Check your email for confirmation.');
+      showToast('success', `Fitting booked successfully! Total: ₱${Math.round(totalPrice).toLocaleString()}`);
     } catch (error) {
       console.error('Booking error:', error);
       showToast('error', error.message || 'Failed to book fitting. Please try again.');
     } finally {
       setSubmitting(false);
     }
-  };
+  }, [isLoggedIn, booking, selectedItem, currentUser, hasUserBookedItem, getUserBookingForItem, showToast, calculateTotalPrice]);
 
-  // Show error state if needed
-  if (loadError && isItemsLoaded) {
+  const handleViewItem = useCallback((item) => {
+    setSelectedItem(item);
+    setModal('view');
+  }, []);
+
+  const handleBookItem = useCallback((item, rentalStrategy) => {
+    setSelectedItem(item);
+    setSelectedRentalStrategy(rentalStrategy);
+    setBooking(prev => ({ ...prev, rentalStrategy }));
+    setModal('booking');
+  }, []);
+
+  const handleImageClick = useCallback((item, index) => {
+    if (item.mediaFiles?.length) {
+      setGallery({ item, startIndex: index });
+    }
+  }, []);
+
+  // Error state
+  if (loadError && isLoaded) {
     return (
       <div className="inv-root">
         <div className="inv-error-state">
@@ -472,12 +742,11 @@ export default function BrowseOutfitsFragment() {
     );
   }
 
-  // Show skeletons only for the items grid/table, not the whole page
-  const showSkeletons = !isItemsLoaded;
+  const showSkeletons = !isLoaded;
 
   return (
     <div className="inv-root">
-      {/* Header - displays immediately */}
+      {/* Header */}
       <div className="inv-top">
         <div>
           <h2 className="inv-title">Browse Our Collection</h2>
@@ -491,7 +760,7 @@ export default function BrowseOutfitsFragment() {
         )}
       </div>
 
-      {/* Filters and Toolbar - displays immediately */}
+      {/* Filters and Toolbar */}
       <div className="inv-card">
         <div className="inv-toolbar">
           <div className="inv-search-wrap">
@@ -505,19 +774,16 @@ export default function BrowseOutfitsFragment() {
           </div>
           <div className="inv-filters">
             <select className="inv-select" value={filterCat} onChange={e => setFilterCat(e.target.value)}>
-              <option value="All">All Categories</option>
               {categories.map(c => <option key={c}>{c}</option>)}
             </select>
             
-            {filterCat !== 'All' && subcategories.length > 0 && (
+            {filterCat !== 'All' && subcategories.length > 1 && (
               <select className="inv-select" value={filterSubcat} onChange={e => setFilterSubcat(e.target.value)}>
-                <option value="All">All {filterCat}</option>
                 {subcategories.map(s => <option key={s}>{s}</option>)}
               </select>
             )}
             
             <select className="inv-select" value={filterSize} onChange={e => setFilterSize(e.target.value)}>
-              <option value="All">All Sizes</option>
               {sizes.map(s => <option key={s}>{s}</option>)}
             </select>
           </div>
@@ -531,100 +797,50 @@ export default function BrowseOutfitsFragment() {
           </div>
         </div>
 
-        {/* GRID VIEW - with ultra-fast skeletons */}
+        {/* GRID VIEW */}
         {viewMode === 'grid' && (
           <div className="inv-grid">
-            {showSkeletons && (
-              <>
-                {[...Array(12)].map((_, i) => <FastSkeletonCard key={i} />)}
-              </>
-            )}
+            {showSkeletons && [...Array(12)].map((_, i) => <FastSkeletonCard key={i} />)}
             
             {!showSkeletons && visibleItems.length === 0 && (
               <div className="inv-empty-grid">No items found.</div>
             )}
             
             {!showSkeletons && visibleItems.map(item => {
-              const promo = activePromo(item);
-              const price = discPrice(item);
-              const files = item.mediaFiles?.length || 0;
               const alreadyBooked = hasUserBookedItem(item.id);
-              const userBooking = getUserBookingForItem(item.id);
+              const userBooking = alreadyBooked ? getUserBookingForItem(item.id) : null;
+              const itemRentalStrategy = getItemRentalStrategy(item.id);
               
               return (
-                <div key={item.id} className="inv-grid-card">
-                  <div className="inv-grid-media" onClick={() => files && setGallery({ item, startIndex: 0 })}>
-                    <MediaThumb item={item} />
-                    <div className="inv-grid-media-overlay"><Eye size={16} /> View</div>
-                    <div className="inv-grid-status-pin"><StatusBadge status={item.status} /></div>
-                    {promo && (
-                      <div className="inv-grid-promo-ribbon">
-                        <Sparkles size={9} />
-                        {promo.type === 'percentage' ? `${promo.value}% OFF` : `₱${promo.value} OFF`}
-                      </div>
-                    )}
-                    {alreadyBooked && (
-                      <div className="inv-grid-booked-badge">
-                        <CheckCircle size={10} /> Booked for {fmtDate(userBooking.fittingDate)}
-                      </div>
-                    )}
-                  </div>
-                  <div className="inv-grid-info">
-                    <div className="inv-grid-name">{item.name}</div>
-                    <div className="inv-grid-meta">
-                      <span className="inv-cat-tag">{item.category}</span>
-                      {item.subtype && <span className="inv-subtype-tag">{item.subtype}</span>}
-                      <span className="inv-grid-size">{item.size}</span>
-                    </div>
-                    <div className="inv-grid-price-row">
-                      {promo ? (
-                        <>
-                          <span className="inv-price-old">₱{item.price.toLocaleString()}</span>
-                          <span className="inv-price-new">₱{Math.round(price).toLocaleString()}</span>
-                        </>
-                      ) : (
-                        <span className="inv-price">₱{item.price.toLocaleString()}</span>
-                      )}
-                    </div>
-                    {promo && (
-                      <div className="inv-promo-code-pill">
-                        <Sparkles size={9} />
-                        <span>{promo.code}</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="inv-grid-actions">
-                    <button className="inv-icon-btn" onClick={() => { setSelectedItem(item); setModal('view'); }}><Eye size={13} /></button>
-                    <button 
-                      className={`inv-btn-book ${alreadyBooked ? 'inv-btn-booked' : ''}`}
-                      onClick={() => { 
-                        if (alreadyBooked) {
-                          showToast('error', `You already have a fitting booked for this item on ${fmtDate(userBooking.fittingDate)}.`);
-                        } else {
-                          setSelectedItem(item); 
-                          setModal('booking');
-                        }
-                      }} 
-                      disabled={item.status !== 'Available' || alreadyBooked || !isLoggedIn}
-                    >
-                      <Calendar size={13} /> 
-                      {alreadyBooked ? 'Already Booked' : 'Book Fitting'}
-                    </button>
-                  </div>
-                </div>
+                <GridCard
+                  key={item.id}
+                  item={item}
+                  promoCode={item.promoCode}
+                  discountValueText={item.discountValueText}
+                  finalPrice={item.finalPrice}
+                  originalPrice={item.originalPrice}
+                  discountActive={item.discountActive}
+                  alreadyBooked={alreadyBooked}
+                  userBooking={userBooking}
+                  rentalStrategy={itemRentalStrategy}
+                  onView={handleViewItem}
+                  onBook={handleBookItem}
+                  onImageClick={handleImageClick}
+                  onRentalStrategyChange={handleRentalStrategyChange}
+                />
               );
             })}
           </div>
         )}
 
-        {/* LIST VIEW - FIXED VERSION */}
+        {/* LIST VIEW */}
         {viewMode === 'list' && (
           <div className="inv-table-wrap">
             <table className="inv-table">
               <thead>
                 <tr>
                   <th style={{ width: 72 }}>Photo</th>
-                  <th>Name</th>
+                  <th>Name & Options</th>
                   <th>Category</th>
                   <th>Type</th>
                   <th>Size</th>
@@ -634,79 +850,33 @@ export default function BrowseOutfitsFragment() {
                 </tr>
               </thead>
               <tbody>
-                {showSkeletons && (
-                  <>
-                    {[...Array(8)].map((_, i) => <FastSkeletonRow key={i} />)}
-                  </>
-                )}
+                {showSkeletons && [...Array(8)].map((_, i) => <FastSkeletonRow key={i} />)}
                 
                 {!showSkeletons && visibleItems.length === 0 && (
-                  <tr>
-                    <td colSpan={8} className="inv-empty">No items found.</td>
-                  </tr>
+                  <tr><td colSpan={8} className="inv-empty">No items found.</td></tr>
                 )}
                 
                 {!showSkeletons && visibleItems.map(item => {
-                  const promo = activePromo(item);
-                  const price = discPrice(item);
                   const alreadyBooked = hasUserBookedItem(item.id);
-                  const userBooking = getUserBookingForItem(item.id);
+                  const userBooking = alreadyBooked ? getUserBookingForItem(item.id) : null;
+                  const itemRentalStrategy = getItemRentalStrategy(item.id);
                   
                   return (
-                    <tr key={item.id} className={`inv-tr${promo ? ' inv-tr-promo' : ''}`}>
-                      <td>
-                        <div className="inv-list-thumb" onClick={() => setGallery({ item, startIndex: 0 })}>
-                          <MediaThumb item={item} />
-                        </div>
-                      </td>
-                      <td>
-                        <div className="inv-item-name">{item.name}</div>
-                        {promo && (
-                          <div className="inv-list-promo-badge">
-                            <Sparkles size={9} />
-                            <span>{promo.code}</span>
-                          </div>
-                        )}
-                        {alreadyBooked && (
-                          <div className="inv-list-booked-badge">
-                            <CheckCircle size={10} /> Booked for {fmtDate(userBooking.fittingDate)}
-                          </div>
-                        )}
-                      </td>
-                      <td><span className="inv-cat-tag">{item.category}</span></td>
-                      <td><span className="inv-subtype-tag">{item.subtype}</span></td>
-                      <td>{item.size}</td>
-                      <td>
-                        {promo ? (
-                          <div>
-                            <div className="inv-price-old">₱{item.price.toLocaleString()}</div>
-                            <div className="inv-price-new">₱{Math.round(price).toLocaleString()}</div>
-                          </div>
-                        ) : (
-                          <span className="inv-price">₱{item.price.toLocaleString()}</span>
-                        )}
-                      </td>
-                      <td><StatusBadge status={item.status} /></td>
-                      <td>
-                        <div className="inv-row-actions">
-                          <button className="inv-icon-btn" onClick={() => { setSelectedItem(item); setModal('view'); }}><Eye size={13} /></button>
-                          <button 
-                            className={`inv-btn-book-sm ${alreadyBooked ? 'inv-btn-booked' : ''}`}
-                            onClick={() => {
-                              if (alreadyBooked) {
-                                showToast('error', `You already have a fitting booked for this item on ${fmtDate(userBooking.fittingDate)}.`);
-                              } else {
-                                setSelectedItem(item); 
-                                setModal('booking');
-                              }
-                            }} 
-                            disabled={item.status !== 'Available' || alreadyBooked || !isLoggedIn}
-                          >
-                            <Calendar size={12} /> {alreadyBooked ? 'Booked' : 'Book Fitting'}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
+                    <ListRow
+                      key={item.id}
+                      item={item}
+                      promoCode={item.promoCode}
+                      finalPrice={item.finalPrice}
+                      originalPrice={item.originalPrice}
+                      discountActive={item.discountActive}
+                      alreadyBooked={alreadyBooked}
+                      userBooking={userBooking}
+                      rentalStrategy={itemRentalStrategy}
+                      onView={handleViewItem}
+                      onBook={handleBookItem}
+                      onImageClick={handleImageClick}
+                      onRentalStrategyChange={handleRentalStrategyChange}
+                    />
                   );
                 })}
               </tbody>
@@ -716,96 +886,114 @@ export default function BrowseOutfitsFragment() {
       </div>
 
       {/* VIEW MODAL */}
-      {modal === 'view' && selectedItem && (() => {
-        const promo = activePromo(selectedItem);
-        const price = discPrice(selectedItem);
-        const alreadyBooked = hasUserBookedItem(selectedItem.id);
-        const userBooking = getUserBookingForItem(selectedItem.id);
-        
-        return (
-          <div className="inv-overlay" onClick={closeModal}>
-            <div className="inv-modal inv-modal-view" onClick={e => e.stopPropagation()}>
-              <div className="inv-modal-header">
-                <h3>Item Details</h3>
-                <button className="inv-modal-close" onClick={closeModal}><X size={15} /></button>
+      {modal === 'view' && selectedItem && (
+        <div className="inv-overlay" onClick={closeModal}>
+          <div className="inv-modal inv-modal-view" onClick={e => e.stopPropagation()}>
+            <div className="inv-modal-header">
+              <h3>Item Details</h3>
+              <button className="inv-modal-close" onClick={closeModal}><X size={15} /></button>
+            </div>
+            <div className="inv-modal-body">
+              <div className="inv-view-media" onClick={() => handleImageClick(selectedItem, 0)}>
+                <MediaThumb item={selectedItem} />
+                <div className="inv-view-media-overlay"><Eye size={17} /> View Full</div>
               </div>
-              <div className="inv-modal-body">
-                <div className="inv-view-media" onClick={() => setGallery({ item: selectedItem, startIndex: 0 })}>
-                  <MediaThumb item={selectedItem} />
-                  <div className="inv-view-media-overlay"><Eye size={17} /> View Full</div>
+              <div className="inv-view-details">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                  <h4 className="inv-view-name">{selectedItem.name}</h4>
+                  <StatusBadge status={selectedItem.status} />
                 </div>
-                <div className="inv-view-details">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-                    <h4 className="inv-view-name">{selectedItem.name}</h4>
-                    <StatusBadge status={selectedItem.status} />
+                
+                {selectedItem.discountActive && selectedItem.discountValueText && (
+                  <div className="inv-view-promo-banner">
+                    <Sparkles size={14} />
+                    <div>
+                      <div className="inv-view-promo-banner-title">Promo Active: <strong>{selectedItem.discountValueText}</strong></div>
+                      <div className="inv-view-promo-banner-sub">Promo Code: {selectedItem.promoCode}</div>
+                    </div>
+                    <div className="inv-view-promo-banner-price">
+                      <span className="inv-view-promo-was">₱{selectedItem.originalPrice.toLocaleString()}</span>
+                      <span className="inv-view-promo-now">₱{Math.round(selectedItem.finalPrice).toLocaleString()}</span>
+                    </div>
                   </div>
-                  {promo && (
-                    <div className="inv-view-promo-banner">
-                      <Sparkles size={14} />
-                      <div>
-                        <div className="inv-view-promo-banner-title">Promo Active: <strong>{promo.code}</strong></div>
-                        <div className="inv-view-promo-banner-sub">
-                          {promo.type === 'percentage' ? `${promo.value}% discount applied` : `₱${promo.value} flat discount applied`}
+                )}
+                
+                <div className="inv-view-grid">
+                  {[
+                    ['Category', selectedItem.category],
+                    ['Type', selectedItem.subtype],
+                    ['Size', selectedItem.size],
+                    ['Color', selectedItem.color],
+                    ['Age Range', selectedItem.ageRange],
+                    ['Base Daily Rate', `₱${selectedItem.originalPrice.toLocaleString()}`],
+                    ...(selectedItem.discountActive ? [['Promo Daily Rate', `₱${Math.round(selectedItem.finalPrice).toLocaleString()}`]] : []),
+                  ].map(([k, v]) => v && (
+                    <div key={k} className="inv-view-row">
+                      <span className="inv-view-key">{k}</span>
+                      <span className="inv-view-val">{v}</span>
+                    </div>
+                  ))}
+                </div>
+                
+                {/* Rental Strategy Options in View Modal */}
+                <div className="inv-view-strategy-section">
+                  <label className="inv-field-label">Rental Duration Options:</label>
+                  <div className="inv-strategy-options">
+                    {Object.entries(RENTAL_STRATEGIES).map(([key, strategy]) => (
+                      <div key={key} className="inv-strategy-option">
+                        <div className="inv-strategy-option-header">
+                          <strong>{strategy.name}</strong>
+                          {strategy.discount > 0 && (
+                            <span className="inv-strategy-discount-badge">{strategy.discount}% OFF</span>
+                          )}
                         </div>
-                      </div>
-                      <div className="inv-view-promo-banner-price">
-                        <span className="inv-view-promo-was">₱{selectedItem.price.toLocaleString()}</span>
-                        <span className="inv-view-promo-now">₱{Math.round(price).toLocaleString()}</span>
-                      </div>
-                    </div>
-                  )}
-                  {alreadyBooked && (
-                    <div className="inv-view-booked-warning">
-                      <CheckCircle size={14} />
-                      <span>You have already booked a fitting for this item on <strong>{fmtDate(userBooking.fittingDate)}</strong>.</span>
-                    </div>
-                  )}
-                  <div className="inv-view-grid">
-                    {[
-                      ['Category', selectedItem.category],
-                      ['Type', selectedItem.subtype],
-                      ['Size', selectedItem.size],
-                      ['Color', selectedItem.color],
-                      ['Age Range', selectedItem.ageRange],
-                      ['Daily Rate', promo ? 
-                        <><span style={{ textDecoration: 'line-through', color: '#bbb', marginRight: '0.4rem' }}>₱{selectedItem.price.toLocaleString()}</span>
-                        <strong style={{ color: '#15803d' }}>₱{Math.round(price).toLocaleString()}</strong></> : 
-                        `₱${selectedItem.price.toLocaleString()}`
-                      ],
-                    ].map(([k, v]) => v && (
-                      <div key={k} className="inv-view-row">
-                        <span className="inv-view-key">{k}</span>
-                        <span className="inv-view-val">{v}</span>
+                        <div className="inv-strategy-option-price">
+                          {strategy.discount > 0 ? (
+                            <>
+                              <span className="strikethrough">₱{Math.round(selectedItem.finalPrice || selectedItem.originalPrice)}/day</span>
+                              <span className="discounted">
+                                ₱{Math.round((selectedItem.finalPrice || selectedItem.originalPrice) * (1 - strategy.discount / 100))}/day
+                              </span>
+                            </>
+                          ) : (
+                            <span>₱{Math.round(selectedItem.finalPrice || selectedItem.originalPrice)}/day</span>
+                          )}
+                        </div>
+                        <div className="inv-strategy-option-desc">{strategy.description}</div>
                       </div>
                     ))}
                   </div>
-                  {selectedItem.description && <p className="inv-view-desc">{selectedItem.description}</p>}
                 </div>
-              </div>
-              <div className="inv-modal-footer">
-                <button className="inv-btn-ghost" onClick={closeModal}>Close</button>
-                <button 
-                  className="inv-btn-primary" 
-                  onClick={() => {
-                    if (alreadyBooked) {
-                      showToast('error', `You already have a fitting booked for this item on ${fmtDate(userBooking.fittingDate)}.`);
-                      closeModal();
-                    } else {
-                      setModal('booking');
-                    }
-                  }} 
-                  disabled={selectedItem.status !== 'Available' || alreadyBooked || !isLoggedIn}
-                >
-                  <Calendar size={14} /> 
-                  {alreadyBooked ? 'Already Booked' : 'Book Fitting'}
-                </button>
+                
+                {selectedItem.description && <p className="inv-view-desc">{selectedItem.description}</p>}
               </div>
             </div>
+            <div className="inv-modal-footer">
+              <button className="inv-btn-ghost" onClick={closeModal}>Close</button>
+              <button 
+                className="inv-btn-primary" 
+                onClick={() => {
+                  if (hasUserBookedItem(selectedItem.id)) {
+                    const userBooking = getUserBookingForItem(selectedItem.id);
+                    showToast('error', `You already have a fitting booked for this item on ${fmtDate(userBooking.fittingDate)}.`);
+                    closeModal();
+                  } else {
+                    setSelectedRentalStrategy('daily');
+                    setBooking(prev => ({ ...prev, rentalStrategy: 'daily' }));
+                    setModal('booking');
+                  }
+                }} 
+                disabled={selectedItem.status !== 'Available' || hasUserBookedItem(selectedItem.id) || !isLoggedIn}
+              >
+                <Calendar size={14} /> 
+                {hasUserBookedItem(selectedItem.id) ? 'Already Booked' : 'Book Fitting'}
+              </button>
+            </div>
           </div>
-        );
-      })()}
+        </div>
+      )}
 
-      {/* BOOKING FITTING MODAL */}
+      {/* BOOKING FITTING MODAL with Strategy Pattern Integration */}
       {modal === 'booking' && selectedItem && !bookingConfirmed && (() => {
         const alreadyBooked = hasUserBookedItem(selectedItem.id);
         
@@ -818,11 +1006,16 @@ export default function BrowseOutfitsFragment() {
           return null;
         }
         
-        const promo = activePromo(selectedItem);
+        const basePrice = selectedItem.finalPrice || selectedItem.originalPrice;
+        const strategy = RENTAL_STRATEGIES[booking.rentalStrategy];
+        const dailyRate = strategy.discount > 0 
+          ? basePrice * (1 - strategy.discount / 100)
+          : basePrice;
+        const totalPrice = dailyRate * booking.rentalDays;
         
         return (
           <div className="inv-overlay" onClick={closeModal}>
-            <div className="inv-modal" style={{ maxWidth: '560px' }} onClick={e => e.stopPropagation()}>
+            <div className="inv-modal" style={{ maxWidth: '600px' }} onClick={e => e.stopPropagation()}>
               <div className="inv-modal-header">
                 <h3>Book a Fitting - {selectedItem.name}</h3>
                 <button className="inv-modal-close" onClick={closeModal} disabled={submitting}><X size={16} /></button>
@@ -836,22 +1029,81 @@ export default function BrowseOutfitsFragment() {
                   <div>
                     <div className="inv-lease-preview-name">{selectedItem.name}</div>
                     <div className="inv-lease-preview-price">
-                      {promo ? (
-                        <>
-                          <span style={{ textDecoration: 'line-through', color: '#bbb', marginRight: '0.3rem' }}>
-                            ₱{selectedItem.price.toLocaleString()}
-                          </span>
-                          ₱{Math.round(discPrice(selectedItem)).toLocaleString()}/day
-                        </>
-                      ) : (
-                        `₱${selectedItem.price.toLocaleString()}/day`
+                      {selectedItem.discountActive && (
+                        <div className="promo-badge-sm">
+                          <Sparkles size={10} /> {selectedItem.promoCode}
+                        </div>
                       )}
                     </div>
-                    {promo && (
-                      <div className="inv-promo-code-pill" style={{ marginTop: '0.25rem' }}>
-                        <Sparkles size={8} /> {promo.code}
-                      </div>
-                    )}
+                  </div>
+                </div>
+
+                {/* Strategy Pattern: Rental Duration Selector */}
+                <div className="inv-field">
+                  <label className="inv-field-label">Rental Duration Plan <span className="inv-required">*</span></label>
+                  <div className="inv-strategy-selector-buttons">
+                    {Object.entries(RENTAL_STRATEGIES).map(([key, strat]) => (
+                      <button
+                        key={key}
+                        type="button"
+                        className={`inv-strategy-btn ${booking.rentalStrategy === key ? 'active' : ''}`}
+                        onClick={() => setBooking(prev => ({ ...prev, rentalStrategy: key }))}
+                        disabled={submitting}
+                      >
+                        <div className="inv-strategy-btn-name">{strat.name}</div>
+                        {strat.discount > 0 && (
+                          <div className="inv-strategy-btn-discount">{strat.discount}% OFF</div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Rental Days Input */}
+                <div className="inv-field">
+                  <label className="inv-field-label">Number of Rental Days <span className="inv-required">*</span></label>
+                  <input
+                    className="inv-input"
+                    type="number"
+                    min="1"
+                    max="365"
+                    value={booking.rentalDays}
+                    onChange={e => setBooking(prev => ({ ...prev, rentalDays: Math.max(1, parseInt(e.target.value) || 1) }))}
+                    disabled={submitting}
+                  />
+                </div>
+
+                {/* Price Breakdown */}
+                <div className="bk-payment-summary">
+                  <div className="bk-ps-row total">
+                    <span><strong>Price Summary</strong></span>
+                  </div>
+                  <div className="bk-ps-row">
+                    <span>Daily Rate ({strategy.name})</span>
+                    <span>₱{Math.round(dailyRate).toLocaleString()}/day</span>
+                  </div>
+                  {strategy.discount > 0 && (
+                    <div className="bk-ps-row">
+                      <span>Discount Applied</span>
+                      <span style={{ color: '#15803d' }}>-{strategy.discount}%</span>
+                    </div>
+                  )}
+                  {selectedItem.discountActive && (
+                    <div className="bk-ps-row">
+                      <span>Promo Code ({selectedItem.promoCode})</span>
+                      <span style={{ color: '#15803d' }}>Applied</span>
+                    </div>
+                  )}
+                  <div className="bk-ps-row">
+                    <span>Rental Days</span>
+                    <span>{booking.rentalDays} day{booking.rentalDays !== 1 ? 's' : ''}</span>
+                  </div>
+                  <div className="bk-ps-row total" style={{ borderTop: '1px solid #e2e8f0', marginTop: '0.5rem', paddingTop: '0.5rem' }}>
+                    <span><strong>Total Rental Price</strong></span>
+                    <span><strong>₱{Math.round(totalPrice).toLocaleString()}</strong></span>
+                  </div>
+                  <div className="bk-ps-row" style={{ fontSize: '0.7rem', color: '#999', justifyContent: 'center', marginTop: '0.5rem' }}>
+                    * Fitting is FREE and no obligation to rent
                   </div>
                 </div>
 
@@ -960,27 +1212,6 @@ export default function BrowseOutfitsFragment() {
                     disabled={submitting}
                   />
                 </div>
-
-                <div className="bk-payment-summary">
-                  <div className="bk-ps-row total" style={{ borderBottom: 'none', marginBottom: 0, paddingBottom: 0 }}>
-                    <span><strong>Fitting Summary</strong></span>
-                  </div>
-                  <div className="bk-ps-row">
-                    <span>Item</span>
-                    <span>{selectedItem.name}</span>
-                  </div>
-                  <div className="bk-ps-row">
-                    <span>Fitting Date</span>
-                    <span>{booking.fittingDate ? fmtDate(booking.fittingDate) : '—'}</span>
-                  </div>
-                  <div className="bk-ps-row">
-                    <span>Fitting Time</span>
-                    <span>{booking.fittingTime || '—'}</span>
-                  </div>
-                  <div className="bk-ps-row" style={{ fontSize: '0.7rem', color: '#999', justifyContent: 'center', marginTop: '0.5rem' }}>
-                    * Fitting is FREE and no obligation to rent
-                  </div>
-                </div>
               </div>
               
               <div className="inv-modal-footer">
@@ -990,7 +1221,7 @@ export default function BrowseOutfitsFragment() {
                   onClick={handleBookingSubmit} 
                   disabled={submitting || !booking.fittingDate || !booking.fittingTime || !booking.name || !booking.email || !booking.phone}
                 >
-                  {submitting ? <><Loader2 size={14} className="inv-spinner-inline" /> Submitting...</> : <>Confirm Fitting</>}
+                  {submitting ? <><Loader2 size={14} className="inv-spinner-inline" /> Submitting...</> : <>Confirm Booking • ₱{Math.round(totalPrice).toLocaleString()}</>}
                 </button>
               </div>
             </div>
@@ -1004,24 +1235,37 @@ export default function BrowseOutfitsFragment() {
           <div className="inv-modal" style={{ maxWidth: '500px' }} onClick={e => e.stopPropagation()}>
             <div className="inv-modal-header" style={{ background: '#15803d08', borderBottomColor: '#15803d20' }}>
               <h3 style={{ color: '#15803d', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <CheckCircle size={20} /> Fitting Confirmed!
+                <CheckCircle size={20} /> Booking Confirmed!
               </h3>
               <button className="inv-modal-close" onClick={closeModal}><X size={15} /></button>
             </div>
             <div className="inv-modal-body">
               <div className="inv-confirmation-summary">
                 <p className="inv-confirmation-message">
-                  Your fitting has been successfully booked. We've sent a confirmation to <strong>{bookingConfirmed.customerEmail}</strong>.
+                  Your booking has been successfully confirmed. We've sent a confirmation to <strong>{bookingConfirmed.customerEmail}</strong>.
                 </p>
                 
                 <div className="inv-booking-details">
                   <div className="inv-booking-detail-row">
                     <span className="inv-booking-label">Booking ID:</span>
-                    <span className="inv-booking-value">#FT-{bookingConfirmed.id}</span>
+                    <span className="inv-booking-value">#BK-{bookingConfirmed.id}</span>
                   </div>
                   <div className="inv-booking-detail-row">
                     <span className="inv-booking-label">Item:</span>
                     <span className="inv-booking-value">{bookingConfirmed.item.name}</span>
+                  </div>
+                  <div className="inv-booking-detail-row">
+                    <span className="inv-booking-label">Rental Plan:</span>
+                    <span className="inv-booking-value">
+                      {RENTAL_STRATEGIES[bookingConfirmed.rentalStrategy]?.name || 'Daily Rate'}
+                      {bookingConfirmed.rentalDays > 0 && ` • ${bookingConfirmed.rentalDays} day(s)`}
+                    </span>
+                  </div>
+                  <div className="inv-booking-detail-row">
+                    <span className="inv-booking-label">Total Price:</span>
+                    <span className="inv-booking-value" style={{ color: '#15803d', fontWeight: 'bold' }}>
+                      ₱{Math.round(bookingConfirmed.totalPrice).toLocaleString()}
+                    </span>
                   </div>
                   <div className="inv-booking-detail-row">
                     <span className="inv-booking-label">Fitting Date & Time:</span>
@@ -1050,7 +1294,23 @@ export default function BrowseOutfitsFragment() {
       )}
 
       {/* Gallery Lightbox */}
-      {gallery && <MediaGallery item={gallery.item} startIndex={gallery.startIndex} onClose={() => setGallery(null)} />}
+      {gallery && (
+        <div className="inv-lightbox" onClick={() => setGallery(null)}>
+          <button className="inv-lightbox-close" onClick={() => setGallery(null)}><X size={18} /></button>
+          <div className="inv-lightbox-inner" onClick={e => e.stopPropagation()}>
+            <div className="inv-lightbox-topbar">
+              <span className="inv-lightbox-itemname">{gallery.item.name}</span>
+            </div>
+            <div className="inv-gallery-stage">
+              {gallery.item.mediaFiles?.[gallery.startIndex]?.type === 'video' ? (
+                <video src={gallery.item.mediaFiles[gallery.startIndex].url} controls autoPlay className="inv-lightbox-media" />
+              ) : (
+                <img src={gallery.item.mediaFiles?.[gallery.startIndex]?.url} alt={gallery.item.name} className="inv-lightbox-media" />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Toast */}
       <Toast toast={toast} onClose={closeToast} />

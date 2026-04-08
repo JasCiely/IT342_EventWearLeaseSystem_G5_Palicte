@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface BookingRepository extends JpaRepository<Booking, String> {
@@ -15,6 +16,9 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
     List<Booking> findByUserIdOrderByCreatedAtDesc(Long userId);
 
     List<Booking> findByItemIdAndCustomerEmailAndStatus(String itemId, String customerEmail, String status);
+
+    // Find by booking ID
+    Optional<Booking> findByBookingId(String bookingId);
 
     // Fixed: Compare string dates properly
     @Query("SELECT b FROM Booking b WHERE b.customerEmail = :email AND b.status = 'CONFIRMED' AND b.fittingDate >= :today ORDER BY b.fittingDate ASC")

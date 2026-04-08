@@ -70,11 +70,13 @@ const authFetch = async (endpoint, options = {}) => {
   }
 };
 
-// Fetch all items
+// Fetch all items - BACKEND USES DECORATOR PATTERN
+// Backend returns finalPrice and discountApplied already calculated
 export const fetchItems = async () => {
   try {
     const response = await authFetch('/inventory/items');
     const itemsArray = Array.isArray(response) ? response : (response.content || response.items || []);
+    
     return itemsArray.map(item => ({
       id: item.id,
       name: item.name,
@@ -83,8 +85,11 @@ export const fetchItems = async () => {
       size: item.size,
       color: item.color,
       price: item.price,
-      finalPrice: item.finalPrice || item.price,
-      discountApplied: item.promotionApplied !== 'None' ? item.promotionApplied : null,
+      // BACKEND DECORATOR PATTERN PROVIDES THESE:
+      finalPrice: item.finalPrice !== undefined && item.finalPrice !== null ? item.finalPrice : item.price,
+      discountApplied: item.discountApplied !== null && item.discountApplied !== undefined && item.discountApplied !== 'None' 
+        ? item.discountApplied 
+        : null,
       status: item.status,
       ageRange: item.ageRange || '',
       description: item.description || '',
@@ -96,7 +101,7 @@ export const fetchItems = async () => {
   }
 };
 
-// Fetch single item by ID with price calculation (uses backend Decorator pattern)
+// Fetch single item by ID - BACKEND USES DECORATOR PATTERN
 export const fetchItemById = async (id) => {
   try {
     const response = await authFetch(`/inventory/items/${id}`);
@@ -108,8 +113,10 @@ export const fetchItemById = async (id) => {
       size: response.size,
       color: response.color,
       price: response.price,
-      finalPrice: response.finalPrice || response.price,
-      discountApplied: response.promotionApplied !== 'None' ? response.promotionApplied : null,
+      finalPrice: response.finalPrice !== undefined && response.finalPrice !== null ? response.finalPrice : response.price,
+      discountApplied: response.discountApplied !== null && response.discountApplied !== undefined && response.discountApplied !== 'None' 
+        ? response.discountApplied 
+        : null,
       priceDescription: response.priceDescription || null,
       savings: response.savings || 0,
       status: response.status,
@@ -153,8 +160,8 @@ export const fetchPromotions = async () => {
       type: promo.type,
       value: promo.value,
       items: promo.items || [],
-      start: promo.startDate || promo.start,
-      end: promo.endDate || promo.end,
+      start: promo.start,
+      end: promo.end,
       active: promo.active,
     }));
   } catch (error) {
@@ -227,5 +234,135 @@ export const getUserBookings = async () => {
   } catch (error) {
     console.error('Error fetching user bookings:', error);
     return [];
+  }
+};
+
+// Create a new item (admin only)
+export const createItem = async (itemData, mediaFiles = []) => {
+  try {
+    const formData = new FormData();
+    formData.append('data', JSON.stringify(itemData));
+    mediaFiles.forEach(file => {
+      formData.append('files', file);
+    });
+    
+    const token = getAuthToken();
+    const response = await fetch(`${API_BASE_URL}/inventory/items`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: formData,
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to create item');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error creating item:', error);
+    throw error;
+  }
+};
+
+// Update an existing item (admin only)
+export const updateItem = async (id, itemData, newFiles = [], keepUrls = []) => {
+  try {
+    const formData = new FormData();
+    formData.append('data', JSON.stringify(itemData));
+    formData.append('keepUrls', JSON.stringify(keepUrls));
+    newFiles.forEach(file => {
+      formData.append('files', file);
+    });
+    
+    const token = getAuthToken();
+    const response = await fetch(`${API_BASE_URL}/inventory/items/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: formData,
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to update item');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error updating item:', error);
+    throw error;
+  }
+};
+
+// Delete an item (admin only)
+export const deleteItem = async (id) => {
+  try {
+    const response = await authFetch(`/inventory/items/${id}`, {
+      method: 'DELETE',
+    });
+    return response;
+  } catch (error) {
+    console.error('Error deleting item:', error);
+    throw error;
+  }
+};
+
+// Create a promotion (admin only)
+export const createPromotion = async (promoData) => {
+  try {
+    const response = await authFetch('/inventory/promotions', {
+      method: 'POST',
+      body: JSON.stringify(promoData),
+    });
+    return response;
+  } catch (error) {
+    console.error('Error creating promotion:', error);
+    throw error;
+  }
+};
+
+// Update a promotion (admin only)
+export const updatePromotion = async (id, promoData) => {
+  try {
+    const response = await authFetch(`/inventory/promotions/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(promoData),
+    });
+    return response;
+  } catch (error) {
+    console.error('Error updating promotion:', error);
+    throw error;
+  }
+};
+
+// Delete a promotion (admin only)
+export const deletePromotion = async (id) => {
+  try {
+    const response = await authFetch(`/inventory/promotions/${id}`, {
+      method: 'DELETE',
+    });
+    return response;
+  } catch (error) {
+    console.error('Error deleting promotion:', error);
+    throw error;
+  }
+};
+
+// Add this function to inventoryApi.js
+export const calculateRentalPrice = async (itemId, strategyType, days) => {
+  try {
+    const response = await authFetch(`/inventory/items/${itemId}/calculate-price`, {
+      method: 'POST',
+      body: JSON.stringify({ 
+        strategyType, // "daily", "weekly", "monthly"
+        days 
+      }),
+    });
+    return response;
+  } catch (error) {
+    console.error('Error calculating rental price:', error);
+    return { finalPrice: null, error: error.message };
   }
 };

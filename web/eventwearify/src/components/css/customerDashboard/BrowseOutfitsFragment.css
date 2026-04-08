@@ -1408,3 +1408,451 @@
   align-items: center;
   gap: 0.5rem;
 }
+
+/* ============================================
+   Strategy Pattern - Rental Duration Styles
+   ============================================ */
+
+/* Rental Strategy Selector on Grid Cards */
+.inv-rental-strategy-selector {
+  margin: 0.5rem 0;
+  width: 100%;
+}
+
+.inv-strategy-select {
+  width: 100%;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.7rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: white;
+  color: #1e293b;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.inv-strategy-select:hover:not(:disabled) {
+  border-color: #c4717f;
+  background: #fef2f2;
+}
+
+.inv-strategy-select:focus {
+  outline: none;
+  border-color: #6b2d39;
+  box-shadow: 0 0 0 2px rgba(107, 45, 57, 0.1);
+}
+
+.inv-strategy-select:disabled {
+  background: #f1f5f9;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* Rental Badge on Price */
+.inv-rental-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  background: #10b981;
+  color: white;
+  font-size: 0.6rem;
+  font-weight: 600;
+  padding: 0.15rem 0.4rem;
+  border-radius: 12px;
+  margin-left: 0.5rem;
+}
+
+/* Strategy Description Text */
+.inv-strategy-desc {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.6rem;
+  color: #6b7280;
+  margin-top: 0.25rem;
+}
+
+/* List View Strategy Selector */
+.inv-list-strategy-selector {
+  margin-top: 0.35rem;
+}
+
+.inv-strategy-select-sm {
+  padding: 0.2rem 0.35rem;
+  font-size: 0.65rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  background: white;
+  color: #1e293b;
+  cursor: pointer;
+  width: auto;
+  min-width: 90px;
+}
+
+.inv-strategy-select-sm:hover:not(:disabled) {
+  border-color: #c4717f;
+}
+
+/* View Modal - Strategy Section */
+.inv-view-strategy-section {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.inv-view-strategy-section .inv-field-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #475569;
+  margin-bottom: 0.75rem;
+  display: block;
+}
+
+.inv-strategy-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.inv-strategy-option {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 0.75rem;
+  transition: all 0.2s ease;
+}
+
+.inv-strategy-option:hover {
+  border-color: #c4717f;
+  background: #fef2f2;
+}
+
+.inv-strategy-option-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.inv-strategy-option-header strong {
+  font-size: 0.85rem;
+  color: #1e293b;
+}
+
+.inv-strategy-discount-badge {
+  background: #10b981;
+  color: white;
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 0.2rem 0.5rem;
+  border-radius: 20px;
+}
+
+.inv-strategy-option-price {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.inv-strategy-option-price .strikethrough {
+  text-decoration: line-through;
+  color: #94a3b8;
+  font-size: 0.75rem;
+}
+
+.inv-strategy-option-price .discounted {
+  color: #15803d;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.inv-strategy-option-desc {
+  font-size: 0.65rem;
+  color: #64748b;
+}
+
+/* Booking Modal - Strategy Selector Buttons */
+.inv-strategy-selector-buttons {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.inv-strategy-btn {
+  flex: 1;
+  min-width: 100px;
+  padding: 0.6rem 0.75rem;
+  background: #f1f5f9;
+  border: 2px solid #e2e8f0;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+
+.inv-strategy-btn.active {
+  background: #6b2d39;
+  border-color: #6b2d39;
+}
+
+.inv-strategy-btn.active .inv-strategy-btn-name {
+  color: white;
+}
+
+.inv-strategy-btn.active .inv-strategy-btn-discount {
+  color: #fcd34d;
+}
+
+.inv-strategy-btn:hover:not(.active) {
+  border-color: #c4717f;
+  background: #fef2f2;
+}
+
+.inv-strategy-btn-name {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 0.2rem;
+}
+
+.inv-strategy-btn.active .inv-strategy-btn-name {
+  color: white;
+}
+
+.inv-strategy-btn-discount {
+  font-size: 0.65rem;
+  color: #10b981;
+  font-weight: 500;
+}
+
+.inv-strategy-btn.active .inv-strategy-btn-discount {
+  color: #fcd34d;
+}
+
+/* Price Summary in Booking Modal */
+.bk-payment-summary {
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 0.75rem;
+  margin: 1rem 0;
+}
+
+.bk-ps-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8rem;
+  padding: 0.35rem 0;
+  color: #475569;
+}
+
+.bk-ps-row.total {
+  font-size: 0.9rem;
+  color: #1e293b;
+  border-top: 1px solid #e2e8f0;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+}
+
+.bk-ps-row.total strong {
+  color: #6b2d39;
+}
+
+/* Promo Badge in Preview */
+.promo-badge-sm {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  background: #fef3c7;
+  color: #d97706;
+  font-size: 0.65rem;
+  font-weight: 500;
+  padding: 0.2rem 0.5rem;
+  border-radius: 20px;
+  margin-top: 0.25rem;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+  .inv-strategy-selector-buttons {
+    flex-direction: column;
+  }
+  
+  .inv-strategy-btn {
+    min-width: auto;
+  }
+  
+  .inv-strategy-options {
+    gap: 0.5rem;
+  }
+  
+  .inv-strategy-option {
+    padding: 0.6rem;
+  }
+  
+  .inv-rental-strategy-selector {
+    margin: 0.35rem 0;
+  }
+  
+  .inv-strategy-select {
+    font-size: 0.65rem;
+    padding: 0.3rem 0.4rem;
+  }
+}
+
+/* Animation for price changes */
+.inv-price-new, .inv-price-old {
+  transition: all 0.2s ease;
+}
+
+/* Hover effect on strategy selector */
+.inv-grid-card:hover .inv-strategy-select {
+  border-color: #c4717f;
+}
+
+/* Disabled state for strategy selector when item is booked */
+.inv-strategy-select:disabled {
+  background: #f1f5f9;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+/* Tooltip style for strategy description */
+.inv-strategy-desc svg {
+  flex-shrink: 0;
+}
+
+/* Price highlight when discount is applied */
+.inv-price-new {
+  font-weight: 700;
+  color: #15803d;
+}
+
+.inv-price-old {
+  text-decoration: line-through;
+  color: #94a3b8;
+  font-size: 0.7rem;
+  margin-right: 0.4rem;
+}
+
+/* Combined discount indicator (promo + rental) */
+.inv-grid-card.has-combined-discount .inv-grid-promo-ribbon {
+  background: linear-gradient(135deg, #6b2d39, #c4717f);
+}
+
+/* Strategy badge on list view */
+.inv-list-strategy-selector {
+  display: inline-block;
+  margin-left: 0;
+}
+
+/* Confirmation modal strategy details */
+.inv-booking-detail-row .inv-booking-value {
+  word-break: break-word;
+  text-align: right;
+}
+
+/* Rental days input styling */
+input[type="number"].inv-input {
+  -moz-appearance: textfield;
+}
+
+input[type="number"].inv-input::-webkit-inner-spin-button,
+input[type="number"].inv-input::-webkit-outer-spin-button {
+  opacity: 0.5;
+}
+
+/* Strategy option active state */
+.inv-strategy-option.active {
+  border-color: #6b2d39;
+  background: #fef2f2;
+}
+
+/* Loading state for price calculation */
+.inv-price-loading {
+  display: inline-block;
+  width: 60px;
+  height: 14px;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: loading-shimmer 1.5s infinite;
+  border-radius: 4px;
+}
+
+@keyframes loading-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Mobile-specific strategy styles */
+@media (max-width: 640px) {
+  .inv-strategy-selector-buttons {
+    gap: 0.35rem;
+  }
+  
+  .inv-strategy-btn {
+    padding: 0.5rem 0.5rem;
+  }
+  
+  .inv-strategy-btn-name {
+    font-size: 0.7rem;
+  }
+  
+  .inv-strategy-btn-discount {
+    font-size: 0.55rem;
+  }
+  
+  .inv-strategy-option-header strong {
+    font-size: 0.75rem;
+  }
+  
+  .inv-strategy-discount-badge {
+    font-size: 0.55rem;
+    padding: 0.15rem 0.35rem;
+  }
+  
+  .inv-strategy-option-price .discounted {
+    font-size: 0.8rem;
+  }
+  
+  .bk-ps-row {
+    font-size: 0.7rem;
+  }
+  
+  .bk-ps-row.total {
+    font-size: 0.8rem;
+  }
+  
+  .inv-rental-strategy-selector {
+    margin: 0.3rem 0;
+  }
+  
+  .inv-strategy-select {
+    font-size: 0.6rem;
+    padding: 0.25rem 0.35rem;
+  }
+}
+
+/* Compact list view strategy selector */
+.inv-list-strategy-selector {
+  display: flex;
+  align-items: center;
+  margin-top: 0.25rem;
+}
+
+.inv-strategy-select-sm {
+  padding: 0.15rem 0.3rem;
+  font-size: 0.6rem;
+  border-radius: 4px;
+  background: #f8fafc;
+}
+
+.inv-strategy-select-sm:hover:not(:disabled) {
+  background: #fef2f2;
+}
