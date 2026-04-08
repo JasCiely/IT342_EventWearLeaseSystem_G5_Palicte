@@ -6,6 +6,7 @@ import com.backend.dto.response.ItemResponse;
 import com.backend.dto.response.PromotionResponse;
 import com.backend.entity.Item;
 import com.backend.entity.Promotion;
+import com.backend.factory.ItemFactoryRegistry;
 import com.backend.repository.ItemRepository;
 import com.backend.repository.PromotionRepository;
 import com.backend.service.InventoryService;
@@ -27,6 +28,7 @@ public class InventoryServiceImpl implements InventoryService {
     private final ItemRepository itemRepository;
     private final PromotionRepository promotionRepository;
     private final InventorySupabaseService supabaseService;
+    private final ItemFactoryRegistry factoryRegistry;
 
     // ── Items ────────────────────────────────────────────────
 
@@ -46,8 +48,13 @@ public class InventoryServiceImpl implements InventoryService {
 
     @Override
     public ItemResponse createItem(ItemRequest request, List<MultipartFile> files) {
-        Item item = new Item();
-        applyRequest(item, request);
+        log.info("Creating item with category: {}", request.getCategory());
+
+        // Get the appropriate factory based on category
+        var factory = factoryRegistry.getFactory(request.getCategory());
+
+        // Create item using factory (with category-specific logic)
+        Item item = factory.createItem(request);
 
         List<String> urls = new ArrayList<>();
         List<String> types = new ArrayList<>();
@@ -56,6 +63,7 @@ public class InventoryServiceImpl implements InventoryService {
         item.setMediaUrls(String.join(",", urls));
         item.setMediaTypes(String.join(",", types));
 
+        log.info("Created new {} item: {}", request.getCategory(), item.getName());
         return toItemResponse(itemRepository.save(item));
     }
 
