@@ -52,11 +52,24 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
+                        // Public auth endpoints
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
+
+                        // Public inventory reads
                         .requestMatchers(HttpMethod.GET, "/api/inventory/items", "/api/inventory/promotions")
                         .permitAll()
+
+                        // Direct bookings — customers can create/view their own; admins manage all
+                        .requestMatchers(HttpMethod.POST, "/api/direct-bookings").hasRole("CUSTOMER")
+                        .requestMatchers(HttpMethod.GET, "/api/direct-bookings/my-bookings").hasRole("CUSTOMER")
+                        .requestMatchers(HttpMethod.GET, "/api/direct-bookings/availability").hasRole("CUSTOMER")
+                        .requestMatchers(HttpMethod.GET, "/api/direct-bookings/**").hasAnyRole("ADMIN", "CUSTOMER")
+                        .requestMatchers(HttpMethod.PUT, "/api/direct-bookings/**").hasRole("ADMIN")
+
+                        // Preflight
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+
                         .anyRequest().authenticated())
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -68,7 +81,6 @@ public class SecurityConfig {
                                         new SmartPromptResolver(clientRegistrationRepository)))
                         .successHandler(oAuth2SuccessHandler)
                         .failureHandler(oAuth2FailureHandler))
-                // Return JSON for authentication errors instead of HTML
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint((request, response, authException) -> {
                             response.setContentType("application/json");
@@ -87,30 +99,24 @@ public class SecurityConfig {
         private final DefaultOAuth2AuthorizationRequestResolver defaultResolver;
 
         SmartPromptResolver(ClientRegistrationRepository repo) {
-            this.defaultResolver = new DefaultOAuth2AuthorizationRequestResolver(
-                    repo, "/oauth2/authorization");
+            this.defaultResolver = new DefaultOAuth2AuthorizationRequestResolver(repo, "/oauth2/authorization");
         }
 
         @Override
         public OAuth2AuthorizationRequest resolve(HttpServletRequest request) {
-            OAuth2AuthorizationRequest req = defaultResolver.resolve(request);
-            return customize(req, request);
+            return customize(defaultResolver.resolve(request), request);
         }
 
         @Override
         public OAuth2AuthorizationRequest resolve(HttpServletRequest request, String clientRegistrationId) {
-            OAuth2AuthorizationRequest req = defaultResolver.resolve(request, clientRegistrationId);
-            return customize(req, request);
+            return customize(defaultResolver.resolve(request, clientRegistrationId), request);
         }
 
         private OAuth2AuthorizationRequest customize(OAuth2AuthorizationRequest req, HttpServletRequest request) {
             if (req == null)
                 return null;
-
-            String uri = request.getRequestURI();
-            boolean isRegister = uri.contains("google-register");
+            boolean isRegister = request.getRequestURI().contains("google-register");
             String prompt = isRegister ? "select_account consent" : "select_account";
-
             return OAuth2AuthorizationRequest.from(req)
                     .additionalParameters(params -> params.put("prompt", prompt))
                     .build();

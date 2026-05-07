@@ -428,3 +428,44 @@ export const SEED_BOOKINGS = [
     ],
   },
 ];
+
+// ── Leasing & Pricing Utilities ──────────────────────────────
+export const getLeasingSettings = () => {
+  const saved = localStorage.getItem('leasingSettings');
+  return saved ? JSON.parse(saved) : {
+    minLeaseDays: 2,
+    weeklyDiscount: 100,
+    monthlyDiscountCap: 300
+  };
+};
+
+export const calculateLeasePricing = (dailyRate, startDate, endDate) => {
+  if (!startDate || !endDate) return null;
+
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  const diffTime = end - start;
+  const totalDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // Include both dates
+
+  if (totalDays < 0) return null;
+
+  const settings = getLeasingSettings();
+  const basePrice = dailyRate * totalDays;
+
+  // Calculate discount: weekly discount accumulates, capped at monthly cap
+  const weeks = Math.floor(totalDays / 7);
+  const weeklyDiscountAmount = weeks * settings.weeklyDiscount;
+  const discount = Math.min(weeklyDiscountAmount, settings.monthlyDiscountCap);
+  const finalPrice = basePrice - discount;
+
+  return {
+    totalDays,
+    basePrice,
+    discount,
+    finalPrice,
+    weeks,
+    minLeaseDays: settings.minLeaseDays,
+    isValid: totalDays >= settings.minLeaseDays,
+    savingsText: weeks > 0 ? `You saved ₱${discount} for ${weeks} week${weeks > 1 ? 's' : ''}` : ''
+  };
+};
