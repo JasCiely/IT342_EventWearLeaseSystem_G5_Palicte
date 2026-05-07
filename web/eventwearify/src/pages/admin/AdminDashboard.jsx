@@ -5,6 +5,7 @@ import CustomersFragment from './fragment/CustomersFragment';
 import InventoryFragment from './fragment/InventoryFragment';
 import ProfileFragment from './fragment/ProfileFragment';
 import BookingsFragment from './fragment/BookingsFragment';
+import StaffFragment from './fragment/StaffFragment';
 import {
   CheckCircle,
   LayoutDashboard,
@@ -37,6 +38,7 @@ const renderFragment = (key) => {
     case 'customers': return <CustomersFragment />;
     case 'profile':   return <ProfileFragment />;
     case 'bookings':  return <BookingsFragment />;
+    case 'staff':     return <StaffFragment />;
     default:
       return (
         <p style={{ color: '#bbb', fontSize: '0.95rem', marginTop: '0.5rem' }}>
@@ -63,7 +65,7 @@ const AdminDashboard = () => {
       setToast({ show: true, message: `Welcome back, ${firstName}! You have successfully logged in.` });
       setTimeout(() => setToast({ show: false, message: '' }), 3500);
     }
-  }, []);
+  }, [firstName]);
 
   const handleLogout = async () => {
     try {
@@ -104,19 +106,22 @@ const AdminDashboard = () => {
           )}
 
           <nav className="sidebar-nav">
-            {NAV_ITEMS.map(({ key, label, icon: Icon, path }) => (
-              <button
-                key={key}
-                className={`sidebar-item ${activeKey === key ? 'active' : ''}`}
-                onClick={() => navigate(path)}
-                title={collapsed ? label : ''}
-              >
-                <span className="sidebar-icon-wrap">
-                  <Icon size={18} />
-                </span>
-                {!collapsed && <span className="sidebar-label">{label}</span>}
-              </button>
-            ))}
+            {NAV_ITEMS.map(({ key, label, icon, path }) => {
+              const Icon = icon;
+              return (
+                <button
+                  key={key}
+                  className={`sidebar-item ${activeKey === key ? 'active' : ''}`}
+                  onClick={() => navigate(path)}
+                  title={collapsed ? label : ''}
+                >
+                  <span className="sidebar-icon-wrap">
+                    <Icon size={18} />
+                  </span>
+                  {!collapsed && <span className="sidebar-label">{label}</span>}
+                </button>
+              );
+            })}
           </nav>
 
           <button

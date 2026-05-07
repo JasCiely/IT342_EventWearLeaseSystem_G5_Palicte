@@ -24,7 +24,9 @@ public class AdminUserServiceImpl implements AdminUserService {
     @Override
     @Transactional(readOnly = true)
     public UserPageResponse getUsers(int page, int size, String search, String status) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        // ✅ No Sort here — ORDER BY u.created_at DESC is hardcoded in the native SQL
+        // query
+        Pageable pageable = PageRequest.of(page, size);
 
         // Resolve optional active filter
         Boolean activeFilter = null;
@@ -33,8 +35,14 @@ public class AdminUserServiceImpl implements AdminUserService {
         if ("inactive".equalsIgnoreCase(status))
             activeFilter = false;
 
+        // Handle null search safely
+        String trimmedSearch = search != null ? search.trim() : null;
+
         Page<User> userPage = userRepository.findUsersFiltered(
-                Role.CUSTOMER, search.trim(), activeFilter, pageable);
+                null, // ← Fetch all users regardless of role
+                trimmedSearch, // ← Handle null search
+                activeFilter,
+                pageable);
 
         List<UserSummaryResponse> content = userPage.getContent()
                 .stream()
