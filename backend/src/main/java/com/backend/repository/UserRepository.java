@@ -18,27 +18,36 @@ public interface UserRepository extends JpaRepository<User, String> {
 
         boolean existsByEmail(String email);
 
-        // Used by DataSeeder — skips seeding if ANY admin exists,
-        // regardless of what details the admin has changed
         boolean existsByRole(Role role);
 
-        // Check if phone is taken by someone OTHER than the current user
         boolean existsByPhone(String phone);
 
         boolean existsByPhoneAndIdNot(String phone, String id);
 
-        // Check if email is taken by someone OTHER than the current user
         boolean existsByEmailAndIdNot(String email, String id);
 
-        @Query("SELECT u FROM User u WHERE " +
-                        "(:role IS NULL OR u.role = :role) AND " +
-                        "(:searchTerm IS NULL OR LOWER(u.firstName) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
-                        "OR LOWER(u.lastName) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
-                        "OR LOWER(u.email) LIKE LOWER(CONCAT('%', :searchTerm, '%'))) AND " +
-                        "(:active IS NULL OR u.active = :active)")
+        @Query(value = "SELECT * FROM users u WHERE " +
+                        "(:role IS NULL OR u.role = CAST(:role AS text)) AND " +
+                        "(:searchTerm IS NULL OR lower(u.first_name) LIKE lower(CONCAT('%', CAST(:searchTerm AS text), '%')) "
+                        +
+                        "OR lower(u.last_name) LIKE lower(CONCAT('%', CAST(:searchTerm AS text), '%')) " +
+                        "OR lower(u.email) LIKE lower(CONCAT('%', CAST(:searchTerm AS text), '%'))) AND " +
+                        "(:active IS NULL OR u.active = :active) " +
+                        "ORDER BY u.created_at DESC", countQuery = "SELECT count(*) FROM users u WHERE " +
+                                        "(:role IS NULL OR u.role = CAST(:role AS text)) AND " +
+                                        "(:searchTerm IS NULL OR lower(u.first_name) LIKE lower(CONCAT('%', CAST(:searchTerm AS text), '%')) "
+                                        +
+                                        "OR lower(u.last_name) LIKE lower(CONCAT('%', CAST(:searchTerm AS text), '%')) "
+                                        +
+                                        "OR lower(u.email) LIKE lower(CONCAT('%', CAST(:searchTerm AS text), '%'))) AND "
+                                        +
+                                        "(:active IS NULL OR u.active = :active)", nativeQuery = true)
         Page<User> findUsersFiltered(
-                        @Param("role") Role role,
+                        @Param("role") String role,
                         @Param("searchTerm") String searchTerm,
                         @Param("active") Boolean active,
                         Pageable pageable);
+
+        @Query(value = "SELECT * FROM users u WHERE u.role = 'CUSTOMER' ORDER BY u.created_at DESC", countQuery = "SELECT count(*) FROM users u WHERE u.role = 'CUSTOMER'", nativeQuery = true)
+        Page<User> findAllCustomers(Pageable pageable);
 }
