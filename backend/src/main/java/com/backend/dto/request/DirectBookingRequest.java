@@ -19,4 +19,10 @@ public class DirectBookingRequest {
     private BigDecimal discountAmount;
     private BigDecimal finalPrice;
     private String notes;
+
+    // Add these new fields
+    private String customerName;
+    private String customerEmail;
+    private String customerPhone;
+    private String preferredSize;
 }

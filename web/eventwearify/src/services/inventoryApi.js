@@ -1,5 +1,3 @@
-// src/services/inventoryApi.js
-
 const API_BASE_URL = 'http://localhost:8080/api';
 
 const getAuthToken = () => {
@@ -179,13 +177,17 @@ export const createDirectBooking = async (bookingData) => {
   try {
     const payload = {
       inventoryItemId: bookingData.itemId,
-      startDate: bookingData.startDate,       // "YYYY-MM-DD"
-      endDate: bookingData.endDate,           // "YYYY-MM-DD"
+      startDate: bookingData.startDate,
+      endDate: bookingData.endDate,
       totalDays: bookingData.totalDays,
       basePrice: bookingData.basePrice,
       discountAmount: bookingData.discountAmount,
       finalPrice: bookingData.finalPrice,
       notes: bookingData.notes || '',
+      customerName: bookingData.customerName,
+      customerEmail: bookingData.customerEmail,
+      customerPhone: bookingData.customerPhone,
+      preferredSize: bookingData.preferredSize || ''
     };
     const response = await authFetch('/direct-bookings', {
       method: 'POST',
@@ -201,10 +203,14 @@ export const createDirectBooking = async (bookingData) => {
 export const getUserDirectBookings = async (page = 0, size = 10) => {
   try {
     const response = await authFetch(`/direct-bookings/my-bookings?page=${page}&size=${size}`);
-    return response;
+    // Handle paginated response
+    if (response && response.content) {
+      return response.content;
+    }
+    return Array.isArray(response) ? response : [];
   } catch (error) {
     console.error('Error fetching user direct bookings:', error);
-    return { content: [], totalElements: 0 };
+    return [];
   }
 };
 

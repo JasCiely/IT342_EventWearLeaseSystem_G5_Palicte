@@ -9,7 +9,7 @@ import {
 import '../../../components/css/customerDashboard/BrowseOutfitsFragment.css';
 import {
   fetchItems, fetchPromotions, bookFitting, getUserBookings,
-  createDirectBooking, checkDirectBookingAvailability,
+  createDirectBooking, checkDirectBookingAvailability, getUserDirectBookings
 } from '../../../services/inventoryApi';
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -594,9 +594,14 @@ export default function BrowseOutfitsFragment() {
       getUserBookings()
         .then(data => setUserBookings(data))
         .catch(err => console.error('Error loading user bookings:', err));
-
-      const storedDirectBookings = JSON.parse(localStorage.getItem('userDirectBookings') || '[]');
-      setDirectBookings(storedDirectBookings);
+      
+      getUserDirectBookings()
+        .then(data => {
+          const bookings = Array.isArray(data) ? data : [];
+          setDirectBookings(bookings);
+          localStorage.setItem('userDirectBookings', JSON.stringify(bookings));
+        })
+        .catch(err => console.error('Error loading direct bookings:', err));
     }
   }, [isLoggedIn]);
 
@@ -618,16 +623,16 @@ export default function BrowseOutfitsFragment() {
   const hasUserDirectBookedItem = useCallback(itemId => {
     if (!directBookings.length) return false;
     return directBookings.some(b =>
-      String(b.itemId) === String(itemId) &&
-      (b.status === 'pending' || b.status === 'approved' || b.status === 'confirmed')
+      String(b.inventoryItemId) === String(itemId) &&
+      (b.bookingStatus === 'Pending' || b.bookingStatus === 'Approved' || b.bookingStatus === 'Confirmed')
     );
   }, [directBookings]);
 
   const getUserDirectBookingForItem = useCallback(itemId => {
     if (!directBookings.length) return null;
     return directBookings.find(b =>
-      String(b.itemId) === String(itemId) &&
-      (b.status === 'pending' || b.status === 'approved' || b.status === 'confirmed')
+      String(b.inventoryItemId) === String(itemId) &&
+      (b.bookingStatus === 'Pending' || b.bookingStatus === 'Approved' || b.bookingStatus === 'Confirmed')
     );
   }, [directBookings]);
 
@@ -812,7 +817,7 @@ export default function BrowseOutfitsFragment() {
                 directButtonLabel = 'Unavailable';
               } else if (hasDirectBooking) {
                 fittingButtonLabel = 'Unavailable';
-                directButtonLabel = userDirectBooking?.status === 'approved' ? 'Booking Approved' : 'Booking Pending';
+                directButtonLabel = userDirectBooking?.bookingStatus === 'Approved' ? 'Booking Approved' : 'Booking Pending';
               }
 
               return (
@@ -832,7 +837,7 @@ export default function BrowseOutfitsFragment() {
                         {hasFittingBooking ? (
                           <><Calendar size={10} /> Fitting: {fmtDate(userFittingBooking.fittingDate)}</>
                         ) : (
-                          <><ShoppingBag size={10} /> {userDirectBooking?.status === 'approved' ? 'Approved' : 'Pending'}</>
+                          <><ShoppingBag size={10} /> {userDirectBooking?.bookingStatus === 'Approved' ? 'Approved' : 'Pending'}</>
                         )}
                       </div>
                     )}
@@ -919,7 +924,7 @@ export default function BrowseOutfitsFragment() {
                 {showSkeletons && [...Array(8)].map((_, i) => <FastSkeletonRow key={i} />)}
                 {!showSkeletons && visibleItems.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="inv-empty">No items found.</td>
+                    <td colSpan={8} className="inv-empty">No items found. </td>
                   </tr>
                 )}
                 {!showSkeletons && visibleItems.map(item => {
@@ -942,7 +947,7 @@ export default function BrowseOutfitsFragment() {
                     directButtonLabel = 'N/A';
                   } else if (hasDirectBooking) {
                     fittingButtonLabel = 'N/A';
-                    directButtonLabel = userDirectBooking?.status === 'approved' ? 'Approved' : 'Pending';
+                    directButtonLabel = userDirectBooking?.bookingStatus === 'Approved' ? 'Approved' : 'Pending';
                   }
 
                   return (
@@ -960,7 +965,7 @@ export default function BrowseOutfitsFragment() {
                             {hasFittingBooking ? (
                               <><Calendar size={10} /> Fitting: {fmtDate(userFittingBooking.fittingDate)}</>
                             ) : (
-                              <><ShoppingBag size={10} /> {userDirectBooking?.status === 'approved' ? 'Approved' : 'Pending'}</>
+                              <><ShoppingBag size={10} /> {userDirectBooking?.bookingStatus === 'Approved' ? 'Approved' : 'Pending'}</>
                             )}
                           </div>
                         )}
@@ -974,7 +979,7 @@ export default function BrowseOutfitsFragment() {
                         ) : (
                           <span className="inv-price">₱{item.price.toLocaleString()}</span>
                         )}
-                       </td>
+                      </td>
                       <td><StatusBadge status={item.status} /></td>
                       <td>
                         <div className="inv-row-actions">
@@ -1016,8 +1021,8 @@ export default function BrowseOutfitsFragment() {
                             <ShoppingBag size={12} /> {directButtonLabel}
                           </button>
                         </div>
-                       </td>
-                     </tr>
+                      </td>
+                    </tr>
                   );
                 })}
               </tbody>
@@ -1046,7 +1051,7 @@ export default function BrowseOutfitsFragment() {
           directButtonLabel = 'Unavailable';
         } else if (hasDirectBooking) {
           fittingButtonLabel = 'Unavailable';
-          directButtonLabel = userDirectBooking?.status === 'approved' ? 'Booking Approved' : 'Booking Pending';
+          directButtonLabel = userDirectBooking?.bookingStatus === 'Approved' ? 'Booking Approved' : 'Booking Pending';
         }
 
         return (
@@ -1084,7 +1089,7 @@ export default function BrowseOutfitsFragment() {
                       {hasFittingBooking ? (
                         <><Calendar size={14} style={{ color: '#6b2d39' }} /> <span>You have a fitting booked on <strong>{fmtDate(userFittingBooking.fittingDate)}</strong> at <strong>{userFittingBooking.fittingTime}</strong>.</span></>
                       ) : (
-                        <><ShoppingBag size={14} style={{ color: '#c4717f' }} /> <span>You have a direct booking for this item - <strong>{userDirectBooking?.status === 'approved' ? 'Approved' : 'Pending Approval'}</strong>.</span></>
+                        <><ShoppingBag size={14} style={{ color: '#c4717f' }} /> <span>You have a direct booking for this item - <strong>{userDirectBooking?.bookingStatus === 'Approved' ? 'Approved' : 'Pending Approval'}</strong>.</span></>
                       )}
                     </div>
                   )}
@@ -1132,7 +1137,7 @@ export default function BrowseOutfitsFragment() {
                   onClick={() => {
                     if (hasAnyBooking) {
                       if (hasDirectBooking) {
-                        showToast('error', `You already have a direct booking for this item (${userDirectBooking?.status === 'approved' ? 'Approved' : 'Pending approval'}).`);
+                        showToast('error', `You already have a direct booking for this item (${userDirectBooking?.bookingStatus === 'Approved' ? 'Approved' : 'Pending approval'}).`);
                       } else if (hasFittingBooking) {
                         showToast('error', `You already have a fitting booked for this item on ${fmtDate(userFittingBooking.fittingDate)}.`);
                       }
@@ -1295,23 +1300,14 @@ export default function BrowseOutfitsFragment() {
           showToast={showToast}
           currentUser={currentUser}
           onSuccess={confirmed => {
-            const newDirectBooking = {
-              id: confirmed.id,
-              itemId: selectedItem.id,
-              itemName: selectedItem.name,
-              startDate: confirmed.startDate,
-              endDate: confirmed.endDate,
-              totalDays: confirmed.totalDays,
-              finalPrice: confirmed.finalPrice,
-              status: 'pending',
-              createdAt: new Date().toISOString(),
-              customerName: confirmed.customerName,
-              customerEmail: confirmed.customerEmail,
-              customerPhone: confirmed.customerPhone,
-            };
-            const updatedDirectBookings = [...directBookings, newDirectBooking];
-            setDirectBookings(updatedDirectBookings);
-            localStorage.setItem('userDirectBookings', JSON.stringify(updatedDirectBookings));
+            getUserDirectBookings()
+              .then(data => {
+                const bookings = Array.isArray(data) ? data : [];
+                setDirectBookings(bookings);
+                localStorage.setItem('userDirectBookings', JSON.stringify(bookings));
+              })
+              .catch(err => console.error('Error refreshing direct bookings:', err));
+            
             setDirectBookingConfirmed(confirmed);
             setModal('directBookingConfirm');
           }}

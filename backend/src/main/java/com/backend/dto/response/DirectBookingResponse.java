@@ -26,4 +26,10 @@ public class DirectBookingResponse {
     private String notes;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    // Add these new fields
+    private String customerName;
+    private String customerEmail;
+    private String customerPhone;
+    private String preferredSize;
 }

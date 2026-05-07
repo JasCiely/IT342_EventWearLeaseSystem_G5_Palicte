@@ -10,12 +10,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "direct_bookings", indexes = {
-        @Index(name = "idx_direct_bookings_user", columnList = "user_id"),
-        @Index(name = "idx_direct_bookings_item", columnList = "inventory_item_id"),
-        @Index(name = "idx_direct_bookings_dates", columnList = "start_date, end_date"),
-        @Index(name = "idx_direct_bookings_status", columnList = "booking_status")
-})
+@Table(name = "direct_bookings")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -30,6 +25,9 @@ public class DirectBooking {
 
     @Column(name = "inventory_item_id", nullable = false)
     private String inventoryItemId;
+
+    @Column(name = "item_name")
+    private String itemName;
 
     @Column(name = "booking_type", nullable = false)
     private String bookingType = "Direct Booking";
@@ -57,6 +55,19 @@ public class DirectBooking {
 
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
+
+    // Add these new fields
+    @Column(name = "customer_name", nullable = false)
+    private String customerName;
+
+    @Column(name = "customer_email", nullable = false)
+    private String customerEmail;
+
+    @Column(name = "customer_phone", nullable = false)
+    private String customerPhone;
+
+    @Column(name = "preferred_size")
+    private String preferredSize;
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;

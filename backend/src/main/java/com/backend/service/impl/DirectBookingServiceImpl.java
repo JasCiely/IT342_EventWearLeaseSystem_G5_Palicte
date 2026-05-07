@@ -5,6 +5,7 @@ import com.backend.dto.response.DirectBookingResponse;
 import com.backend.entity.DirectBooking;
 import com.backend.repository.DirectBookingRepository;
 import com.backend.service.DirectBookingService;
+import com.backend.service.EmailService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -22,6 +23,7 @@ import java.time.temporal.ChronoUnit;
 public class DirectBookingServiceImpl implements DirectBookingService {
 
     private final DirectBookingRepository directBookingRepository;
+    private final EmailService emailService;
 
     @Override
     @Transactional
@@ -31,6 +33,17 @@ public class DirectBookingServiceImpl implements DirectBookingService {
         // Validate dates
         if (request.getStartDate().isAfter(request.getEndDate())) {
             throw new IllegalArgumentException("Start date cannot be after end date");
+        }
+
+        // Validate customer information
+        if (request.getCustomerName() == null || request.getCustomerName().trim().isEmpty()) {
+            throw new IllegalArgumentException("Customer name is required");
+        }
+        if (request.getCustomerEmail() == null || request.getCustomerEmail().trim().isEmpty()) {
+            throw new IllegalArgumentException("Customer email is required");
+        }
+        if (request.getCustomerPhone() == null || request.getCustomerPhone().trim().isEmpty()) {
+            throw new IllegalArgumentException("Customer phone is required");
         }
 
         // Check availability
@@ -67,9 +80,31 @@ public class DirectBookingServiceImpl implements DirectBookingService {
         booking.setNotes(request.getNotes());
         booking.setBookingStatus("Pending");
 
+        // Set customer information
+        booking.setCustomerName(request.getCustomerName());
+        booking.setCustomerEmail(request.getCustomerEmail());
+        booking.setCustomerPhone(request.getCustomerPhone());
+        booking.setPreferredSize(request.getPreferredSize());
+
         DirectBooking savedBooking = directBookingRepository.save(booking);
 
         log.info("Direct booking created successfully with ID: {}", savedBooking.getId());
+
+        // Send confirmation email
+        try {
+            emailService.sendDirectBookingConfirmation(
+                    savedBooking.getCustomerEmail(),
+                    savedBooking.getCustomerName(),
+                    savedBooking.getId(),
+                    "Item", // You can fetch item name from inventory if needed
+                    savedBooking.getStartDate().toString(),
+                    savedBooking.getEndDate().toString(),
+                    savedBooking.getTotalDays(),
+                    savedBooking.getFinalPrice());
+            log.info("Confirmation email sent for booking: {}", savedBooking.getId());
+        } catch (Exception e) {
+            log.warn("Failed to send confirmation email for booking {}: {}", savedBooking.getId(), e.getMessage());
+        }
 
         return mapToResponse(savedBooking);
     }
@@ -99,10 +134,26 @@ public class DirectBookingServiceImpl implements DirectBookingService {
         DirectBooking booking = directBookingRepository.findById(bookingId)
                 .orElseThrow(() -> new IllegalArgumentException("Booking not found"));
 
+        String oldStatus = booking.getBookingStatus();
         booking.setBookingStatus(status);
         DirectBooking updatedBooking = directBookingRepository.save(booking);
 
-        log.info("Updated booking {} status to {}", bookingId, status);
+        log.info("Updated booking {} status from {} to {}", bookingId, oldStatus, status);
+
+        // Send status update email only if status changed to Approved or Rejected
+        try {
+            if ("Approved".equals(status) || "Rejected".equals(status)) {
+                emailService.sendDirectBookingStatusUpdate(
+                        updatedBooking.getCustomerEmail(),
+                        updatedBooking.getCustomerName(),
+                        "Item", // You can fetch item name from inventory if needed
+                        status,
+                        updatedBooking.getId());
+                log.info("Status update email sent for booking: {}", bookingId);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to send status update email for booking {}: {}", bookingId, e.getMessage());
+        }
 
         return mapToResponse(updatedBooking);
     }
@@ -127,6 +178,10 @@ public class DirectBookingServiceImpl implements DirectBookingService {
                 booking.getBookingStatus(),
                 booking.getNotes(),
                 booking.getCreatedAt(),
-                booking.getUpdatedAt());
+                booking.getUpdatedAt(),
+                booking.getCustomerName(),
+                booking.getCustomerEmail(),
+                booking.getCustomerPhone(),
+                booking.getPreferredSize());
     }
 }
