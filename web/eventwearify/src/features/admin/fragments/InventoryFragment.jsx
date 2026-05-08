@@ -9,6 +9,8 @@ import {
   CATEGORIES, CATEGORY_MAP, SIZES, COLORS, COLOR_SWATCHES, LIGHT_COLORS,
   CAT_COLORS, ITEM_STATUS_META, MANUAL_ITEM_STATUSES,
   todayStr, fmtDate,
+} from '../../../shared/constants/sharedData.js';
+import {
   fetchItems, fetchPromotions,
   createItem as apiCreateItem,
   updateItem as apiUpdateItem,
@@ -16,7 +18,7 @@ import {
   createPromotion as apiCreatePromotion,
   updatePromotion as apiUpdatePromotion,
   deletePromotion as apiDeletePromotion,
-} from '../../../shared/constants/sharedData.js';
+} from '../../../shared/services/inventoryApi.js';
 
 // ────────────────────────────────────────────────────────────
 // Helpers

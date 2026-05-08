@@ -80,3 +80,65 @@ export const testBackendConnection = async () => {
     return false;
   }
 };
+
+// ── Items (mutations) ──────────────────────────────────────────────────────
+
+export const createItem = async (itemData, files = []) => {
+  const fd = new FormData();
+  fd.append('data', JSON.stringify(itemData));
+  files.forEach(f => fd.append('files', f));
+  const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+  const res = await fetch(`${API_BASE_URL_ROOT}/inventory/items`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: fd,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || 'Failed to create item');
+  }
+  return res.json();
+};
+
+export const updateItem = async (id, itemData, newFiles = [], keepUrls = []) => {
+  const fd = new FormData();
+  fd.append('data', JSON.stringify(itemData));
+  fd.append('keepUrls', JSON.stringify(keepUrls));
+  newFiles.forEach(f => fd.append('files', f));
+  const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+  const res = await fetch(`${API_BASE_URL_ROOT}/inventory/items/${id}`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}` },
+    body: fd,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || 'Failed to update item');
+  }
+  return res.json();
+};
+
+export const deleteItem = async (id) => {
+  const res = await authFetch(`/inventory/items/${id}`, { method: 'DELETE' });
+  return res;
+};
+
+// ── Promotions (mutations) ─────────────────────────────────────────────────
+
+export const createPromotion = async (promoData) => {
+  return authFetch('/inventory/promotions', {
+    method: 'POST',
+    body: JSON.stringify(promoData),
+  });
+};
+
+export const updatePromotion = async (id, promoData) => {
+  return authFetch(`/inventory/promotions/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(promoData),
+  });
+};
+
+export const deletePromotion = async (id) => {
+  return authFetch(`/inventory/promotions/${id}`, { method: 'DELETE' });
+};

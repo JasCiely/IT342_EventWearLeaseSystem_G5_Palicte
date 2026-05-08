@@ -18,6 +18,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -139,5 +141,66 @@ public class StaffServiceImpl implements StaffService {
             return ON_DUTY;
         }
         return OFF_DUTY;
+    }
+
+    // ── Cross-feature access (Attendance feature only) ────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Staff> getActiveStaff() {
+        return staffRepository.findAllByDeletedAtIsNull();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<String, String> getStaffNameMap(List<String> staffIds) {
+        return staffRepository.findAllById(staffIds).stream()
+                .collect(Collectors.toMap(Staff::getId, Staff::getFullName));
+    }
+
+    @Override
+    public void incrementDaysWorked(Staff staff) {
+        staff.setDaysWorked(staff.getDaysWorked() + 1);
+        staffRepository.save(staff);
+    }
+
+    @Override
+    public void decrementDaysWorked(Staff staff) {
+        if (staff.getDaysWorked() > 0) {
+            staff.setDaysWorked(staff.getDaysWorked() - 1);
+            staffRepository.save(staff);
+        }
+    }
+
+    @Override
+    public void updateStaffLiveStatus(String staffId, String newStatus) {
+        staffRepository.findByIdAndDeletedAtIsNull(staffId).ifPresent(staff -> {
+            staff.setStatus(newStatus);
+            staffRepository.save(staff);
+        });
+    }
+
+    @Override
+    public void adjustDaysWorked(String staffId, String oldStatus, String newStatus) {
+        staffRepository.findByIdAndDeletedAtIsNull(staffId).ifPresent(staff -> {
+            boolean wasOnDuty = ON_DUTY.equalsIgnoreCase(oldStatus);
+            boolean isNowOnDuty = ON_DUTY.equalsIgnoreCase(newStatus);
+            if (!wasOnDuty && isNowOnDuty) {
+                staff.setDaysWorked(staff.getDaysWorked() + 1);
+            } else if (wasOnDuty && !isNowOnDuty && staff.getDaysWorked() > 0) {
+                staff.setDaysWorked(staff.getDaysWorked() - 1);
+            }
+            staffRepository.save(staff);
+        });
+    }
+
+    @Override
+    public void saveAll(List<Staff> staffList) {
+        staffRepository.saveAll(staffList);
+    }
+
+    @Override
+    public Optional<Staff> findActiveById(String staffId) {
+        return staffRepository.findByIdAndDeletedAtIsNull(staffId);
     }
 }

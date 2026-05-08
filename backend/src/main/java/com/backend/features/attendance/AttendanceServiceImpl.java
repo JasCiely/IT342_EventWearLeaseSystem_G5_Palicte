@@ -3,12 +3,12 @@ package com.backend.features.attendance;
 import com.backend.features.attendance.dto.request.EditAttendanceRequest;
 import com.backend.features.attendance.dto.response.AttendanceHistoryResponse;
 import com.backend.features.attendance.dto.response.AttendanceResponse;
+import com.backend.features.staff.StaffService;
 import com.backend.shared.entity.AttendanceRecord;
 import com.backend.shared.entity.AttendanceSession;
 import com.backend.shared.entity.Staff;
 import com.backend.features.attendance.AttendanceRecordRepository;
 import com.backend.features.attendance.AttendanceSessionRepository;
-import com.backend.features.staff.StaffRepository;
 import com.backend.features.attendance.AttendanceService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -29,7 +29,7 @@ public class AttendanceServiceImpl implements AttendanceService {
 
     private final AttendanceRecordRepository attendanceRecordRepository;
     private final AttendanceSessionRepository attendanceSessionRepository;
-    private final StaffRepository staffRepository;
+    private final StaffService staffService;
 
     /*
      * ─────────────────────────────────────────────────────────
@@ -44,7 +44,7 @@ public class AttendanceServiceImpl implements AttendanceService {
             throw new IllegalStateException("Attendance already recorded for today: " + today);
         }
 
-        List<Staff> staffList = staffRepository.findAllByDeletedAtIsNull();
+        List<Staff> staffList = staffService.getActiveStaff();
 
         // Create one AttendanceRecord per active staff
         List<AttendanceRecord> records = staffList.stream().map(staff -> {
@@ -64,7 +64,7 @@ public class AttendanceServiceImpl implements AttendanceService {
             return record;
         }).collect(Collectors.toList());
 
-        staffRepository.saveAll(staffList);
+        staffService.saveAll(staffList);
         attendanceRecordRepository.saveAll(records);
 
         // Create the session (one per day, locked by default)
@@ -140,11 +140,11 @@ public class AttendanceServiceImpl implements AttendanceService {
         if (request.getStatus() != null
                 && !request.getStatus().equalsIgnoreCase(record.getStatus())) {
 
-            adjustDaysWorked(record.getStaffId(), record.getStatus(), request.getStatus());
+            staffService.adjustDaysWorked(record.getStaffId(), record.getStatus(), request.getStatus());
 
             // For today's records, also update the staff's live status
             if (isToday) {
-                updateStaffStatus(record.getStaffId(), request.getStatus());
+                staffService.updateStaffLiveStatus(record.getStaffId(), request.getStatus());
             }
 
             record.setStatus(request.getStatus());
@@ -194,13 +194,8 @@ public class AttendanceServiceImpl implements AttendanceService {
         // Reverse daysWorked for staff who were On Duty today
         records.stream()
                 .filter(r -> ON_DUTY.equalsIgnoreCase(r.getStatus()))
-                .forEach(r -> staffRepository.findByIdAndDeletedAtIsNull(r.getStaffId())
-                        .ifPresent(staff -> {
-                            if (staff.getDaysWorked() > 0) {
-                                staff.setDaysWorked(staff.getDaysWorked() - 1);
-                                staffRepository.save(staff);
-                            }
-                        }));
+                .forEach(r -> staffService.findActiveById(r.getStaffId())
+                        .ifPresent(staff -> staffService.decrementDaysWorked(staff)));
 
         attendanceRecordRepository.deleteAll(records);
         attendanceSessionRepository.delete(session);
@@ -214,37 +209,6 @@ public class AttendanceServiceImpl implements AttendanceService {
     /* ── private helpers ── */
 
     /**
-     * When a staff's status is changed during editing, adjust daysWorked:
-     * Off Duty → On Duty : +1
-     * On Duty → Off Duty : -1 (floor 0)
-     */
-    private void adjustDaysWorked(String staffId, String oldStatus, String newStatus) {
-        staffRepository.findByIdAndDeletedAtIsNull(staffId).ifPresent(staff -> {
-            boolean wasOnDuty = ON_DUTY.equalsIgnoreCase(oldStatus);
-            boolean isNowOnDuty = ON_DUTY.equalsIgnoreCase(newStatus);
-
-            if (!wasOnDuty && isNowOnDuty) {
-                staff.setDaysWorked(staff.getDaysWorked() + 1);
-            } else if (wasOnDuty && !isNowOnDuty && staff.getDaysWorked() > 0) {
-                staff.setDaysWorked(staff.getDaysWorked() - 1);
-            }
-
-            staffRepository.save(staff);
-        });
-    }
-
-    /**
-     * Update the staff's live status field.
-     * This should only be called for today's attendance edits.
-     */
-    private void updateStaffStatus(String staffId, String newStatus) {
-        staffRepository.findByIdAndDeletedAtIsNull(staffId).ifPresent(staff -> {
-            staff.setStatus(newStatus);
-            staffRepository.save(staff);
-        });
-    }
-
-    /**
      * Batch-loads staff names to avoid N+1 queries.
      */
     private List<AttendanceHistoryResponse> mapWithStaffNames(List<AttendanceRecord> records) {
@@ -253,8 +217,7 @@ public class AttendanceServiceImpl implements AttendanceService {
                 .distinct()
                 .collect(Collectors.toList());
 
-        Map<String, String> nameMap = staffRepository.findAllById(staffIds).stream()
-                .collect(Collectors.toMap(Staff::getId, Staff::getFullName));
+        Map<String, String> nameMap = staffService.getStaffNameMap(staffIds);
 
         return records.stream()
                 .map(r -> AttendanceHistoryResponse.from(r, nameMap.getOrDefault(r.getStaffId(), "Unknown")))

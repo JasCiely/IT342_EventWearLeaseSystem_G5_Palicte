@@ -4,7 +4,6 @@ import com.backend.features.booking.dto.request.FittingBookingRequest;
 import com.backend.features.booking.dto.response.BookingDetailResponse;
 import com.backend.features.booking.dto.response.DirectBookingResponse;
 import com.backend.features.booking.dto.response.FittingBookingResponse;
-import com.backend.shared.email.EmailService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -30,7 +29,6 @@ public class BookingController {
 
     private final BookingService bookingService;
     private final DirectBookingService directBookingService;
-    private final EmailService emailService;
 
     // ── Fitting Booking (authenticated users) ─────────────────
 

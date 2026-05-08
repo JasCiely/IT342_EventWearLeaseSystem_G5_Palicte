@@ -4,7 +4,6 @@ import com.backend.features.booking.dto.request.DirectBookingRequest;
 import com.backend.features.booking.dto.response.DirectBookingResponse;
 import com.backend.shared.entity.DirectBooking;
 import com.backend.features.booking.DirectBookingRepository;
-import com.backend.features.inventory.InventoryService;
 import com.backend.features.booking.DirectBookingService;
 import com.backend.shared.email.EmailService;
 import lombok.RequiredArgsConstructor;
@@ -25,7 +24,6 @@ public class DirectBookingServiceImpl implements DirectBookingService {
 
     private final DirectBookingRepository directBookingRepository;
     private final EmailService emailService;
-    private final InventoryService inventoryService;
 
     @Override
     @Transactional
@@ -88,8 +86,8 @@ public class DirectBookingServiceImpl implements DirectBookingService {
         booking.setCustomerPhone(request.getCustomerPhone());
         booking.setPreferredSize(request.getPreferredSize());
 
-        // Fetch and set item name
-        booking.setItemName(inventoryService.getItemName(request.getInventoryItemId()));
+        // Set item name from request (passed by caller — avoids cross-feature dependency)
+        booking.setItemName(request.getItemName() != null ? request.getItemName() : "");
 
         DirectBooking savedBooking = directBookingRepository.save(booking);
 

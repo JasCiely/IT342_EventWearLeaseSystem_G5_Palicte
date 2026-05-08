@@ -12,6 +12,7 @@ import java.time.LocalDate;
 @AllArgsConstructor
 public class DirectBookingRequest {
     private String inventoryItemId;
+    private String itemName;
     private LocalDate startDate;
     private LocalDate endDate;
     private Integer totalDays;
