@@ -619,6 +619,16 @@ export default function InventoryFragment() {
   // ── Confirm delete state ──────────────────────────────────
   const [confirmDelete, setConfirmDelete] = useState(null);
 
+  // ── Leasing settings state ────────────────────────────────
+  const [leasingSettings, setLeasingSettings] = useState(() => {
+    const saved = localStorage.getItem('leasingSettings');
+    return saved ? JSON.parse(saved) : {
+      minLeaseDays: 2,
+      weeklyDiscount: 100,
+      monthlyDiscountCap: 300
+    };
+  });
+
   const blank      = { name:'', category:'', subtype:'', size:'', color:'Ivory', price:'', status:'Available', mediaFiles:[], ageRange:'', description:'' };
   const blankPromo = { code:'', type:'percentage', value:'', items:[], start:'', end:'', active:true };
   const [form,      setForm]      = useState(blank);
@@ -914,6 +924,9 @@ export default function InventoryFragment() {
               <button className={`inv-view-btn${viewMode==='grid'?' active':''}`} onClick={()=>setViewMode('grid')} title="Grid"><LayoutGrid size={15}/></button>
               <button className={`inv-view-btn${viewMode==='list'?' active':''}`} onClick={()=>setViewMode('list')} title="List"><List size={15}/></button>
             </div>
+            <button className="inv-btn-ghost" onClick={() => setModal('settings')} title="Leasing Settings">
+              <Package size={15} /> Settings
+            </button>
           </div>
 
           {/* ── GRID VIEW ── */}
@@ -1371,6 +1384,71 @@ export default function InventoryFragment() {
               <button className="inv-btn-ghost" onClick={closeModal} disabled={saving}>Cancel</button>
               <button className="inv-btn-primary" onClick={savePromo} disabled={saving}>
                 {saving ? <><Loader2 size={13} className="inv-spinner-inline"/> Saving…</> : (selected?'Save Changes':'Create Promo')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ MODAL: Leasing Settings ══ */}
+      {modal === 'settings' && (
+        <div className="inv-overlay" onClick={closeModal}>
+          <div className="inv-modal" onClick={e => e.stopPropagation()}>
+            <div className="inv-modal-header">
+              <h3><Package size={16} style={{ color:'#6b2d39' }} /> Leasing Settings</h3>
+              <button className="inv-modal-close" onClick={closeModal}><X size={15}/></button>
+            </div>
+            <div className="inv-modal-body">
+              <div className="inv-settings-body">
+                <div className="inv-settings-info">
+                  <AlertCircle size={14} style={{ color:'#6b2d39' }}/>
+                  <span>Configure leasing rules and discounts for rentals</span>
+                </div>
+                <div className="inv-settings-form">
+                  <div className="inv-form-group">
+                    <label className="inv-label">Minimum Lease Duration (days)</label>
+                    <input
+                      type="number"
+                      min="1"
+                      className="inv-input"
+                      value={leasingSettings.minLeaseDays}
+                      onChange={e => setLeasingSettings(prev => ({ ...prev, minLeaseDays: parseInt(e.target.value) || 1 }))}
+                    />
+                    <div className="inv-field-hint">Customers must lease items for at least this many days</div>
+                  </div>
+                  <div className="inv-form-group">
+                    <label className="inv-label">Weekly Discount (₱)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      className="inv-input"
+                      value={leasingSettings.weeklyDiscount}
+                      onChange={e => setLeasingSettings(prev => ({ ...prev, weeklyDiscount: parseInt(e.target.value) || 0 }))}
+                    />
+                    <div className="inv-field-hint">Discount applied per week of lease duration</div>
+                  </div>
+                  <div className="inv-form-group">
+                    <label className="inv-label">Monthly Discount Cap (₱)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      className="inv-input"
+                      value={leasingSettings.monthlyDiscountCap}
+                      onChange={e => setLeasingSettings(prev => ({ ...prev, monthlyDiscountCap: parseInt(e.target.value) || 0 }))}
+                    />
+                    <div className="inv-field-hint">Maximum discount for monthly leases (overrides weekly accumulation)</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="inv-modal-footer">
+              <button className="inv-btn-ghost" onClick={closeModal}>Cancel</button>
+              <button className="inv-btn-primary" onClick={() => {
+                localStorage.setItem('leasingSettings', JSON.stringify(leasingSettings));
+                showToast('success', 'Leasing settings saved successfully');
+                closeModal();
+              }}>
+                <CheckCircle size={13}/> Save Settings
               </button>
             </div>
           </div>

@@ -22,16 +22,12 @@ import '../../components/css/customerDashboard/CustomerDashboardUnique.css';
 // Fragments
 import DashboardFragment from './fragment/DashboardFragment';
 import BrowseOutfitsFragment from './fragment/BrowseOutfitsFragment';
-import ScheduleFittingFragment from './fragment/ScheduleFittingFragment';
-import ScheduleBookingFragment from './fragment/ScheduleBookingFragment';
 import ManageProfileFragment from './fragment/ManageProfileFragment';
 import PastBookingsFragment from './fragment/PastBookingsFragment';
 
 const NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/customer/dashboard' },
   { key: 'outfits', label: 'Browse Outfits', icon: ShoppingBag, path: '/customer/outfits' },
-  { key: 'fitting', label: 'Schedule Fitting', icon: CalendarDays, path: '/customer/fitting' },
-  { key: 'booking', label: 'Book Event', icon: TicketCheck, path: '/customer/booking' },
   { key: 'profile', label: 'My Profile', icon: UserCircle, path: '/customer/profile' },
   { key: 'history', label: 'Past Bookings', icon: History, path: '/customer/history' },
 ];
@@ -40,8 +36,6 @@ const renderFragment = (key) => {
   switch (key) {
     case 'dashboard': return <DashboardFragment />;
     case 'outfits': return <BrowseOutfitsFragment />;
-    case 'fitting': return <ScheduleFittingFragment />;
-    case 'booking': return <ScheduleBookingFragment />;
     case 'profile': return <ManageProfileFragment />;
     case 'history': return <PastBookingsFragment />;
     default: return <DashboardFragment />;
