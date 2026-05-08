@@ -3,6 +3,7 @@ package com.backend.features.auth;
 import com.backend.shared.entity.TokenBlacklist;
 import com.backend.features.auth.TokenBlacklistRepository;
 import com.backend.shared.security.JwtService;
+import com.backend.shared.security.TokenBlacklistService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -14,7 +15,7 @@ import java.util.Date;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class TokenBlacklistService {
+public class TokenBlacklistServiceImpl implements TokenBlacklistService {
 
     private final TokenBlacklistRepository tokenBlacklistRepository;
     private final JwtService jwtService;

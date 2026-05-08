@@ -1,4 +1,4 @@
-package com.backend.features.auth.dto.response;
+package com.backend.shared.exception;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

@@ -3,9 +3,8 @@ package com.backend.features.booking;
 import com.backend.features.booking.dto.request.DirectBookingRequest;
 import com.backend.features.booking.dto.response.DirectBookingResponse;
 import com.backend.shared.entity.DirectBooking;
-import com.backend.shared.entity.Item;
 import com.backend.features.booking.DirectBookingRepository;
-import com.backend.features.inventory.ItemRepository;
+import com.backend.features.inventory.InventoryService;
 import com.backend.features.booking.DirectBookingService;
 import com.backend.shared.email.EmailService;
 import lombok.RequiredArgsConstructor;
@@ -18,7 +17,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
-import java.util.Optional;
 
 @Slf4j
 @Service
@@ -27,7 +25,7 @@ public class DirectBookingServiceImpl implements DirectBookingService {
 
     private final DirectBookingRepository directBookingRepository;
     private final EmailService emailService;
-    private final ItemRepository itemRepository;
+    private final InventoryService inventoryService;
 
     @Override
     @Transactional
@@ -91,12 +89,7 @@ public class DirectBookingServiceImpl implements DirectBookingService {
         booking.setPreferredSize(request.getPreferredSize());
 
         // Fetch and set item name
-        Optional<Item> item = itemRepository.findById(request.getInventoryItemId());
-        if (item.isPresent()) {
-            booking.setItemName(item.get().getName());
-        } else {
-            booking.setItemName("Item");
-        }
+        booking.setItemName(inventoryService.getItemName(request.getInventoryItemId()));
 
         DirectBooking savedBooking = directBookingRepository.save(booking);
 

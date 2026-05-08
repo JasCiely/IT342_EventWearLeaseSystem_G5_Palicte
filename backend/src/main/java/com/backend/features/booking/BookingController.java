@@ -1,9 +1,9 @@
 package com.backend.features.booking;
 
-import com.backend.shared.entity.Booking;
-import com.backend.shared.entity.DirectBooking;
-import com.backend.features.booking.BookingRepository;
-import com.backend.features.booking.DirectBookingRepository;
+import com.backend.features.booking.dto.request.FittingBookingRequest;
+import com.backend.features.booking.dto.response.BookingDetailResponse;
+import com.backend.features.booking.dto.response.DirectBookingResponse;
+import com.backend.features.booking.dto.response.FittingBookingResponse;
 import com.backend.shared.email.EmailService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -13,94 +13,112 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/admin/bookings")
+@RequestMapping("/api")
 @RequiredArgsConstructor
 public class BookingController {
 
-    private final BookingRepository bookingRepository;
-    private final DirectBookingRepository directBookingRepository;
+    private final BookingService bookingService;
+    private final DirectBookingService directBookingService;
     private final EmailService emailService;
 
-    // Get all fitting bookings
-    @GetMapping("/fitting")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Page<Booking>> getAllFittingBookings(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        Page<Booking> bookings = bookingRepository.findAll(pageable);
+    // ── Fitting Booking (authenticated users) ─────────────────
+
+    @PostMapping("/inventory/book-fitting")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<FittingBookingResponse> bookFitting(
+            @RequestBody FittingBookingRequest request,
+            @AuthenticationPrincipal UserDetails userDetails) {
+
+        log.info("Booking fitting for user: {}", userDetails.getUsername());
+
+        if (request.getCustomerEmail() == null || request.getCustomerEmail().isEmpty()) {
+            request.setCustomerEmail(userDetails.getUsername());
+        }
+
+        FittingBookingResponse response = bookingService.createBooking(request);
+
+        if ("FAILED".equals(response.getStatus())) {
+            return ResponseEntity.badRequest().body(response);
+        }
+
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/inventory/bookings/my")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<List<BookingDetailResponse>> getMyBookings(
+            @AuthenticationPrincipal UserDetails userDetails) {
+        log.info("Fetching bookings for user: {}", userDetails.getUsername());
+        List<BookingDetailResponse> bookings = bookingService
+                .getBookingsByEmail(userDetails.getUsername())
+                .stream()
+                .map(BookingDetailResponse::from)
+                .collect(Collectors.toList());
         return ResponseEntity.ok(bookings);
     }
 
-    // Get all direct bookings
-    @GetMapping("/direct")
+    // ── Admin: Fitting Bookings ────────────────────────────────
+
+    @GetMapping("/admin/bookings/fitting")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Page<DirectBooking>> getAllDirectBookings(
+    public ResponseEntity<Page<BookingDetailResponse>> getAllFittingBookings(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        Page<DirectBooking> bookings = directBookingRepository.findAll(pageable);
-        return ResponseEntity.ok(bookings);
+        Page<BookingDetailResponse> result = bookingService.getAllFittingBookings(pageable)
+                .map(BookingDetailResponse::from);
+        return ResponseEntity.ok(result);
     }
 
-    // Update fitting booking status
-    @PutMapping("/fitting/{bookingId}/status")
+    @PutMapping("/admin/bookings/fitting/{bookingId}/status")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> updateFittingBookingStatus(
             @PathVariable String bookingId,
             @RequestParam String status) {
         try {
-            Booking booking = bookingRepository.findById(bookingId)
-                    .orElseThrow(() -> new IllegalArgumentException("Booking not found"));
-            booking.setStatus(status);
-            bookingRepository.save(booking);
-
+            BookingDetailResponse dto = BookingDetailResponse.from(
+                    bookingService.updateFittingBookingStatus(bookingId, status));
             Map<String, Object> response = new HashMap<>();
-            response.put("id", booking.getId());
-            response.put("status", booking.getStatus());
+            response.put("id", dto.getId());
+            response.put("status", dto.getStatus());
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
         }
     }
 
-    // Update direct booking status
-    @PutMapping("/direct/{bookingId}/status")
+    // ── Admin: Direct Bookings ─────────────────────────────────
+
+    @GetMapping("/admin/bookings/direct")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Page<DirectBookingResponse>> getAllDirectBookings(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        return ResponseEntity.ok(directBookingService.getAllBookings(pageable));
+    }
+
+    @PutMapping("/admin/bookings/direct/{bookingId}/status")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> updateDirectBookingStatus(
             @PathVariable String bookingId,
             @RequestParam String status) {
         try {
-            DirectBooking booking = directBookingRepository.findById(bookingId)
-                    .orElseThrow(() -> new IllegalArgumentException("Booking not found"));
-            String oldStatus = booking.getBookingStatus();
-            booking.setBookingStatus(status);
-            directBookingRepository.save(booking);
-
-            // Send email notification only when status changes to Approved or Rejected
-            if (("Approved".equals(status) || "Rejected".equals(status)) && !oldStatus.equals(status)) {
-                try {
-                    emailService.sendDirectBookingStatusUpdate(
-                            booking.getCustomerEmail(),
-                            booking.getCustomerName(),
-                            booking.getItemName() != null ? booking.getItemName() : "Item",
-                            status,
-                            bookingId);
-                } catch (Exception e) {
-                    log.warn("Failed to send status update email: {}", e.getMessage());
-                }
-            }
-
+            directBookingService.updateBookingStatus(bookingId, status);
             Map<String, Object> response = new HashMap<>();
-            response.put("id", booking.getId());
-            response.put("status", booking.getBookingStatus());
+            response.put("id", bookingId);
+            response.put("status", status);
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();

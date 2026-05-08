@@ -16,7 +16,7 @@ import {
   createPromotion as apiCreatePromotion,
   updatePromotion as apiUpdatePromotion,
   deletePromotion as apiDeletePromotion,
-} from '../constants/sharedData.js';
+} from '../../../shared/constants/sharedData.js';
 
 // ────────────────────────────────────────────────────────────
 // Helpers

@@ -1,23 +1,15 @@
 package com.backend.features.inventory;
 
-import com.backend.features.booking.dto.request.FittingBookingRequest;
 import com.backend.features.inventory.dto.request.ItemRequest;
 import com.backend.features.inventory.dto.request.PromotionRequest;
-import com.backend.features.booking.dto.response.FittingBookingResponse;
 import com.backend.features.inventory.dto.response.ItemResponse;
 import com.backend.features.inventory.dto.response.PromotionResponse;
-import com.backend.shared.entity.Booking;
-import com.backend.features.booking.BookingService;
-import com.backend.shared.email.EmailService;
-import com.backend.features.inventory.InventoryService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -31,9 +23,7 @@ import java.util.List;
 public class InventoryController {
 
     private final InventoryService inventoryService;
-    private final EmailService emailService;
     private final ObjectMapper objectMapper;
-    private final BookingService bookingService;
 
     // ── Items (public GET, ADMIN write) ─────────────────────
 
@@ -115,38 +105,5 @@ public class InventoryController {
     public ResponseEntity<Void> deletePromotion(@PathVariable String id) {
         inventoryService.deletePromotion(id);
         return ResponseEntity.noContent().build();
-    }
-
-    // ── Fitting Booking (authenticated users) ─────────────────
-
-    @PostMapping("/book-fitting")
-    @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<FittingBookingResponse> bookFitting(
-            @RequestBody FittingBookingRequest request,
-            @AuthenticationPrincipal UserDetails userDetails) {
-
-        log.info("Booking fitting for user: {}", userDetails.getUsername());
-
-        // Set customer email from authenticated user if not provided
-        if (request.getCustomerEmail() == null || request.getCustomerEmail().isEmpty()) {
-            request.setCustomerEmail(userDetails.getUsername());
-        }
-
-        FittingBookingResponse response = bookingService.createBooking(request);
-
-        if ("FAILED".equals(response.getStatus())) {
-            return ResponseEntity.badRequest().body(response);
-        }
-
-        return ResponseEntity.ok(response);
-    }
-
-    // Add this new endpoint to get user's bookings
-    @GetMapping("/bookings/my")
-    @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<List<Booking>> getMyBookings(@AuthenticationPrincipal UserDetails userDetails) {
-        log.info("Fetching bookings for user: {}", userDetails.getUsername());
-        List<Booking> bookings = bookingService.getBookingsByEmail(userDetails.getUsername());
-        return ResponseEntity.ok(bookings);
     }
 }

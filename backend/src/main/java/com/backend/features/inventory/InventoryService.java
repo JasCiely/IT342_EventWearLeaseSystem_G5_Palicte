@@ -26,4 +26,6 @@ public interface InventoryService {
     PromotionResponse updatePromotion(String id, PromotionRequest request);
 
     void deletePromotion(String id);
+
+    String getItemName(String itemId);
 }

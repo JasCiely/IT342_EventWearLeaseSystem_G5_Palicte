@@ -6,7 +6,7 @@ import com.backend.features.auth.dto.request.RegisterRequest;
 import com.backend.features.auth.dto.response.AuthResponse;
 import com.backend.shared.security.JwtService;
 import com.backend.features.auth.AuthService;
-import com.backend.features.auth.TokenBlacklistService;
+import com.backend.shared.security.TokenBlacklistService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

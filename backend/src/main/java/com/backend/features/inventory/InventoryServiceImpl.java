@@ -208,6 +208,13 @@ public class InventoryServiceImpl implements InventoryService {
         return r;
     }
 
+    @Override
+    public String getItemName(String itemId) {
+        return itemRepository.findById(itemId)
+                .map(item -> item.getName())
+                .orElse("Item");
+    }
+
     private List<String> parseList(String csv) {
         if (csv == null || csv.isBlank())
             return new ArrayList<>();

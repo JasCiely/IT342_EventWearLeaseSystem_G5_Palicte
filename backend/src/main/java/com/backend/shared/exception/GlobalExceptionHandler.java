@@ -1,6 +1,6 @@
 package com.backend.shared.exception;
 
-import com.backend.features.auth.dto.response.ErrorResponse;
+import com.backend.shared.exception.ErrorResponse;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.MalformedJwtException;
 import io.jsonwebtoken.security.SignatureException;

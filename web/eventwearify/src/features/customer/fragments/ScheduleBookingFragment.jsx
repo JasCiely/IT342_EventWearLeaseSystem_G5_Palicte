@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, AlertCircle, CheckCircle } from 'lucide-react';
-import { getLeasingSettings, calculateLeasePricing } from '../../admin/constants/sharedData.js';
+import { getLeasingSettings, calculateLeasePricing } from '../../../shared/constants/sharedData.js';
 
 const ScheduleBookingFragment = () => {
     const [eventDate, setEventDate] = useState('');

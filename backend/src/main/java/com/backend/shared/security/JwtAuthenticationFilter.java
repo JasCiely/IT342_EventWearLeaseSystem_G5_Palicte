@@ -1,6 +1,6 @@
 package com.backend.shared.security;
 
-import com.backend.features.auth.TokenBlacklistService;
+import com.backend.shared.security.TokenBlacklistService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
