@@ -3,7 +3,9 @@ package com.backend.service.impl;
 import com.backend.dto.request.DirectBookingRequest;
 import com.backend.dto.response.DirectBookingResponse;
 import com.backend.entity.DirectBooking;
+import com.backend.entity.Item;
 import com.backend.repository.DirectBookingRepository;
+import com.backend.repository.ItemRepository;
 import com.backend.service.DirectBookingService;
 import com.backend.service.EmailService;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -24,6 +27,7 @@ public class DirectBookingServiceImpl implements DirectBookingService {
 
     private final DirectBookingRepository directBookingRepository;
     private final EmailService emailService;
+    private final ItemRepository itemRepository;
 
     @Override
     @Transactional
@@ -86,6 +90,14 @@ public class DirectBookingServiceImpl implements DirectBookingService {
         booking.setCustomerPhone(request.getCustomerPhone());
         booking.setPreferredSize(request.getPreferredSize());
 
+        // Fetch and set item name
+        Optional<Item> item = itemRepository.findById(request.getInventoryItemId());
+        if (item.isPresent()) {
+            booking.setItemName(item.get().getName());
+        } else {
+            booking.setItemName("Item");
+        }
+
         DirectBooking savedBooking = directBookingRepository.save(booking);
 
         log.info("Direct booking created successfully with ID: {}", savedBooking.getId());
@@ -96,7 +108,7 @@ public class DirectBookingServiceImpl implements DirectBookingService {
                     savedBooking.getCustomerEmail(),
                     savedBooking.getCustomerName(),
                     savedBooking.getId(),
-                    "Item", // You can fetch item name from inventory if needed
+                    savedBooking.getItemName(),
                     savedBooking.getStartDate().toString(),
                     savedBooking.getEndDate().toString(),
                     savedBooking.getTotalDays(),
@@ -146,7 +158,7 @@ public class DirectBookingServiceImpl implements DirectBookingService {
                 emailService.sendDirectBookingStatusUpdate(
                         updatedBooking.getCustomerEmail(),
                         updatedBooking.getCustomerName(),
-                        "Item", // You can fetch item name from inventory if needed
+                        updatedBooking.getItemName(),
                         status,
                         updatedBooking.getId());
                 log.info("Status update email sent for booking: {}", bookingId);
@@ -164,24 +176,26 @@ public class DirectBookingServiceImpl implements DirectBookingService {
     }
 
     private DirectBookingResponse mapToResponse(DirectBooking booking) {
-        return new DirectBookingResponse(
-                booking.getId(),
-                booking.getUserId(),
-                booking.getInventoryItemId(),
-                booking.getBookingType(),
-                booking.getStartDate(),
-                booking.getEndDate(),
-                booking.getTotalDays(),
-                booking.getBasePrice(),
-                booking.getDiscountAmount(),
-                booking.getFinalPrice(),
-                booking.getBookingStatus(),
-                booking.getNotes(),
-                booking.getCreatedAt(),
-                booking.getUpdatedAt(),
-                booking.getCustomerName(),
-                booking.getCustomerEmail(),
-                booking.getCustomerPhone(),
-                booking.getPreferredSize());
+        DirectBookingResponse response = new DirectBookingResponse();
+        response.setId(booking.getId());
+        response.setUserId(booking.getUserId());
+        response.setInventoryItemId(booking.getInventoryItemId());
+        response.setItemName(booking.getItemName());
+        response.setBookingType(booking.getBookingType());
+        response.setStartDate(booking.getStartDate());
+        response.setEndDate(booking.getEndDate());
+        response.setTotalDays(booking.getTotalDays());
+        response.setBasePrice(booking.getBasePrice());
+        response.setDiscountAmount(booking.getDiscountAmount());
+        response.setFinalPrice(booking.getFinalPrice());
+        response.setBookingStatus(booking.getBookingStatus());
+        response.setNotes(booking.getNotes());
+        response.setCreatedAt(booking.getCreatedAt());
+        response.setUpdatedAt(booking.getUpdatedAt());
+        response.setCustomerName(booking.getCustomerName());
+        response.setCustomerEmail(booking.getCustomerEmail());
+        response.setCustomerPhone(booking.getCustomerPhone());
+        response.setPreferredSize(booking.getPreferredSize());
+        return response;
     }
 }

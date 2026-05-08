@@ -237,3 +237,49 @@ export const testBackendConnection = async () => {
     return false;
   }
 };
+
+// ── Admin Bookings ─────────────────────────────────────────────────────────
+
+export const getAllFittingBookings = async (page = 0, size = 20) => {
+  try {
+    const response = await authFetch(`/admin/bookings/fitting?page=${page}&size=${size}`);
+    return response;
+  } catch (error) {
+    console.error('Error fetching fitting bookings:', error);
+    return { content: [], totalElements: 0 };
+  }
+};
+
+export const getAllDirectBookings = async (page = 0, size = 20) => {
+  try {
+    const response = await authFetch(`/admin/bookings/direct?page=${page}&size=${size}`);
+    return response;
+  } catch (error) {
+    console.error('Error fetching direct bookings:', error);
+    return { content: [], totalElements: 0 };
+  }
+};
+
+export const updateFittingBookingStatus = async (bookingId, status) => {
+  try {
+    const response = await authFetch(`/admin/bookings/fitting/${bookingId}/status?status=${status}`, {
+      method: 'PUT',
+    });
+    return response;
+  } catch (error) {
+    console.error('Error updating fitting booking status:', error);
+    throw error;
+  }
+};
+
+export const updateDirectBookingStatus = async (bookingId, status) => {
+  try {
+    const response = await authFetch(`/admin/bookings/direct/${bookingId}/status?status=${status}`, {
+      method: 'PUT',
+    });
+    return response;
+  } catch (error) {
+    console.error('Error updating direct booking status:', error);
+    throw error;
+  }
+};

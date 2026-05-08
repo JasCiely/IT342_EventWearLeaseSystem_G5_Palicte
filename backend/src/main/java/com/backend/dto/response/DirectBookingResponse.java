@@ -15,6 +15,7 @@ public class DirectBookingResponse {
     private String id;
     private String userId;
     private String inventoryItemId;
+    private String itemName;
     private String bookingType;
     private LocalDate startDate;
     private LocalDate endDate;
@@ -26,8 +27,6 @@ public class DirectBookingResponse {
     private String notes;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
-
-    // Add these new fields
     private String customerName;
     private String customerEmail;
     private String customerPhone;
