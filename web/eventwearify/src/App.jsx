@@ -1,11 +1,11 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import Index from './pages/Index';
-import Auth from './pages/Auth';
-import AdminChangePassword from './pages/admin/AdminChangePassword';
-import AdminDashboard from './pages/admin/AdminDashboard';
-import CustomerDashboard from './pages/customer/CustomerDashboard';
-import OAuth2Callback from './pages/OAuth2Callback';
-import ForgotPassword from './pages/ForgotPassword';
+import Index from './features/home/pages/Index';
+import Auth from './features/auth/pages/Auth';
+import ForgotPassword from './features/auth/pages/ForgotPassword';
+import OAuth2Callback from './features/auth/pages/OAuth2Callback';
+import AdminChangePassword from './features/admin/pages/AdminChangePassword';
+import AdminDashboard from './features/admin/pages/AdminDashboard';
+import CustomerDashboard from './features/customer/pages/CustomerDashboard';
 
 const AdminRoute = ({ children }) => {
   const role = localStorage.getItem('userRole');
@@ -61,10 +61,7 @@ function App() {
           element={<OAuth2Callback onLogin={handleLogin} />}
         />
 
-        {/* UPDATED: Customer dashboard paths.
-            We use /customer/* so that /customer/outfits, /customer/profile, etc. 
-            all load the CustomerDashboard component.
-        */}
+        {/* Customer dashboard paths */}
         <Route
           path="/customer/*"
           element={
@@ -95,10 +92,10 @@ function App() {
         />
 
         <Route path="/forgot-password" element={<ForgotPassword />} />
-        
-        {/* Default Redirect: If user goes to /dashboard, send to the new /customer/dashboard path */}
+
+        {/* Default Redirect */}
         <Route path="/dashboard" element={<Navigate to="/customer/dashboard" replace />} />
-        
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
