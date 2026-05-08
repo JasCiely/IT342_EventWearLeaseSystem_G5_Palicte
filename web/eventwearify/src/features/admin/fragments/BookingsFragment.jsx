@@ -6,7 +6,9 @@ import {
   XCircle, Star, AlertTriangle,
   Loader2, ShoppingBag, Settings, Save, Sun,
   Calendar as CalendarIcon, AlarmClock, Edit3, Scissors,
-  Image as ImageIcon, Video, RefreshCw
+  Image as ImageIcon, Video, RefreshCw, Download, FileText,
+  History, CheckSquare, Square, Mail, MailX,
+  TrendingUp, Filter, ChevronDown, ChevronUp
 } from 'lucide-react';
 import {
   getAllFittingBookings,
@@ -29,14 +31,12 @@ const BOOKING_STATUS_META = {
   'Returned':     { color: '#0e7490', bg: 'rgba(14,116,144,0.1)', dot: '#06b6d4', label: 'Returned' },
 };
 
-// ─── Fitting flow: Pending → Approved → Completed (no lease stages) ─────────
 const FITTING_FLOW_STEPS = ['Pending', 'Approved', 'Completed'];
 const FITTING_NEXT_ACTIONS = {
   'Pending':  { label: 'Approve Fitting', icon: CheckCircle, next: 'Approved',  color: '#15803d' },
   'Approved': { label: 'Mark as Done',    icon: Star,        next: 'Completed', color: '#1d4ed8' },
 };
 
-// ─── Direct booking flow: full lease lifecycle ───────────────────────────────
 const DIRECT_FLOW_STEPS = ['Pending', 'Approved', 'Active Lease', 'Returned', 'Completed'];
 const DIRECT_NEXT_ACTIONS = {
   'Pending':      { label: 'Approve Booking',  icon: CheckCircle, next: 'Approved',     color: '#15803d' },
@@ -54,6 +54,7 @@ const DEFAULT_WORKING_HOURS = {
   endHour: 17,  endMinute: 0,
   workingDays: [1, 2, 3, 4, 5],
   timezone: 'Asia/Manila',
+  autoApproveThreshold: 500,
 };
 
 const DAYS = [
@@ -63,31 +64,12 @@ const DAYS = [
   { value: 6, label: 'Saturday' },
 ];
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/**
- * Returns true if the fitting appointment has already passed.
- */
 const isFittingPast = (booking) => {
-  if (!booking.fittingDate) return false;
+  if (!booking?.fittingDate) return false;
   const dateStr = booking.fittingDate;
   const timeStr = booking.fittingTime || '23:59';
   const dt = new Date(`${dateStr}T${timeStr}`);
   return dt < new Date();
-};
-
-/**
- * Auto-complete past fittings that are still 'Approved'
- */
-const autoCompletePastFittings = (bookings, updateFn) => {
-  let updated = false;
-  bookings.forEach(booking => {
-    if (booking._type === 'fitting' && booking.status === 'Approved' && isFittingPast(booking)) {
-      updateFn(booking.id, 'Completed', 'Auto-completed by system (past fitting date)');
-      updated = true;
-    }
-  });
-  return updated;
 };
 
 // ─── StatusBadge ─────────────────────────────────────────────────────────────
@@ -129,13 +111,47 @@ function FlowStepper({ current, isFitting }) {
   );
 }
 
-// ─── ActionModal ─────────────────────────────────────────────────────────────
+// ─── HistoryTimeline ─────────────────────────────────────────────────────────
+
+function HistoryTimeline({ history }) {
+  if (!history || history.length === 0) {
+    return <div className="bk-history-empty">No history available</div>;
+  }
+
+  return (
+    <div className="bk-history-timeline">
+      {history.map((entry, idx) => (
+        <div key={idx} className="bk-history-entry">
+          <div className="bk-history-dot" />
+          {idx < history.length - 1 && <div className="bk-history-line" />}
+          <div className="bk-history-content">
+            <div className="bk-history-header">
+              <span className="bk-history-status">{entry.oldStatus} → {entry.newStatus}</span>
+              <span className="bk-history-date">{new Date(entry.timestamp).toLocaleString()}</span>
+            </div>
+            <div className="bk-history-details">
+              <span className="bk-history-actor">By: {entry.actor || 'System'}</span>
+              {entry.note && <span className="bk-history-note">Note: {entry.note}</span>}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── ActionModal ─────────────────────────────────────────────────────────
 
 function ActionModal({ booking, actionDef, onConfirm, onClose }) {
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const isCancel = actionDef.next === 'Cancelled' || actionDef.next === 'Rejected';
 
   const handle = async () => {
+    if (isCancel && !note.trim()) {
+      alert('Please provide a reason for cancellation/rejection');
+      return;
+    }
     setSubmitting(true);
     await onConfirm({ note });
     setSubmitting(false);
@@ -162,11 +178,15 @@ function ActionModal({ booking, actionDef, onConfirm, onClose }) {
             )}
           </div>
           <div className="inv-field">
-            <label className="inv-field-label">Notes <span style={{ opacity: 0.5, fontWeight: 400 }}>(optional)</span></label>
+            <label className="inv-field-label">
+              {isCancel ? 'Cancellation Reason *' : 'Notes '}
+              <span style={{ opacity: 0.5, fontWeight: 400 }}>(optional)</span>
+            </label>
             <textarea
-              className="inv-textarea" rows={2} value={note}
+              className="inv-textarea" rows={3} value={note}
               onChange={e => setNote(e.target.value)}
-              placeholder="Any remarks…" disabled={submitting}
+              placeholder={isCancel ? "Please explain why this booking is being cancelled/rejected..." : "Any remarks…"}
+              disabled={submitting}
             />
           </div>
         </div>
@@ -186,15 +206,154 @@ function ActionModal({ booking, actionDef, onConfirm, onClose }) {
   );
 }
 
-// ─── EditFittingModal ─────────────────────────────────────────────────────────
+// ─── BulkActionModal ─────────────────────────────────────────────────────────
 
-function EditFittingModal({ booking, onSave, onClose }) {
-  const [date, setDate]       = useState(booking.fittingDate || '');
-  const [time, setTime]       = useState(booking.fittingTime || '');
-  const [saving, setSaving]   = useState(false);
+function BulkActionModal({ selectedCount, action, onConfirm, onClose }) {
+  const [note, setNote] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const handle = async () => {
+    if ((action === 'Cancel' || action === 'Reject') && !note.trim()) {
+      alert(`Please provide a reason for bulk ${action.toLowerCase()}`);
+      return;
+    }
+    setSubmitting(true);
+    await onConfirm({ note });
+    setSubmitting(false);
+  };
+
+  const actionConfig = {
+    'Approve': { icon: CheckCircle, color: '#15803d', label: `Approve ${selectedCount} booking${selectedCount > 1 ? 's' : ''}` },
+    'Cancel': { icon: XCircle, color: '#991b1b', label: `Cancel ${selectedCount} booking${selectedCount > 1 ? 's' : ''}` },
+    'Reject': { icon: AlertCircle, color: '#b45309', label: `Reject ${selectedCount} booking${selectedCount > 1 ? 's' : ''}` },
+  };
+
+  const config = actionConfig[action];
+  const Icon = config.icon;
+
+  return (
+    <div className="inv-overlay" onClick={onClose}>
+      <div className="inv-modal inv-modal-sm" onClick={e => e.stopPropagation()}>
+        <div className="inv-modal-header">
+          <h3>{config.label}</h3>
+          <button className="inv-modal-close" onClick={onClose}><X size={15} /></button>
+        </div>
+        <div className="inv-modal-body">
+          <div className="bk-action-context">
+            <div className="bk-action-customer" style={{ color: config.color }}>
+              {config.icon && <config.icon size={14} style={{ marginRight: 6 }} />}
+              You are about to {action.toLowerCase()} {selectedCount} booking{selectedCount > 1 ? 's' : ''}
+            </div>
+          </div>
+          <div className="inv-field">
+            <label className="inv-field-label">
+              {(action === 'Cancel' || action === 'Reject') ? 'Reason *' : 'Notes '}
+              <span style={{ opacity: 0.5, fontWeight: 400 }}>(optional)</span>
+            </label>
+            <textarea
+              className="inv-textarea" rows={3} value={note}
+              onChange={e => setNote(e.target.value)}
+              placeholder={(action === 'Cancel' || action === 'Reject') ? "Please provide a reason..." : "Any remarks…"}
+              disabled={submitting}
+            />
+          </div>
+        </div>
+        <div className="inv-modal-footer">
+          <button className="inv-btn-ghost" onClick={onClose} disabled={submitting}>Cancel</button>
+          <button
+            className="inv-btn-primary"
+            style={{ background: config.color }}
+            onClick={handle} disabled={submitting}
+          >
+            {submitting ? <Loader2 size={13} className="inv-spinner-inline" /> : <Icon size={13} />}
+            Confirm {action}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── EditFittingModal ────────────────────────────────────────────────────────
+
+function EditFittingModal({ booking, onSave, onClose, workingHours }) {
+  const [date, setDate] = useState(booking.fittingDate || '');
+  const [time, setTime] = useState(booking.fittingTime || '');
+  const [saving, setSaving] = useState(false);
+  const [availabilityError, setAvailabilityError] = useState('');
+
+  const isWorkingHour = useCallback((dateStr, timeStr) => {
+    if (!workingHours?.enabled) return { valid: true };
+    
+    const dt = new Date(`${dateStr}T${timeStr}`);
+    const hour = dt.getHours();
+    const dayOfWeek = dt.getDay();
+    
+    if (!workingHours.workingDays?.includes(dayOfWeek)) {
+      return { valid: false, message: 'Selected day is not a working day' };
+    }
+    
+    if (hour < workingHours.startHour || hour >= workingHours.endHour) {
+      return { valid: false, message: `Selected time is outside working hours (${workingHours.startHour}:00 - ${workingHours.endHour}:00)` };
+    }
+    
+    return { valid: true };
+  }, [workingHours]);
+
+  const checkAvailability = async (dateStr, timeStr) => {
+    try {
+      const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+      const res = await fetch(`http://localhost:8080/api/admin/bookings/fitting/${booking.id}/check-availability?date=${dateStr}&time=${timeStr}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const data = await res.json();
+      return data.available;
+    } catch (e) {
+      console.error('Availability check failed:', e);
+      return true;
+    }
+  };
+
+  const validateSchedule = async (dateStr, timeStr) => {
+    const workingHourCheck = isWorkingHour(dateStr, timeStr);
+    if (!workingHourCheck.valid) {
+      setAvailabilityError(workingHourCheck.message);
+      return false;
+    }
+    
+    const isAvailable = await checkAvailability(dateStr, timeStr);
+    if (!isAvailable) {
+      setAvailabilityError('This time slot is fully booked. Please choose another time.');
+      return false;
+    }
+    
+    return true;
+  };
+
+  const handleDateChange = (e) => {
+    const newDate = e.target.value;
+    setDate(newDate);
+    setAvailabilityError('');
+    if (newDate && time) {
+      validateSchedule(newDate, time);
+    }
+  };
+
+  const handleTimeChange = (e) => {
+    const newTime = e.target.value;
+    setTime(newTime);
+    setAvailabilityError('');
+    if (date && newTime) {
+      validateSchedule(date, newTime);
+    }
+  };
 
   const handle = async () => {
     if (!date || !time) return;
+    
+    const isValid = await validateSchedule(date, time);
+    if (!isValid) return;
+    
     setSaving(true);
     await onSave({ fittingDate: date, fittingTime: time });
     setSaving(false);
@@ -220,7 +379,7 @@ function EditFittingModal({ booking, onSave, onClose }) {
               <label className="inv-field-label"><CalendarIcon size={11} /> New Date</label>
               <input
                 type="date" className="inv-input"
-                value={date} onChange={e => setDate(e.target.value)}
+                value={date} onChange={handleDateChange}
                 min={new Date().toISOString().split('T')[0]}
               />
             </div>
@@ -228,11 +387,16 @@ function EditFittingModal({ booking, onSave, onClose }) {
               <label className="inv-field-label"><AlarmClock size={11} /> New Time</label>
               <input
                 type="time" className="inv-input"
-                value={time} onChange={e => setTime(e.target.value)}
+                value={time} onChange={handleTimeChange}
               />
             </div>
           </div>
-          {date && time && (
+          {availabilityError && (
+            <div className="bk-error-message" style={{ color: '#dc2626', fontSize: '0.75rem', marginTop: '0.5rem' }}>
+              <AlertTriangle size={12} /> {availabilityError}
+            </div>
+          )}
+          {date && time && !availabilityError && (
             <div className="bk-time-preview" style={{ marginTop: 0 }}>
               <CalendarIcon size={12} />
               New schedule: {new Date(`${date}T${time}`).toLocaleString('en-PH', {
@@ -247,7 +411,7 @@ function EditFittingModal({ booking, onSave, onClose }) {
           <button
             className="inv-btn-primary"
             onClick={handle}
-            disabled={saving || !date || !time}
+            disabled={saving || !date || !time || !!availabilityError}
           >
             {saving ? <Loader2 size={13} className="inv-spinner-inline" /> : <Save size={13} />}
             Save Schedule
@@ -279,15 +443,18 @@ function MediaViewer({ file }) {
 
 // ─── BookingDrawer ────────────────────────────────────────────────────────────
 
-function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, isFitting }) {
-  const [itemDetails, setItemDetails]   = useState(null);
-  const [loadingItem, setLoadingItem]   = useState(false);
+function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, isFitting, workingHours }) {
+  const [itemDetails, setItemDetails] = useState(null);
+  const [loadingItem, setLoadingItem] = useState(false);
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
+  const [activeTab, setActiveTab] = useState('details');
+  const [emailStatus, setEmailStatus] = useState(null);
+  const [emailSending, setEmailSending] = useState(false);
 
   const nextActions = isFitting ? FITTING_NEXT_ACTIONS : DIRECT_NEXT_ACTIONS;
-  const actionDef   = nextActions[booking.status];
-  const canCancel   = CANCELLABLE.includes(booking.status);
-  const isTerminal  = TERMINAL.includes(booking.status);
+  const actionDef = nextActions[booking.status];
+  const canCancel = CANCELLABLE.includes(booking.status);
+  const isTerminal = TERMINAL.includes(booking.status);
   const pastFitting = isFitting && isFittingPast(booking);
 
   useEffect(() => {
@@ -305,6 +472,28 @@ function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, is
     load();
   }, [booking.itemId, booking.inventoryItemId]);
 
+  const resendConfirmationEmail = async () => {
+    setEmailSending(true);
+    try {
+      const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+      const res = await fetch(`http://localhost:8080/api/admin/bookings/${isFitting ? 'fitting' : 'direct'}/${booking.id}/resend-email`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (res.ok) {
+        setEmailStatus({ type: 'success', message: 'Confirmation email resent successfully' });
+        setTimeout(() => setEmailStatus(null), 3000);
+      } else {
+        throw new Error('Failed to resend');
+      }
+    } catch (e) {
+      setEmailStatus({ type: 'error', message: 'Failed to resend email' });
+      setTimeout(() => setEmailStatus(null), 3000);
+    } finally {
+      setEmailSending(false);
+    }
+  };
+
   const mediaFiles = itemDetails?.mediaFiles || [];
   const currentMedia = mediaFiles[currentMediaIndex];
   const hasMultipleMedia = mediaFiles.length > 1;
@@ -316,7 +505,6 @@ function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, is
     <div className="bk-drawer-overlay" onClick={onClose}>
       <div className="bk-drawer" onClick={e => e.stopPropagation()}>
 
-        {/* ── Header ── */}
         <div className="bk-drawer-header">
           <div>
             <div className="bk-drawer-id">#{(booking.id || booking.bookingId || '').slice(-8)}</div>
@@ -333,158 +521,187 @@ function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, is
           </div>
         </div>
 
-        {/* ── Body ── */}
+        <div className="bk-drawer-tabs">
+          <button className={`bk-tab ${activeTab === 'details' ? 'active' : ''}`} onClick={() => setActiveTab('details')}>
+            Details
+          </button>
+          <button className={`bk-tab ${activeTab === 'history' ? 'active' : ''}`} onClick={() => setActiveTab('history')}>
+            <History size={12} /> History
+          </button>
+        </div>
+
         <div className="bk-drawer-body">
+          
+          {activeTab === 'details' && (
+            <>
+              {emailStatus && (
+                <div className={`bk-email-status ${emailStatus.type}`}>
+                  {emailStatus.type === 'success' ? <Mail size={12} /> : <MailX size={12} />}
+                  {emailStatus.message}
+                </div>
+              )}
 
-          {/* Past-fitting warning */}
-          {isFitting && pastFitting && booking.status === 'Approved' && (
-            <div className="bk-damage-warning" style={{ background: 'rgba(29,78,216,0.07)', borderColor: 'rgba(29,78,216,0.2)', color: '#1d4ed8' }}>
-              <AlertTriangle size={13} />
-              <span>This fitting appointment has passed. Mark it as Done or reschedule.</span>
-            </div>
-          )}
+              {isFitting && pastFitting && booking.status === 'Approved' && (
+                <div className="bk-damage-warning" style={{ background: 'rgba(29,78,216,0.07)', borderColor: 'rgba(29,78,216,0.2)', color: '#1d4ed8' }}>
+                  <AlertTriangle size={13} />
+                  <span>This fitting appointment has passed. Mark it as Done or reschedule.</span>
+                </div>
+              )}
 
-          {/* Flow stepper */}
-          <FlowStepper current={booking.status} isFitting={isFitting} />
+              <FlowStepper current={booking.status} isFitting={isFitting} />
 
-          {/* Item details with Media Viewer */}
-          <div className="bk-detail-section">
-            <div className="bk-section-label">Item</div>
-            <div className="bk-item-row">
-              <div className="bk-item-thumb">
-                {loadingItem ? (
-                  <Loader2 size={24} className="inv-spinner-inline" style={{ color: '#c4717f' }} />
-                ) : currentMedia ? (
-                  <div className="bk-media-container">
-                    <MediaViewer file={currentMedia} />
-                    {hasMultipleMedia && (
-                      <div className="bk-media-controls">
-                        <button onClick={prevMedia} className="bk-media-nav">‹</button>
-                        <span className="bk-media-counter">{currentMediaIndex + 1}/{mediaFiles.length}</span>
-                        <button onClick={nextMedia} className="bk-media-nav">›</button>
+              <div className="bk-detail-section">
+                <div className="bk-section-label">Item</div>
+                <div className="bk-item-row">
+                  <div className="bk-item-thumb">
+                    {loadingItem ? (
+                      <Loader2 size={24} className="inv-spinner-inline" style={{ color: '#c4717f' }} />
+                    ) : currentMedia ? (
+                      <div className="bk-media-container">
+                        <MediaViewer file={currentMedia} />
+                        {hasMultipleMedia && (
+                          <div className="bk-media-controls">
+                            <button onClick={prevMedia} className="bk-media-nav">‹</button>
+                            <span className="bk-media-counter">{currentMediaIndex + 1}/{mediaFiles.length}</span>
+                            <button onClick={nextMedia} className="bk-media-nav">›</button>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="bk-no-media">
+                        <ShoppingBag size={28} style={{ color: '#c4717f', opacity: 0.5 }} />
+                        <span>No image</span>
                       </div>
                     )}
                   </div>
-                ) : (
-                  <div className="bk-no-media">
-                    <ShoppingBag size={28} style={{ color: '#c4717f', opacity: 0.5 }} />
-                    <span>No image</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.95rem', marginBottom: '0.3rem' }}>{booking.itemName}</div>
+                    {itemDetails && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginBottom: '0.3rem' }}>
+                        <span className="inv-cat-tag">{itemDetails.category}</span>
+                        {itemDetails.subtype && <span className="inv-subtype-tag">{itemDetails.subtype}</span>}
+                      </div>
+                    )}
+                    {booking.preferredSize && (
+                      <div style={{ fontSize: '0.75rem', color: '#888' }}>
+                        <b>Size:</b> {booking.preferredSize}
+                      </div>
+                    )}
+                    {itemDetails?.color && (
+                      <div style={{ fontSize: '0.75rem', color: '#888' }}>
+                        <b>Color:</b> {itemDetails.color}
+                      </div>
+                    )}
+                    {itemDetails?.price && (
+                      <div style={{ fontSize: '0.75rem', color: '#15803d', fontWeight: 600, marginTop: '0.2rem' }}>
+                        ₱{itemDetails.price.toLocaleString()}/day
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, fontSize: '0.95rem', marginBottom: '0.3rem' }}>{booking.itemName}</div>
-                {itemDetails && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginBottom: '0.3rem' }}>
-                    <span className="inv-cat-tag">{itemDetails.category}</span>
-                    {itemDetails.subtype && <span className="inv-subtype-tag">{itemDetails.subtype}</span>}
-                  </div>
-                )}
-                {booking.preferredSize && (
-                  <div style={{ fontSize: '0.75rem', color: '#888' }}>
-                    <b>Size:</b> {booking.preferredSize}
-                  </div>
-                )}
-                {itemDetails?.color && (
-                  <div style={{ fontSize: '0.75rem', color: '#888' }}>
-                    <b>Color:</b> {itemDetails.color}
-                  </div>
-                )}
-                {itemDetails?.price && (
-                  <div style={{ fontSize: '0.75rem', color: '#15803d', fontWeight: 600, marginTop: '0.2rem' }}>
-                    ₱{itemDetails.price.toLocaleString()}/day
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Customer */}
-          <div className="bk-detail-section">
-            <div className="bk-section-label">Customer</div>
-            <div className="bk-info-grid">
-              <div className="bk-info-row"><User size={12} /><span>{booking.customerName}</span></div>
-              {booking.customerPhone && <div className="bk-info-row"><Phone size={12} /><span>{booking.customerPhone}</span></div>}
-              {booking.customerEmail && <div className="bk-info-row"><Calendar size={12} /><span>{booking.customerEmail}</span></div>}
-            </div>
-          </div>
-
-          {/* Fitting schedule */}
-          {isFitting && booking.fittingDate && (
-            <div className="bk-detail-section">
-              <div className="bk-section-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span>Fitting Schedule</span>
-                {!isTerminal && (
-                  <button
-                    className="inv-btn-sm outline"
-                    style={{ fontSize: '0.68rem', padding: '0.2rem 0.6rem' }}
-                    onClick={() => onEditFitting(booking)}
-                  >
-                    <Edit3 size={10} /> Edit
-                  </button>
-                )}
-              </div>
-              <div className="bk-dates-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
-                <div className={`bk-date-card ${pastFitting ? 'bk-date-card--past' : ''}`}>
-                  <div className="bk-date-label">Date</div>
-                  <div className="bk-date-val">{booking.fittingDate}</div>
-                  {pastFitting && <span className="bk-date-time" style={{ color: '#dc2626' }}>Past</span>}
-                </div>
-                <div className="bk-date-card">
-                  <div className="bk-date-label">Time</div>
-                  <div className="bk-date-val">{booking.fittingTime}</div>
                 </div>
               </div>
-            </div>
+
+              <div className="bk-detail-section">
+                <div className="bk-section-label">Customer</div>
+                <div className="bk-info-grid">
+                  <div className="bk-info-row"><User size={12} /><span>{booking.customerName}</span></div>
+                  {booking.customerPhone && <div className="bk-info-row"><Phone size={12} /><span>{booking.customerPhone}</span></div>}
+                  {booking.customerEmail && (
+                    <div className="bk-info-row">
+                      <Mail size={12} /><span>{booking.customerEmail}</span>
+                      <button 
+                        className="bk-resend-email-btn" 
+                        onClick={resendConfirmationEmail} 
+                        disabled={emailSending}
+                        title="Resend confirmation email"
+                      >
+                        {emailSending ? <Loader2 size={10} className="inv-spinner-inline" /> : <RefreshCw size={10} />}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {isFitting && booking.fittingDate && (
+                <div className="bk-detail-section">
+                  <div className="bk-section-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span>Fitting Schedule</span>
+                    {!isTerminal && (
+                      <button
+                        className="inv-btn-sm outline"
+                        style={{ fontSize: '0.68rem', padding: '0.2rem 0.6rem' }}
+                        onClick={() => onEditFitting(booking)}
+                      >
+                        <Edit3 size={10} /> Edit
+                      </button>
+                    )}
+                  </div>
+                  <div className="bk-dates-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                    <div className={`bk-date-card ${pastFitting ? 'bk-date-card--past' : ''}`}>
+                      <div className="bk-date-label">Date</div>
+                      <div className="bk-date-val">{booking.fittingDate}</div>
+                      {pastFitting && <span className="bk-date-time" style={{ color: '#dc2626' }}>Past</span>}
+                    </div>
+                    <div className="bk-date-card">
+                      <div className="bk-date-label">Time</div>
+                      <div className="bk-date-val">{booking.fittingTime}</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {!isFitting && booking.startDate && (
+                <div className="bk-detail-section">
+                  <div className="bk-section-label">Rental Schedule</div>
+                  <div className="bk-dates-grid">
+                    <div className="bk-date-card">
+                      <div className="bk-date-label">Start</div>
+                      <div className="bk-date-val">{booking.startDate}</div>
+                    </div>
+                    <div className="bk-date-card">
+                      <div className="bk-date-label">End</div>
+                      <div className="bk-date-val">{booking.endDate}</div>
+                    </div>
+                    <div className="bk-date-card">
+                      <div className="bk-date-label">Days</div>
+                      <div className="bk-date-val">{booking.totalDays || '—'}</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {(booking.finalPrice || booking.basePrice) && (
+                <div className="bk-detail-section">
+                  <div className="bk-section-label">Payment</div>
+                  <div className="bk-payment-summary">
+                    <div className="bk-ps-row"><span>Base Price</span><span>₱{(booking.basePrice || booking.finalPrice || 0).toLocaleString()}</span></div>
+                    {booking.discountAmount > 0 && (
+                      <div className="bk-ps-row discount"><span>Discount</span><span>-₱{booking.discountAmount.toLocaleString()}</span></div>
+                    )}
+                    <div className="bk-ps-row total"><span>Total</span><span>₱{(booking.finalPrice || booking.basePrice || 0).toLocaleString()}</span></div>
+                  </div>
+                </div>
+              )}
+
+              {booking.notes && (
+                <div className="bk-detail-section">
+                  <div className="bk-section-label">Notes</div>
+                  <div style={{ padding: '0.65rem 0.85rem', background: '#faf9f7', borderRadius: 8, fontSize: '0.82rem', color: '#555', lineHeight: 1.6 }}>
+                    {booking.notes}
+                  </div>
+                </div>
+              )}
+            </>
           )}
 
-          {/* Rental schedule */}
-          {!isFitting && booking.startDate && (
+          {activeTab === 'history' && (
             <div className="bk-detail-section">
-              <div className="bk-section-label">Rental Schedule</div>
-              <div className="bk-dates-grid">
-                <div className="bk-date-card">
-                  <div className="bk-date-label">Start</div>
-                  <div className="bk-date-val">{booking.startDate}</div>
-                </div>
-                <div className="bk-date-card">
-                  <div className="bk-date-label">End</div>
-                  <div className="bk-date-val">{booking.endDate}</div>
-                </div>
-                <div className="bk-date-card">
-                  <div className="bk-date-label">Days</div>
-                  <div className="bk-date-val">{booking.totalDays || '—'}</div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Payment */}
-          {(booking.finalPrice || booking.basePrice) && (
-            <div className="bk-detail-section">
-              <div className="bk-section-label">Payment</div>
-              <div className="bk-payment-summary">
-                <div className="bk-ps-row"><span>Base Price</span><span>₱{(booking.basePrice || booking.finalPrice || 0).toLocaleString()}</span></div>
-                {booking.discountAmount > 0 && (
-                  <div className="bk-ps-row discount"><span>Discount</span><span>-₱{booking.discountAmount.toLocaleString()}</span></div>
-                )}
-                <div className="bk-ps-row total"><span>Total</span><span>₱{(booking.finalPrice || booking.basePrice || 0).toLocaleString()}</span></div>
-              </div>
-            </div>
-          )}
-
-          {/* Notes */}
-          {booking.notes && (
-            <div className="bk-detail-section">
-              <div className="bk-section-label">Notes</div>
-              <div style={{ padding: '0.65rem 0.85rem', background: '#faf9f7', borderRadius: 8, fontSize: '0.82rem', color: '#555', lineHeight: 1.6 }}>
-                {booking.notes}
-              </div>
+              <div className="bk-section-label">Status History</div>
+              <HistoryTimeline history={booking.history || []} />
             </div>
           )}
         </div>
 
-        {/* ── Footer with multiple action buttons ── */}
         <div className="bk-drawer-footer">
           {canCancel && (
             <button
@@ -556,7 +773,7 @@ function SettingsModal({ settings, onSave, onClose }) {
     <div className="inv-overlay" onClick={onClose}>
       <div className="inv-modal" style={{ maxWidth: 500 }} onClick={e => e.stopPropagation()}>
         <div className="inv-modal-header">
-          <h3><Settings size={16} style={{ marginRight: 8 }} />Booking Hours Settings</h3>
+          <h3><Settings size={16} style={{ marginRight: 8 }} />Booking Settings</h3>
           <button className="inv-modal-close" onClick={onClose}><X size={15} /></button>
         </div>
         <div className="inv-modal-body">
@@ -611,18 +828,33 @@ function SettingsModal({ settings, onSave, onClose }) {
                 <label className="inv-field-label">Timezone</label>
                 <input className="inv-input" value={local.timezone} onChange={e => setLocal(p => ({ ...p, timezone: e.target.value }))} placeholder="Asia/Manila" />
               </div>
-              <div className="bk-settings-summary">
-                <Sun size={14} />
-                <span>Bookings accepted only during working hours on working days.</span>
-              </div>
             </>
           )}
-          {!local.enabled && (
-            <div className="bk-settings-summary" style={{ background: '#fff3e0', borderLeftColor: '#f59e0b' }}>
-              <AlertTriangle size={14} />
-              <span>Time restrictions disabled — bookings accepted anytime.</span>
+
+          <div className="inv-divider" />
+          <div className="inv-field">
+            <label className="inv-field-label">Auto-approve Threshold</label>
+            <div className="bk-auto-approve">
+              <span className="bk-currency-prefix">₱</span>
+              <input
+                type="number"
+                className="inv-input"
+                value={local.autoApproveThreshold}
+                onChange={e => setLocal(p => ({ ...p, autoApproveThreshold: +e.target.value }))}
+                style={{ width: '120px' }}
+              />
+              <span className="bk-auto-approve-hint">and below</span>
             </div>
-          )}
+            <div className="bk-settings-summary" style={{ marginTop: 8 }}>
+              <TrendingUp size={14} />
+              <span>Bookings with total price ≤ ₱{local.autoApproveThreshold} will be auto-approved</span>
+            </div>
+          </div>
+
+          <div className="bk-settings-summary">
+            <Sun size={14} />
+            <span>{local.enabled ? 'Bookings accepted only during working hours on working days.' : 'Time restrictions disabled — bookings accepted anytime.'}</span>
+          </div>
         </div>
         <div className="inv-modal-footer">
           <button className="inv-btn-ghost" onClick={onClose}>Cancel</button>
@@ -636,16 +868,21 @@ function SettingsModal({ settings, onSave, onClose }) {
   );
 }
 
-// ─── BookingCard (list row) ───────────────────────────────────────────────────
+// ─── BookingCard ──────────────────────────────────────────────────────────────
 
-function BookingCard({ booking, isFitting, onOpen, onAction }) {
+function BookingCard({ booking, isFitting, onOpen, onAction, selected, onSelect }) {
   const nextActions = isFitting ? FITTING_NEXT_ACTIONS : DIRECT_NEXT_ACTIONS;
-  const actionDef   = nextActions[booking.status];
-  const isPast      = isFitting && isFittingPast(booking) && booking.status === 'Approved';
+  const actionDef = nextActions[booking.status];
+  const isPast = isFitting && isFittingPast(booking) && booking.status === 'Approved';
 
   return (
-    <div className={`bk-card ${isPast ? 'bk-card--alert' : ''}`} onClick={() => onOpen(booking)}>
-      <div className="bk-card-left">
+    <div className={`bk-card ${isPast ? 'bk-card--alert' : ''}`}>
+      <div className="bk-card-select" onClick={e => e.stopPropagation()}>
+        <button className="bk-checkbox-btn" onClick={() => onSelect(booking.id)}>
+          {selected ? <CheckSquare size={16} color="#c4717f" /> : <Square size={16} />}
+        </button>
+      </div>
+      <div className="bk-card-left" onClick={() => onOpen(booking)}>
         <div className="bk-card-avatar">{booking.customerName?.charAt(0)?.toUpperCase() || 'U'}</div>
         <div className="bk-card-info">
           <div className="bk-card-customer">
@@ -687,24 +924,86 @@ function BookingCard({ booking, isFitting, onOpen, onAction }) {
   );
 }
 
+// ─── ExportModal ─────────────────────────────────────────────────────────────
+
+function ExportModal({ bookings, onClose, onExport }) {
+  const [format, setFormat] = useState('csv');
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = async () => {
+    setExporting(true);
+    await onExport(bookings, format);
+    setExporting(false);
+    onClose();
+  };
+
+  return (
+    <div className="inv-overlay" onClick={onClose}>
+      <div className="inv-modal inv-modal-sm" onClick={e => e.stopPropagation()}>
+        <div className="inv-modal-header">
+          <h3><Download size={15} style={{ marginRight: 6 }} />Export Bookings</h3>
+          <button className="inv-modal-close" onClick={onClose}><X size={15} /></button>
+        </div>
+        <div className="inv-modal-body">
+          <div className="inv-field">
+            <label className="inv-field-label">Export Format</label>
+            <div className="bk-export-options">
+              <label className="bk-radio-label">
+                <input type="radio" value="csv" checked={format === 'csv'} onChange={() => setFormat('csv')} />
+                <FileText size={14} /> CSV (.csv)
+              </label>
+              <label className="bk-radio-label">
+                <input type="radio" value="json" checked={format === 'json'} onChange={() => setFormat('json')} />
+                <FileText size={14} /> JSON (.json)
+              </label>
+            </div>
+          </div>
+          <div className="bk-export-summary">
+            Exporting {bookings.length} booking{bookings.length !== 1 ? 's' : ''}
+          </div>
+        </div>
+        <div className="inv-modal-footer">
+          <button className="inv-btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="inv-btn-primary" onClick={handleExport} disabled={exporting}>
+            {exporting ? <Loader2 size={13} className="inv-spinner-inline" /> : <Download size={13} />}
+            Export
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function BookingsManagement() {
+  // State declarations
   const [fittingBookings, setFittingBookings] = useState([]);
-  const [directBookings,  setDirectBookings]  = useState([]);
-  const [loading, setLoading]             = useState(true);
-  const [refreshing, setRefreshing]       = useState(false);
-  const [search, setSearch]               = useState('');
-  const [filterStat, setFilterStat]       = useState('All');
-  const [bookingType, setBookingType]     = useState('all');
-  const [viewTab, setViewTab]             = useState('active');
-  const [drawer, setDrawer]               = useState(null);
-  const [actionModal, setActionModal]     = useState(null);
+  const [directBookings, setDirectBookings] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [search, setSearch] = useState('');
+  const [filterStat, setFilterStat] = useState('All');
+  const [bookingType, setBookingType] = useState('all');
+  const [viewTab, setViewTab] = useState('active');
+  const [drawer, setDrawer] = useState(null);
+  const [actionModal, setActionModal] = useState(null);
   const [editFittingModal, setEditFittingModal] = useState(null);
-  const [toast, setToast]                 = useState({ show: false, type: 'success', message: '' });
-  const [showSettings, setShowSettings]   = useState(false);
-  const [workingHours, setWorkingHours]   = useState(() => {
-    try { return JSON.parse(localStorage.getItem('bookingWorkingHours')) || DEFAULT_WORKING_HOURS; }
+  const [toast, setToast] = useState({ show: false, type: 'success', message: '' });
+  const [showSettings, setShowSettings] = useState(false);
+  const [showExport, setShowExport] = useState(false);
+  const [selectedBookings, setSelectedBookings] = useState(new Set());
+  const [bulkAction, setBulkAction] = useState(null);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [dateRangeFilter, setDateRangeFilter] = useState({ start: '', end: '' });
+  const [priceRangeFilter, setPriceRangeFilter] = useState({ min: '', max: '' });
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  
+  const [workingHours, setWorkingHours] = useState(() => {
+    try { 
+      const saved = localStorage.getItem('bookingWorkingHours');
+      return saved ? { ...DEFAULT_WORKING_HOURS, ...JSON.parse(saved) } : DEFAULT_WORKING_HOURS;
+    }
     catch { return DEFAULT_WORKING_HOURS; }
   });
 
@@ -712,8 +1011,7 @@ export default function BookingsManagement() {
     setToast({ show: true, type, message: msg });
   }, []);
 
-  // ── Load Data with auto-completion ──────────────────────────────────────────
-
+  // Load Data
   const loadData = useCallback(async (showRefreshIndicator = false) => {
     if (showRefreshIndicator) setRefreshing(true);
     else setLoading(true);
@@ -727,17 +1025,17 @@ export default function BookingsManagement() {
       let fitting = Array.isArray(fRes?.content) ? fRes.content : [];
       let direct = Array.isArray(dRes?.content) ? dRes.content : [];
       
-      // Auto-complete past fittings that are still 'Approved'
       let fittingUpdated = false;
       fitting = fitting.map(booking => {
         if (booking.status === 'Approved' && isFittingPast(booking)) {
           fittingUpdated = true;
-          // Silently auto-complete in UI - actual API call happens separately
           updateFittingBookingStatus(booking.id, 'Completed').catch(console.error);
-          return { ...booking, status: 'Completed' };
+          return { ...booking, status: 'Completed', history: booking.history || [] };
         }
-        return booking;
+        return { ...booking, history: booking.history || [] };
       });
+      
+      direct = direct.map(booking => ({ ...booking, history: booking.history || [] }));
       
       if (fittingUpdated) {
         showToastMsg('success', `${fittingUpdated} past fitting${fittingUpdated > 1 ? 's were' : ' was'} auto-completed`);
@@ -754,17 +1052,141 @@ export default function BookingsManagement() {
     }
   }, [showToastMsg]);
 
+  // Auto-refresh
+  useEffect(() => {
+    if (!autoRefresh) return;
+    const interval = setInterval(() => {
+      loadData(false);
+    }, 60000);
+    return () => clearInterval(interval);
+  }, [autoRefresh, loadData]);
+
   useEffect(() => { loadData(); }, [loadData]);
 
-  // ── Status updates ────────────────────────────────────────────────────────
+  // Computed values
+  const allBookings = useMemo(() => {
+    const fitting = fittingBookings.map(b => ({ ...b, _type: 'fitting', status: b.status }));
+    const direct = directBookings.map(b => ({ ...b, _type: 'direct', status: b.bookingStatus }));
 
+    let combined = bookingType === 'fitting' ? fitting
+                 : bookingType === 'direct'  ? direct
+                 : [...fitting, ...direct];
+
+    combined = viewTab === 'active'
+      ? combined.filter(b => !TERMINAL.includes(b.status))
+      : combined.filter(b => TERMINAL.includes(b.status));
+
+    const q = search.toLowerCase();
+    if (q) combined = combined.filter(b =>
+      b.customerName?.toLowerCase().includes(q) ||
+      b.customerEmail?.toLowerCase().includes(q) ||
+      b.itemName?.toLowerCase().includes(q) ||
+      b.id?.toLowerCase().includes(q)
+    );
+
+    if (filterStat !== 'All') combined = combined.filter(b => b.status === filterStat);
+    
+    if (dateRangeFilter.start) {
+      combined = combined.filter(b => {
+        const date = b.fittingDate || b.startDate;
+        return date >= dateRangeFilter.start;
+      });
+    }
+    if (dateRangeFilter.end) {
+      combined = combined.filter(b => {
+        const date = b.fittingDate || b.startDate;
+        return date <= dateRangeFilter.end;
+      });
+    }
+    
+    const price = (b) => b.finalPrice || b.basePrice || 0;
+    if (priceRangeFilter.min) {
+      combined = combined.filter(b => price(b) >= parseFloat(priceRangeFilter.min));
+    }
+    if (priceRangeFilter.max) {
+      combined = combined.filter(b => price(b) <= parseFloat(priceRangeFilter.max));
+    }
+
+    combined.sort((a, b) => {
+      const aPast = a._type === 'fitting' && isFittingPast(a) && a.status === 'Approved';
+      const bPast = b._type === 'fitting' && isFittingPast(b) && b.status === 'Approved';
+      if (aPast !== bPast) return aPast ? -1 : 1;
+      return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+    });
+
+    return combined;
+  }, [fittingBookings, directBookings, bookingType, viewTab, search, filterStat, dateRangeFilter, priceRangeFilter]);
+
+  const stats = useMemo(() => {
+    const pendingFit = fittingBookings.filter(b => b.status === 'Pending').length;
+    const pendingDir = directBookings.filter(b => b.bookingStatus === 'Pending').length;
+    const approvedFit = fittingBookings.filter(b => b.status === 'Approved').length;
+    const approvedDir = directBookings.filter(b => b.bookingStatus === 'Approved').length;
+    const activeLease = directBookings.filter(b => b.bookingStatus === 'Active Lease').length;
+    const completedFit = fittingBookings.filter(b => b.status === 'Completed').length;
+    const completedDir = directBookings.filter(b => b.bookingStatus === 'Completed').length;
+    const pastFitting = fittingBookings.filter(b => isFittingPast(b) && b.status === 'Approved').length;
+    
+    return {
+      pending: pendingFit + pendingDir,
+      approved: approvedFit + approvedDir,
+      active: activeLease,
+      completed: completedFit + completedDir,
+      pastFitting,
+    };
+  }, [fittingBookings, directBookings]);
+
+  // Handlers that depend on allBookings
+  const toggleSelectAll = useCallback(() => {
+    if (selectedBookings.size === allBookings.length) {
+      setSelectedBookings(new Set());
+    } else {
+      setSelectedBookings(new Set(allBookings.map(b => b.id)));
+    }
+  }, [allBookings, selectedBookings.size]);
+
+  const toggleSelect = useCallback((id) => {
+    setSelectedBookings(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  }, []);
+
+  const getBulkActions = useCallback(() => {
+    const selectedStatuses = new Set(allBookings.filter(b => selectedBookings.has(b.id)).map(b => b.status));
+    const actions = [];
+    if (selectedStatuses.has('Pending')) {
+      actions.push({ label: 'Approve', action: 'Approve', color: '#15803d' });
+      actions.push({ label: 'Reject', action: 'Reject', color: '#991b1b' });
+    }
+    if (selectedStatuses.has('Pending') || selectedStatuses.has('Approved')) {
+      actions.push({ label: 'Cancel', action: 'Cancel', color: '#6b7280' });
+    }
+    return actions;
+  }, [allBookings, selectedBookings]);
+
+  // Status update handlers
   const updateFittingStatus = useCallback(async (id, status, note) => {
     try {
       await updateFittingBookingStatus(id, status);
-      setFittingBookings(prev => prev.map(b =>
-        b.id === id ? { ...b, status } : b
-      ));
-      // Also update drawer if it's the same booking
+      setFittingBookings(prev => prev.map(b => {
+        if (b.id === id) {
+          const newHistory = [...(b.history || []), {
+            oldStatus: b.status,
+            newStatus: status,
+            timestamp: new Date().toISOString(),
+            actor: 'Admin',
+            note: note
+          }];
+          return { ...b, status, history: newHistory };
+        }
+        return b;
+      }));
       if (drawer?.id === id && drawer._type === 'fitting') {
         setDrawer(prev => prev ? { ...prev, status } : null);
       }
@@ -778,9 +1200,19 @@ export default function BookingsManagement() {
   const updateDirectStatus = useCallback(async (id, status, note) => {
     try {
       await updateDirectBookingStatus(id, status);
-      setDirectBookings(prev => prev.map(b =>
-        b.id === id ? { ...b, bookingStatus: status } : b
-      ));
+      setDirectBookings(prev => prev.map(b => {
+        if (b.id === id) {
+          const newHistory = [...(b.history || []), {
+            oldStatus: b.bookingStatus,
+            newStatus: status,
+            timestamp: new Date().toISOString(),
+            actor: 'Admin',
+            note: note
+          }];
+          return { ...b, bookingStatus: status, history: newHistory };
+        }
+        return b;
+      }));
       if (drawer?.id === id && drawer._type === 'direct') {
         setDrawer(prev => prev ? { ...prev, status } : null);
       }
@@ -791,7 +1223,62 @@ export default function BookingsManagement() {
     }
   }, [showToastMsg, drawer]);
 
-  // ─── Edit fitting schedule ─────────────────────────────────────────────────
+  const bulkUpdateStatus = useCallback(async (status, note) => {
+    const selectedIds = Array.from(selectedBookings);
+    const fittingToUpdate = fittingBookings.filter(b => selectedIds.includes(b.id));
+    const directToUpdate = directBookings.filter(b => selectedIds.includes(b.id));
+    
+    let successCount = 0;
+    let errorCount = 0;
+    
+    for (const booking of fittingToUpdate) {
+      try {
+        await updateFittingBookingStatus(booking.id, status);
+        setFittingBookings(prev => prev.map(b => {
+          if (b.id === booking.id) {
+            const newHistory = [...(b.history || []), {
+              oldStatus: b.status,
+              newStatus: status,
+              timestamp: new Date().toISOString(),
+              actor: 'Admin (Bulk)',
+              note: note
+            }];
+            return { ...b, status, history: newHistory };
+          }
+          return b;
+        }));
+        successCount++;
+      } catch (e) {
+        errorCount++;
+      }
+    }
+    
+    for (const booking of directToUpdate) {
+      try {
+        await updateDirectBookingStatus(booking.id, status);
+        setDirectBookings(prev => prev.map(b => {
+          if (b.id === booking.id) {
+            const newHistory = [...(b.history || []), {
+              oldStatus: b.bookingStatus,
+              newStatus: status,
+              timestamp: new Date().toISOString(),
+              actor: 'Admin (Bulk)',
+              note: note
+            }];
+            return { ...b, bookingStatus: status, history: newHistory };
+          }
+          return b;
+        }));
+        successCount++;
+      } catch (e) {
+        errorCount++;
+      }
+    }
+    
+    showToastMsg('success', `Updated ${successCount} booking${successCount !== 1 ? 's' : ''}${errorCount > 0 ? ` (${errorCount} failed)` : ''}`);
+    setSelectedBookings(new Set());
+    setBulkAction(null);
+  }, [selectedBookings, fittingBookings, directBookings, showToastMsg]);
 
   const saveFittingSchedule = useCallback(async ({ fittingDate, fittingTime }) => {
     const booking = editFittingModal;
@@ -817,11 +1304,9 @@ export default function BookingsManagement() {
       setEditFittingModal(null);
     } catch (e) {
       console.error(e);
-      showToastMsg('error', 'Failed to update schedule — check backend endpoint');
+      showToastMsg('error', 'Failed to update schedule');
     }
   }, [editFittingModal, drawer, showToastMsg]);
-
-  // ─── Cancel ────────────────────────────────────────────────────────────────
 
   const cancelFitting = useCallback(async (id) => {
     await updateFittingStatus(id, 'Cancelled', 'Cancelled by admin');
@@ -833,74 +1318,60 @@ export default function BookingsManagement() {
     setDrawer(null);
   }, [updateDirectStatus]);
 
-  // ─── Manual refresh ───────────────────────────────────────────────────────
-
   const handleRefresh = useCallback(() => {
     loadData(true);
   }, [loadData]);
 
-  // ─── Computed lists ────────────────────────────────────────────────────────
-
-  const allBookings = useMemo(() => {
-    const fitting = fittingBookings.map(b => ({ ...b, _type: 'fitting', status: b.status }));
-    const direct  = directBookings.map(b => ({ ...b, _type: 'direct',  status: b.bookingStatus }));
-
-    let combined = bookingType === 'fitting' ? fitting
-                 : bookingType === 'direct'  ? direct
-                 : [...fitting, ...direct];
-
-    // Tab filter
-    combined = viewTab === 'active'
-      ? combined.filter(b => !TERMINAL.includes(b.status))
-      : combined.filter(b =>  TERMINAL.includes(b.status));
-
-    // Search
-    const q = search.toLowerCase();
-    if (q) combined = combined.filter(b =>
-      b.customerName?.toLowerCase().includes(q) ||
-      b.itemName?.toLowerCase().includes(q) ||
-      b.id?.toLowerCase().includes(q)
-    );
-
-    // Status filter
-    if (filterStat !== 'All') combined = combined.filter(b => b.status === filterStat);
-
-    // Sort: past-fitting approved first (they need attention), then by creation date desc
-    combined.sort((a, b) => {
-      const aPast = a._type === 'fitting' && isFittingPast(a) && a.status === 'Approved';
-      const bPast = b._type === 'fitting' && isFittingPast(b) && b.status === 'Approved';
-      if (aPast !== bPast) return aPast ? -1 : 1;
-      return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
-    });
-
-    return combined;
-  }, [fittingBookings, directBookings, bookingType, viewTab, search, filterStat]);
-
-  const stats = useMemo(() => {
-    const pendingFit = fittingBookings.filter(b => b.status === 'Pending').length;
-    const pendingDir = directBookings.filter(b => b.bookingStatus === 'Pending').length;
-    const approvedFit = fittingBookings.filter(b => b.status === 'Approved').length;
-    const approvedDir = directBookings.filter(b => b.bookingStatus === 'Approved').length;
-    const activeLease = directBookings.filter(b => b.bookingStatus === 'Active Lease').length;
-    const completedFit = fittingBookings.filter(b => b.status === 'Completed').length;
-    const completedDir = directBookings.filter(b => b.bookingStatus === 'Completed').length;
-    const pastFitting = fittingBookings.filter(b => isFittingPast(b) && b.status === 'Approved').length;
+  const handleExport = useCallback((bookingsToExport, format) => {
+    const exportData = bookingsToExport.map(b => ({
+      ID: b.id,
+      Type: b._type === 'fitting' ? 'Fitting' : 'Rental',
+      Customer: b.customerName,
+      Email: b.customerEmail,
+      Phone: b.customerPhone,
+      Item: b.itemName,
+      Status: b.status,
+      ...(b._type === 'fitting' ? {
+        FittingDate: b.fittingDate,
+        FittingTime: b.fittingTime,
+      } : {
+        StartDate: b.startDate,
+        EndDate: b.endDate,
+        TotalDays: b.totalDays,
+        TotalPrice: b.finalPrice || b.basePrice,
+      }),
+      Notes: b.notes,
+      CreatedAt: b.createdAt,
+    }));
     
-    return {
-      pending: pendingFit + pendingDir,
-      approved: approvedFit + approvedDir,
-      active: activeLease,
-      completed: completedFit + completedDir,
-      pastFitting,
-    };
-  }, [fittingBookings, directBookings]);
+    if (format === 'csv') {
+      const headers = Object.keys(exportData[0]).join(',');
+      const rows = exportData.map(row => Object.values(row).map(v => `"${v || ''}"`).join(','));
+      const csv = [headers, ...rows].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `bookings_export_${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } else {
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `bookings_export_${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+    
+    showToastMsg('success', `Exported ${exportData.length} bookings`);
+  }, [showToastMsg]);
 
   const fmtHours = () => {
     const f = h => { const ap = h >= 12 ? 'PM' : 'AM'; return `${h % 12 || 12}:00 ${ap}`; };
     return workingHours.enabled ? `${f(workingHours.startHour)} – ${f(workingHours.endHour)}` : 'Always open';
   };
-
-  // ─────────────────────────────────────────────────────────────────────────
 
   if (loading) {
     return (
@@ -914,7 +1385,6 @@ export default function BookingsManagement() {
   return (
     <div className="bk-root">
 
-      {/* ── Page header ── */}
       <div className="inv-top">
         <div>
           <h2 className="inv-title">Bookings Management</h2>
@@ -925,7 +1395,12 @@ export default function BookingsManagement() {
             <Clock size={14} />
             <span>{fmtHours()}</span>
           </div>
-          <button className="inv-icon-btn" onClick={handleRefresh} disabled={refreshing} title="Refresh">
+          <button 
+            className="inv-icon-btn" 
+            onClick={handleRefresh} 
+            disabled={refreshing} 
+            title="Refresh now"
+          >
             <RefreshCw size={16} className={refreshing ? 'inv-spinner-inline' : ''} />
           </button>
           <button className="inv-btn-primary" onClick={() => setShowSettings(true)}>
@@ -934,7 +1409,6 @@ export default function BookingsManagement() {
         </div>
       </div>
 
-      {/* ── Stat cards ── */}
       <div className="inv-stats">
         {[
           { label: 'Pending',      value: stats.pending,    icon: Clock,        color: '#b45309' },
@@ -952,7 +1426,6 @@ export default function BookingsManagement() {
         ))}
       </div>
 
-      {/* Past-fitting attention banner */}
       {stats.pastFitting > 0 && (
         <div className="bk-alert-banner">
           <AlertTriangle size={15} />
@@ -969,7 +1442,6 @@ export default function BookingsManagement() {
         </div>
       )}
 
-      {/* ── Tabs ── */}
       <div className="inv-tabs">
         <button className={`inv-tab ${viewTab === 'active' ? 'active' : ''}`} onClick={() => setViewTab('active')}>
           <PackageCheck size={14} /> Active Bookings
@@ -979,14 +1451,13 @@ export default function BookingsManagement() {
         </button>
       </div>
 
-      {/* ── Toolbar ── */}
       <div className="inv-card" style={{ padding: '1rem 1.25rem' }}>
-        <div className="inv-toolbar" style={{ marginBottom: 0 }}>
+        <div className="inv-toolbar" style={{ marginBottom: 0, flexWrap: 'wrap', gap: '0.75rem' }}>
           <div className="inv-search-wrap">
             <Search size={13} className="inv-search-icon" />
             <input
               className="inv-search"
-              placeholder="Search customer, item, or ID…"
+              placeholder="Search customer, email, item, or ID…"
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
@@ -1014,14 +1485,80 @@ export default function BookingsManagement() {
                 </>
               )}
             </select>
+            <button 
+              className={`inv-icon-btn ${showAdvancedFilters ? 'active' : ''}`}
+              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+              title="Advanced Filters"
+            >
+              <Filter size={14} />
+              {showAdvancedFilters ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+            </button>
           </div>
           <div style={{ fontSize: '0.75rem', color: '#aaa', whiteSpace: 'nowrap', flexShrink: 0 }}>
             {allBookings.length} booking{allBookings.length !== 1 ? 's' : ''}
+            {selectedBookings.size > 0 && ` (${selectedBookings.size} selected)`}
           </div>
+          <button className="inv-btn-ghost" onClick={() => setShowExport(true)} disabled={allBookings.length === 0}>
+            <Download size={13} /> Export
+          </button>
         </div>
+        
+        {showAdvancedFilters && (
+          <div className="bk-advanced-filters">
+            <div className="bk-filter-group">
+              <label>Date Range</label>
+              <div className="bk-date-range">
+                <input type="date" value={dateRangeFilter.start} onChange={e => setDateRangeFilter(prev => ({ ...prev, start: e.target.value }))} />
+                <span>to</span>
+                <input type="date" value={dateRangeFilter.end} onChange={e => setDateRangeFilter(prev => ({ ...prev, end: e.target.value }))} />
+              </div>
+            </div>
+            <div className="bk-filter-group">
+              <label>Price Range (₱)</label>
+              <div className="bk-price-range">
+                <input type="number" placeholder="Min" value={priceRangeFilter.min} onChange={e => setPriceRangeFilter(prev => ({ ...prev, min: e.target.value }))} />
+                <span>to</span>
+                <input type="number" placeholder="Max" value={priceRangeFilter.max} onChange={e => setPriceRangeFilter(prev => ({ ...prev, max: e.target.value }))} />
+              </div>
+            </div>
+            <button 
+              className="inv-btn-sm" 
+              onClick={() => {
+                setDateRangeFilter({ start: '', end: '' });
+                setPriceRangeFilter({ min: '', max: '' });
+              }}
+            >
+              Clear Filters
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* ── List ── */}
+      {selectedBookings.size > 0 && (
+        <div className="bk-bulk-bar">
+          <div className="bk-bulk-info">
+            <CheckSquare size={14} />
+            <span>{selectedBookings.size} booking{selectedBookings.size !== 1 ? 's' : ''} selected</span>
+            <button className="inv-btn-sm ghost" onClick={() => setSelectedBookings(new Set())}>Clear</button>
+            <button className="inv-btn-sm ghost" onClick={toggleSelectAll}>
+              {selectedBookings.size === allBookings.length ? 'Deselect All' : 'Select All'}
+            </button>
+          </div>
+          <div className="bk-bulk-actions">
+            {getBulkActions().map(action => (
+              <button
+                key={action.action}
+                className="inv-btn-sm"
+                style={{ background: action.color }}
+                onClick={() => setBulkAction(action.action)}
+              >
+                {action.label} Selected
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="bk-list">
         {allBookings.length === 0 ? (
           <div className="inv-card" style={{ textAlign: 'center', padding: '3rem', color: '#ccc' }}>
@@ -1035,11 +1572,12 @@ export default function BookingsManagement() {
             isFitting={b._type === 'fitting'}
             onOpen={setDrawer}
             onAction={(booking, actionDef) => setActionModal({ booking, actionDef, isFitting: booking._type === 'fitting' })}
+            selected={selectedBookings.has(b.id)}
+            onSelect={toggleSelect}
           />
         ))}
       </div>
 
-      {/* ── Drawer ── */}
       {drawer && (
         <BookingDrawer
           booking={drawer}
@@ -1048,10 +1586,10 @@ export default function BookingsManagement() {
           onCancel={(id, isFit) => isFit ? cancelFitting(id) : cancelDirect(id)}
           onEditFitting={setEditFittingModal}
           onClose={() => setDrawer(null)}
+          workingHours={workingHours}
         />
       )}
 
-      {/* ── Action modal ── */}
       {actionModal && (
         <ActionModal
           booking={actionModal.booking}
@@ -1069,16 +1607,33 @@ export default function BookingsManagement() {
         />
       )}
 
-      {/* ── Edit fitting schedule modal ── */}
+      {bulkAction && (
+        <BulkActionModal
+          selectedCount={selectedBookings.size}
+          action={bulkAction}
+          onConfirm={async ({ note }) => {
+            let status;
+            switch (bulkAction) {
+              case 'Approve': status = 'Approved'; break;
+              case 'Cancel': status = 'Cancelled'; break;
+              case 'Reject': status = 'Rejected'; break;
+              default: return;
+            }
+            await bulkUpdateStatus(status, note);
+          }}
+          onClose={() => setBulkAction(null)}
+        />
+      )}
+
       {editFittingModal && (
         <EditFittingModal
           booking={editFittingModal}
           onSave={saveFittingSchedule}
           onClose={() => setEditFittingModal(null)}
+          workingHours={workingHours}
         />
       )}
 
-      {/* ── Settings modal ── */}
       {showSettings && (
         <SettingsModal
           settings={workingHours}
@@ -1089,6 +1644,14 @@ export default function BookingsManagement() {
             setShowSettings(false);
           }}
           onClose={() => setShowSettings(false)}
+        />
+      )}
+
+      {showExport && (
+        <ExportModal
+          bookings={allBookings}
+          onExport={handleExport}
+          onClose={() => setShowExport(false)}
         />
       )}
 
