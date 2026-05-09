@@ -89,11 +89,13 @@ public class BookingServiceImpl implements BookingService {
             return response;
         }
 
-        // Per-item uniqueness check: same item cannot be booked at the same date+time twice
+        // Per-item uniqueness check: same item cannot be booked at the same date+time
+        // twice
         boolean itemSlotTaken = bookingRepository.existsByItemIdAndFittingDateAndFittingTimeAndStatus(
                 request.getItemId(), request.getFittingDate(), request.getFittingTime(), "CONFIRMED");
         if (itemSlotTaken) {
-            log.warn("Item {} is already booked at {} {}", request.getItemId(), request.getFittingDate(), request.getFittingTime());
+            log.warn("Item {} is already booked at {} {}", request.getItemId(), request.getFittingDate(),
+                    request.getFittingTime());
             FittingBookingResponse response = new FittingBookingResponse();
             response.setBookingId(null);
             response.setStatus("FAILED");
@@ -183,6 +185,10 @@ public class BookingServiceImpl implements BookingService {
 
     // ── Availability ──────────────────────────────────────────────────────────
 
+    public long countBookingsForSlot(String fittingDate, String fittingTime) {
+        return bookingRepository.countConfirmedByFittingDateAndTime(fittingDate, fittingTime);
+    }
+
     public boolean checkAvailability(String fittingDate, String fittingTime, String excludeId) {
         long slotCount;
         if (excludeId != null && !excludeId.isEmpty()) {
@@ -266,6 +272,28 @@ public class BookingServiceImpl implements BookingService {
                 .orElseThrow(() -> new IllegalArgumentException("Booking not found"));
         booking.setStatus(status);
         return bookingRepository.save(booking);
+    }
+
+    @Transactional
+    public Booking rescheduleFitting(String bookingId, String fittingDate, String fittingTime) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new IllegalArgumentException("Booking not found"));
+        booking.setStatus("CONFIRMED");
+        booking.setFittingDate(fittingDate);
+        booking.setFittingTime(fittingTime);
+        return bookingRepository.save(booking);
+    }
+
+    // ── Resend email ──────────────────────────────────────────────────────────
+
+    @Override
+    public void resendFittingConfirmationEmail(String bookingId) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new IllegalArgumentException("Booking not found"));
+        emailService.sendFittingConfirmation(
+                booking.getCustomerEmail(), booking.getCustomerName(),
+                booking.getBookingId(), booking.getItemName(),
+                booking.getFittingDate(), booking.getFittingTime());
     }
 
     // ── Internal helpers ──────────────────────────────────────────────────────

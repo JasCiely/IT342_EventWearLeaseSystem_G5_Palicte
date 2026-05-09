@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, X, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { authFetch } from '../../../shared/services/apiClient.js';
 
 function FittingToLeaseModal({ booking, itemDetails, onConfirm, onClose }) {
   const [startDate, setStartDate] = useState('');
@@ -41,15 +42,7 @@ function FittingToLeaseModal({ booking, itemDetails, onConfirm, onClose }) {
     
     setCheckingAvailability(true);
     try {
-      const response = await fetch(
-        `http://localhost:8080/api/direct-bookings/availability?itemId=${booking.itemId}&startDate=${startDate}&endDate=${endDate}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('accessToken') || localStorage.getItem('token')}`,
-          },
-        }
-      );
-      const data = await response.json();
+      const data = await authFetch(`/direct-bookings/availability?itemId=${booking.itemId}&startDate=${startDate}&endDate=${endDate}`);
       if (!data.available) {
         setAvailabilityError('This item is not available for the selected dates');
         return false;
@@ -91,22 +84,10 @@ function FittingToLeaseModal({ booking, itemDetails, onConfirm, onClose }) {
         fittingBookingId: booking.id,
       };
       
-      const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
-      const response = await fetch('http://localhost:8080/api/direct-bookings', {
+      const result = await authFetch('/direct-bookings', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
         body: JSON.stringify(payload),
       });
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to create rental booking');
-      }
-      
-      const result = await response.json();
       onConfirm(result);
     } catch (error) {
       console.error('Error creating rental booking:', error);

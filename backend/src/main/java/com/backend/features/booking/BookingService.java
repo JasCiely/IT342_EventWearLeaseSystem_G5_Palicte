@@ -21,13 +21,19 @@ public interface BookingService {
 
     Booking updateFittingBookingStatus(String bookingId, String status);
 
+    Booking rescheduleFitting(String bookingId, String fittingDate, String fittingTime);
+
     Booking completeFittingWithoutLease(String bookingId);
 
     Booking markLeaseStartedFromFitting(String bookingId, String directBookingId);
 
     boolean checkAvailability(String fittingDate, String fittingTime, String excludeId);
 
+    long countBookingsForSlot(String fittingDate, String fittingTime);
+
     List<String> getAvailableTimeSlots(String fittingDate);
 
     List<String> getBookedFittingSlots(String itemId, String date);
+
+    void resendFittingConfirmationEmail(String bookingId);
 }

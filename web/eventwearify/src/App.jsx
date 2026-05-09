@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { API_BASE_URL_ROOT } from './shared/services/apiClient.js';
 import Index from './features/home/pages/Index';
 import Auth from './features/auth/pages/Auth';
 import ForgotPassword from './features/auth/pages/ForgotPassword';
@@ -67,7 +68,7 @@ function App() {
         console.log('Validating token...');
         
         // Try to validate token with a simple API call
-        const response = await fetch('http://localhost:8080/api/auth/validate-token', {
+        const response = await fetch(`${API_BASE_URL_ROOT}/auth/validate-token`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,

@@ -152,7 +152,8 @@ public class DirectBookingController {
         }
     }
 
-    // Returns date ranges blocked by other bookings — used by the admin extend date picker.
+    // Returns date ranges blocked by other bookings — used by the admin extend date
+    // picker.
     @GetMapping("/unavailable-dates")
     @PreAuthorize("hasRole('ADMIN') or hasRole('CUSTOMER')")
     public ResponseEntity<List<Map<String, String>>> getUnavailableDates(

@@ -25,6 +25,7 @@ import {
   getUnavailableDates,
 } from '../services/inventoryApi';
 import { fetchBookingSettings, saveBookingSettings, getDefaultSettings } from '../services/bookingSettingsApi';
+import { authFetch } from '../../../shared/services/apiClient.js';
 import FittingToLeaseModal from './FittingToLeaseModal';
 
 // ─── Status meta ────────────────────────────────────────────────────────────
@@ -713,17 +714,9 @@ function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, on
   const resendConfirmationEmail = async () => {
     setEmailSending(true);
     try {
-      const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
-      const res = await fetch(`http://localhost:8080/api/admin/bookings/${isFitting ? 'fitting' : 'direct'}/${booking.id}/resend-email`, {
-        method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      if (res.ok) {
-        setEmailStatus({ type: 'success', message: 'Confirmation email resent successfully' });
-        setTimeout(() => setEmailStatus(null), 3000);
-      } else {
-        throw new Error('Failed to resend');
-      }
+      await authFetch(`/admin/bookings/${isFitting ? 'fitting' : 'direct'}/${booking.id}/resend-email`, { method: 'POST' });
+      setEmailStatus({ type: 'success', message: 'Confirmation email resent successfully' });
+      setTimeout(() => setEmailStatus(null), 3000);
     } catch (e) {
       setEmailStatus({ type: 'error', message: 'Failed to resend email' });
       setTimeout(() => setEmailStatus(null), 3000);
@@ -1404,14 +1397,8 @@ export default function BookingsManagement() {
 
   const fetchItemForLease = useCallback(async (itemId) => {
     try {
-      const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
-      const response = await fetch(`http://localhost:8080/api/inventory/items/${itemId}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      if (response.ok) {
-        const item = await response.json();
-        setItemDetailsForLease(item);
-      }
+      const item = await authFetch(`/inventory/items/${itemId}`);
+      setItemDetailsForLease(item);
     } catch (error) {
       console.error('Error fetching item details:', error);
     }
@@ -1638,10 +1625,8 @@ export default function BookingsManagement() {
 
   const handleLeaseConfirm = useCallback(async (result) => {
     try {
-      const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
-      await fetch(`http://localhost:8080/api/admin/bookings/fitting/${leaseModal.id}/lease-started`, {
+      await authFetch(`/admin/bookings/fitting/${leaseModal.id}/lease-started`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ directBookingId: result.id }),
       });
       setFittingBookings(prev => prev.map(b =>

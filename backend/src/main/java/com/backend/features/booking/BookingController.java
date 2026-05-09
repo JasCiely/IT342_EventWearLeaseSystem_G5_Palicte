@@ -76,12 +76,7 @@ public class BookingController {
             @RequestParam String date,
             @RequestParam String time) {
         boolean available = bookingService.checkAvailability(date, time, null);
-        long bookedCount = 0;
-        try {
-            bookedCount = bookingService.getBookingsByEmail("").size(); // This needs proper implementation
-        } catch (Exception e) {
-            // Fallback
-        }
+        long bookedCount = bookingService.countBookingsForSlot(date, time);
         return ResponseEntity.ok(new FittingAvailabilityResponse(
                 available, (int) bookedCount, 5,
                 available ? "Slot available" : "This time slot is fully booked"));
@@ -129,6 +124,26 @@ public class BookingController {
         }
     }
 
+    @PutMapping("/admin/bookings/fitting/{bookingId}/lease-started")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> markLeaseStarted(
+            @PathVariable String bookingId,
+            @RequestBody Map<String, String> body) {
+        try {
+            String directBookingId = body.get("directBookingId");
+            Booking booking = bookingService.markLeaseStartedFromFitting(bookingId, directBookingId);
+            Map<String, Object> response = new HashMap<>();
+            response.put("id", booking.getId());
+            response.put("status", booking.getStatus());
+            response.put("leaseStarted", booking.isLeaseStarted());
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
     @PutMapping("/admin/bookings/fitting/{bookingId}/complete-no-lease")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> completeFittingWithoutLease(@PathVariable String bookingId) {
@@ -159,12 +174,8 @@ public class BookingController {
                 return ResponseEntity.badRequest().body(Map.of("error", "This time slot is fully booked"));
             }
 
-            Booking booking = bookingService.updateFittingBookingStatus(bookingId, "CONFIRMED");
-            booking.setFittingDate(request.getFittingDate());
-            booking.setFittingTime(request.getFittingTime());
-            booking = bookingService.updateFittingBookingStatus(bookingId, booking.getStatus());
+            bookingService.rescheduleFitting(bookingId, request.getFittingDate(), request.getFittingTime());
 
-            // Update directly via repository would be better, but for now return success
             Map<String, Object> response = new HashMap<>();
             response.put("id", bookingId);
             response.put("fittingDate", request.getFittingDate());
@@ -188,6 +199,17 @@ public class BookingController {
                 available ? "Slot available" : "This time slot is fully booked"));
     }
 
+    // ── Direct Booking: Occupied Dates (customer-facing) ──────
+
+    @GetMapping("/bookings/direct/occupied-dates")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Map<String, Object>> getOccupiedDirectDates(@RequestParam String itemId) {
+        List<Map<String, String>> ranges = directBookingService.getUnavailableDateRanges(itemId, null);
+        Map<String, Object> response = new HashMap<>();
+        response.put("occupiedRanges", ranges);
+        return ResponseEntity.ok(response);
+    }
+
     // ── Admin: Direct Bookings ─────────────────────────────────
 
     @GetMapping("/admin/bookings/direct")
@@ -197,6 +219,28 @@ public class BookingController {
             @RequestParam(defaultValue = "20") int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
         return ResponseEntity.ok(directBookingService.getAllBookings(pageable));
+    }
+
+    @PostMapping("/admin/bookings/fitting/{bookingId}/resend-email")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> resendFittingEmail(@PathVariable String bookingId) {
+        try {
+            bookingService.resendFittingConfirmationEmail(bookingId);
+            return ResponseEntity.ok(Map.of("message", "Email resent successfully"));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @PostMapping("/admin/bookings/direct/{bookingId}/resend-email")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> resendDirectBookingEmail(@PathVariable String bookingId) {
+        try {
+            directBookingService.resendDirectBookingConfirmationEmail(bookingId);
+            return ResponseEntity.ok(Map.of("message", "Email resent successfully"));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     @PutMapping("/admin/bookings/direct/{bookingId}/status")

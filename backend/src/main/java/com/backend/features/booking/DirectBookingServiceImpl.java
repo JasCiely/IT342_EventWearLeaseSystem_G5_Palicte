@@ -247,6 +247,17 @@ public class DirectBookingServiceImpl implements DirectBookingService {
         }
     }
 
+    @Override
+    public void resendDirectBookingConfirmationEmail(String bookingId) {
+        DirectBooking booking = directBookingRepository.findById(bookingId)
+                .orElseThrow(() -> new IllegalArgumentException("Booking not found"));
+        emailService.sendDirectBookingConfirmation(
+                booking.getCustomerEmail(), booking.getCustomerName(),
+                booking.getId(), booking.getItemName(),
+                booking.getStartDate().toString(), booking.getEndDate().toString(),
+                booking.getTotalDays(), booking.getFinalPrice());
+    }
+
     private DirectBookingResponse mapToResponse(DirectBooking booking) {
         DirectBookingResponse response = new DirectBookingResponse();
         response.setId(booking.getId());

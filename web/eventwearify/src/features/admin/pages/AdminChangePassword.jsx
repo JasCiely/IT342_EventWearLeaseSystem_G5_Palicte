@@ -12,8 +12,9 @@ import {
   Info,
 } from 'lucide-react';
 import logo from '../../../assets/logo.png';
+import { API_BASE_URL_ROOT } from '../../../shared/services/apiClient.js';
 
-const API_BASE_URL = 'http://localhost:8080/api/auth';
+const API_BASE_URL = `${API_BASE_URL_ROOT}/auth`;
 
 const AdminChangePassword = () => {
   const navigate = useNavigate();

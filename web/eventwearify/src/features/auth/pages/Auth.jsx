@@ -13,8 +13,9 @@ import {
   CheckCircle,
 } from 'lucide-react';
 import logo from '../../../assets/logo.png';
+import { API_BASE_URL_ROOT } from '../../../shared/services/apiClient.js';
 
-const API_BASE_URL = 'http://localhost:8080/api/auth';
+const API_BASE_URL = `${API_BASE_URL_ROOT}/auth`;
 
 // ── Security: Whitelist allowed error parameters ──
 const ALLOWED_OAUTH_ERRORS = ['not_registered', 'oauth_failed', 'cancelled', 'access_denied'];
@@ -139,8 +140,8 @@ const Auth = ({ onLogin }) => {
     sessionStorage.setItem('oauthStartTime', Date.now().toString());
     
     window.location.href = isLogin
-      ? 'http://localhost:8080/oauth2/authorization/google'
-      : 'http://localhost:8080/oauth2/authorization/google-register';
+      ? `${API_BASE_URL_ROOT.replace('/api', '')}/oauth2/authorization/google`
+      : `${API_BASE_URL_ROOT.replace('/api', '')}/oauth2/authorization/google-register`;
   };
 
   const validateForm = () => {

@@ -38,17 +38,18 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
 
         // Check if user has completed fitting for an item
         @Query("SELECT COUNT(b) > 0 FROM Booking b WHERE b.itemId = :itemId AND b.customerEmail = :email AND b.status = 'COMPLETED'")
-        boolean existsCompletedFittingByItemAndCustomer(@Param("itemId") String itemId, @Param("email") String email,
-                        @Param("customerEmail") String customerEmail);
+        boolean existsCompletedFittingByItemAndCustomer(@Param("itemId") String itemId, @Param("email") String email);
 
         // Get all available time slots for a date (not fully booked)
         @Query("SELECT DISTINCT b.fittingTime FROM Booking b WHERE b.fittingDate = :fittingDate AND b.status = 'CONFIRMED' GROUP BY b.fittingTime HAVING COUNT(b) < :maxSlots")
         List<String> findAvailableTimeSlots(@Param("fittingDate") String fittingDate, @Param("maxSlots") int maxSlots);
 
         @Query("SELECT b.fittingTime FROM Booking b WHERE b.itemId = :itemId AND b.fittingDate = :fittingDate AND b.status = 'CONFIRMED'")
-        List<String> findBookedTimesByItemAndDate(@Param("itemId") String itemId, @Param("fittingDate") String fittingDate);
+        List<String> findBookedTimesByItemAndDate(@Param("itemId") String itemId,
+                        @Param("fittingDate") String fittingDate);
 
-        boolean existsByItemIdAndFittingDateAndFittingTimeAndStatus(String itemId, String fittingDate, String fittingTime, String status);
+        boolean existsByItemIdAndFittingDateAndFittingTimeAndStatus(String itemId, String fittingDate,
+                        String fittingTime, String status);
 
         @Modifying
         @Query("UPDATE Booking b SET b.leaseStarted = true, b.leaseBookingId = :leaseBookingId WHERE b.id = :bookingId")

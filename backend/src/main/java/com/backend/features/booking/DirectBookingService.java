@@ -35,4 +35,6 @@ public interface DirectBookingService {
 
     // Called by the scheduler: transitions Approved bookings whose startDate <= today to Active Lease.
     void activateDueLeases();
+
+    void resendDirectBookingConfirmationEmail(String bookingId);
 }

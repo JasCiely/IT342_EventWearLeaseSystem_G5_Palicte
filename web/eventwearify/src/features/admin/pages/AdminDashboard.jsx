@@ -19,8 +19,9 @@ import {
 } from 'lucide-react';
 import '../styles/AdminDashboardHeader.css';
 import '../styles/AdminDashboard.css';
+import { API_BASE_URL_ROOT } from '../../../shared/services/apiClient.js';
 
-const API_BASE_URL = 'http://localhost:8080/api/auth';
+const API_BASE_URL = `${API_BASE_URL_ROOT}/auth`;
 
 const NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/admin/dashboard' },
