@@ -30,11 +30,15 @@ public interface DirectBookingService {
     DirectBookingResponse extendLease(String bookingId, LocalDate newEndDate);
 
     // Returns date ranges blocked by other bookings for the same item.
-    // excludeBookingId is the current booking being extended (so it doesn't block itself).
+    // excludeBookingId is the current booking being extended (so it doesn't block
+    // itself).
     List<Map<String, String>> getUnavailableDateRanges(String itemId, String excludeBookingId);
 
-    // Called by the scheduler: transitions Approved bookings whose startDate <= today to Active Lease.
+    // Called by the scheduler: transitions Approved bookings whose startDate <=
+    // today to Active Lease.
     void activateDueLeases();
 
     void resendDirectBookingConfirmationEmail(String bookingId);
+
+    List<DirectBookingResponse> getAllUserBookingsList(String userId);
 }
