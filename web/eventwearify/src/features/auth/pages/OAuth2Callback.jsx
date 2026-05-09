@@ -23,26 +23,34 @@ const OAuth2Callback = ({ onLogin }) => {
     const role      = params.get('role');
 
     if (!token) {
-      window.location.replace('/auth');
+      console.error('No token received from OAuth callback');
+      window.location.replace('/auth?error=oauth_failed');
       return;
     }
 
-    // Write to localStorage first
-    localStorage.setItem('token',           token);
+    console.log('OAuth callback - storing token and user data');
+
+    // Clear any old data first
+    localStorage.clear();
+    sessionStorage.clear();
+
+    // Write to localStorage
+    localStorage.setItem('token', token);
     localStorage.setItem('isAuthenticated', 'true');
-    localStorage.setItem('userEmail',       email);
-    localStorage.setItem('firstName',       firstName);
-    localStorage.setItem('lastName',        lastName);
-    localStorage.setItem('userRole',        role);
+    localStorage.setItem('userEmail', email || '');
+    localStorage.setItem('firstName', firstName || '');
+    localStorage.setItem('lastName', lastName || '');
+    localStorage.setItem('userRole', role || 'CUSTOMER');
 
     if (onLogin) onLogin();
     sessionStorage.setItem('showLoginSuccess', 'true');
 
     // Full page reload — guarantees route guards re-read localStorage fresh
-    const destination = role === 'ADMIN' ? '/admin/dashboard' : '/dashboard';
+    const destination = role === 'ADMIN' ? '/admin/dashboard' : '/customer/dashboard';
+    console.log('Redirecting to:', destination);
     window.location.replace(destination);
 
-  }, []);
+  }, [onLogin]);
 
   return (
     <div style={{
@@ -56,7 +64,7 @@ const OAuth2Callback = ({ onLogin }) => {
         <svg width="48" height="48" viewBox="0 0 48 48"
           style={{ display: 'block', margin: '0 auto 16px' }}>
           <circle cx="24" cy="24" r="20" fill="none" stroke="#e0e0e0" strokeWidth="3"/>
-          <circle cx="24" cy="24" r="20" fill="none" stroke="#4285F4" strokeWidth="3"
+          <circle cx="24" cy="24" r="20" fill="none" stroke="#c4717f" strokeWidth="3"
             strokeDasharray="126" strokeDashoffset="96"
             style={{ animation: 'spin 0.9s linear infinite', transformOrigin: 'center' }}/>
         </svg>

@@ -255,6 +255,7 @@ function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, c
     try {
       const result = await createDirectBooking({
         itemId:         item.id,
+        itemName:       item.name,
         startDate:      form.startDate,
         endDate:        form.endDate,
         totalDays:      pricing.totalDays,

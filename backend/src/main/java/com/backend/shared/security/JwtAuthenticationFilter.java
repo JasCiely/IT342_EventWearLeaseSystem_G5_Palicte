@@ -17,6 +17,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.regex.Pattern;
 
 @Slf4j
 @Component
@@ -32,10 +33,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             "/api/auth/login",
             "/api/auth/register");
 
-    // Public GET endpoints for inventory
-    private static final List<String> PUBLIC_GET_PATHS = List.of(
-            "/api/inventory/items",
-            "/api/inventory/promotions");
+    // Public GET endpoints for inventory (including single item by ID)
+    private static final List<Pattern> PUBLIC_GET_PATTERNS = List.of(
+            Pattern.compile("^/api/inventory/items$"),
+            Pattern.compile("^/api/inventory/items/\\d+$"), // Allow /api/inventory/items/{id}
+            Pattern.compile("^/api/inventory/promotions$"));
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
@@ -48,8 +50,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         // Skip public GET endpoints for inventory
-        if (method.equals("GET") && PUBLIC_GET_PATHS.stream().anyMatch(path::startsWith)) {
-            return true;
+        if (method.equals("GET")) {
+            for (Pattern pattern : PUBLIC_GET_PATTERNS) {
+                if (pattern.matcher(path).matches()) {
+                    return true;
+                }
+            }
         }
 
         return false;

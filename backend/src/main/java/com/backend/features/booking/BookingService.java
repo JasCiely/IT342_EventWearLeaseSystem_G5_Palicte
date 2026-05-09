@@ -20,4 +20,12 @@ public interface BookingService {
     Page<Booking> getAllFittingBookings(Pageable pageable);
 
     Booking updateFittingBookingStatus(String bookingId, String status);
+
+    Booking completeFittingWithoutLease(String bookingId);
+
+    Booking markLeaseStartedFromFitting(String bookingId, String directBookingId);
+
+    boolean checkAvailability(String fittingDate, String fittingTime, String excludeId);
+
+    List<String> getAvailableTimeSlots(String fittingDate);
 }

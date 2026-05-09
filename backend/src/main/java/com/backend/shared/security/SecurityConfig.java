@@ -57,7 +57,8 @@ public class SecurityConfig {
                         .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
 
                         // Public inventory reads
-                        .requestMatchers(HttpMethod.GET, "/api/inventory/items", "/api/inventory/promotions")
+                        .requestMatchers(HttpMethod.GET, "/api/inventory/items", "/api/inventory/items/**",
+                                "/api/inventory/promotions")
                         .permitAll()
 
                         // Direct bookings — customers can create/view their own; admins manage all

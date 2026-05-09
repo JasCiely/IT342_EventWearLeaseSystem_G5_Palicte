@@ -2,63 +2,72 @@ package com.backend.shared.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "bookings")
 @Data
-@NoArgsConstructor
-@AllArgsConstructor
 public class Booking {
-
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
 
-    @Column(nullable = false, unique = true)
+    @Column(name = "booking_id", unique = true, nullable = false)
     private String bookingId;
 
-    @Column(nullable = false)
+    @Column(name = "item_id", nullable = false)
     private String itemId;
 
-    @Column(nullable = false)
+    @Column(name = "item_name", nullable = false)
     private String itemName;
 
-    @Column(nullable = false)
-    private String fittingDate; // Keep as String, not Date
+    @Column(name = "fitting_date")
+    private String fittingDate;
 
-    @Column(nullable = false)
+    @Column(name = "fitting_time")
     private String fittingTime;
 
-    @Column(nullable = false)
+    @Column(name = "customer_name", nullable = false)
     private String customerName;
 
-    @Column(nullable = false)
+    @Column(name = "customer_email", nullable = false)
     private String customerEmail;
 
-    @Column(nullable = false)
+    @Column(name = "customer_phone")
     private String customerPhone;
 
+    @Column(name = "preferred_size")
     private String preferredSize;
 
-    @Column(length = 500)
+    @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
 
+    @Column(name = "user_id")
     private Long userId;
 
-    @Column(nullable = false)
-    private String status = "CONFIRMED";
+    @Column(name = "status", nullable = false)
+    private String status;
+
+    @Column(name = "lease_started", nullable = false)
+    private boolean leaseStarted = false;
+
+    @Column(name = "lease_booking_id")
+    private String leaseBookingId;
 
     @CreationTimestamp
+    @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
+    @UpdateTimestamp
+    @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
+    @PrePersist
+    public void generateId() {
+        if (id == null || id.isEmpty()) {
+            id = java.util.UUID.randomUUID().toString();
+        }
     }
 }

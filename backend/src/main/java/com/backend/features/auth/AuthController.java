@@ -13,6 +13,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -27,6 +29,7 @@ public class AuthController {
     private final AuthService authService;
     private final JwtService jwtService;
     private final TokenBlacklistService tokenBlacklistService;
+    private final UserDetailsService userDetailsService;
 
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
@@ -88,6 +91,49 @@ public class AuthController {
         }
 
         return ResponseEntity.ok(Map.of("message", "Logged out successfully"));
+    }
+
+    // ── Token Validation Endpoint ──────────────────────────────────────────────
+    @PostMapping("/validate-token")
+    public ResponseEntity<Map<String, Object>> validateToken(
+            @RequestHeader(value = "Authorization", required = false) String authHeader) {
+        try {
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                log.warn("Token validation failed: No token provided");
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("valid", false, "message", "No token provided"));
+            }
+
+            String token = authHeader.substring(7); // Remove "Bearer "
+
+            // Check if token is blacklisted
+            if (tokenBlacklistService.isBlacklisted(token)) {
+                log.warn("Token validation failed: Token has been revoked");
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("valid", false, "message", "Token has been revoked"));
+            }
+
+            // Validate token
+            String email = jwtService.extractUsername(token);
+            if (email != null) {
+                UserDetails userDetails = userDetailsService.loadUserByUsername(email);
+                if (jwtService.isTokenValid(token, userDetails)) {
+                    log.info("Token validated successfully for user: {}", email);
+                    return ResponseEntity.ok(Map.of(
+                            "valid", true,
+                            "email", email));
+                }
+            }
+
+            log.warn("Token validation failed: Invalid token");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("valid", false, "message", "Invalid token"));
+
+        } catch (Exception e) {
+            log.error("Token validation error: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("valid", false, "message", "Token validation failed: " + e.getMessage()));
+        }
     }
 
     // ── Forgot Password Endpoints ──────────────────────────────────────────────

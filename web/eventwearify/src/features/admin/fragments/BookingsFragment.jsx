@@ -15,8 +15,13 @@ import {
   getAllDirectBookings,
   updateFittingBookingStatus,
   updateDirectBookingStatus,
-  fetchItemById
+  fetchItemById,
+  completeFittingWithoutLease,
+  rescheduleFitting,
+  checkFittingAvailability,
+  getAvailableTimeSlots
 } from '../services/inventoryApi';
+import FittingToLeaseModal from './FittingToLeaseModal';
 
 // ─── Status meta ────────────────────────────────────────────────────────────
 
@@ -29,6 +34,7 @@ const BOOKING_STATUS_META = {
   'Completed':    { color: '#1d4ed8', bg: 'rgba(29,78,216,0.1)',   dot: '#3b82f6', label: 'Completed' },
   'Active Lease': { color: '#7c3aed', bg: 'rgba(124,58,237,0.1)', dot: '#8b5cf6', label: 'Active Lease' },
   'Returned':     { color: '#0e7490', bg: 'rgba(14,116,144,0.1)', dot: '#06b6d4', label: 'Returned' },
+  'LEASE_CONVERTED': { color: '#7c3aed', bg: 'rgba(124,58,237,0.1)', dot: '#8b5cf6', label: 'Lease Converted' },
 };
 
 const FITTING_FLOW_STEPS = ['Pending', 'Approved', 'Completed'];
@@ -39,14 +45,14 @@ const FITTING_NEXT_ACTIONS = {
 
 const DIRECT_FLOW_STEPS = ['Pending', 'Approved', 'Active Lease', 'Returned', 'Completed'];
 const DIRECT_NEXT_ACTIONS = {
-  'Pending':      { label: 'Approve Booking',  icon: CheckCircle, next: 'Approved',     color: '#15803d' },
-  'Approved':     { label: 'Start Lease',       icon: PackageCheck, next: 'Active Lease', color: '#b45309' },
-  'Active Lease': { label: 'Mark Returned',     icon: RotateCcw,   next: 'Returned',     color: '#7c3aed' },
-  'Returned':     { label: 'Complete',          icon: Star,        next: 'Completed',    color: '#15803d' },
+  'Pending':      { label: 'Approve Booking',  icon: CheckCircle,  next: 'Approved',     color: '#15803d' },
+  'Approved':     { label: 'Start Lease',      icon: PackageCheck, next: 'Active Lease', color: '#b45309' },
+  'Active Lease': { label: 'Mark Returned',    icon: RotateCcw,    next: 'Returned',     color: '#7c3aed' },
+  'Returned':     { label: 'Complete',         icon: Star,         next: 'Completed',    color: '#15803d' },
 };
 
 const CANCELLABLE = ['Pending', 'Approved'];
-const TERMINAL    = ['Completed', 'Cancelled', 'Rejected'];
+const TERMINAL    = ['Completed', 'Cancelled', 'Rejected', 'LEASE_CONVERTED'];
 
 const DEFAULT_WORKING_HOURS = {
   enabled: true,
@@ -206,6 +212,49 @@ function ActionModal({ booking, actionDef, onConfirm, onClose }) {
   );
 }
 
+// ─── NoLeaseConfirmModal ─────────────────────────────────────────────────────
+
+function NoLeaseConfirmModal({ booking, onConfirm, onClose }) {
+  const [submitting, setSubmitting] = useState(false);
+
+  return (
+    <div className="inv-overlay" onClick={onClose}>
+      <div className="inv-modal inv-modal-sm" onClick={e => e.stopPropagation()}>
+        <div className="inv-modal-header">
+          <h3>Complete Fitting Without Rental</h3>
+          <button className="inv-modal-close" onClick={onClose}><X size={15} /></button>
+        </div>
+        <div className="inv-modal-body">
+          <div className="bk-action-context">
+            <div className="bk-action-customer">{booking.customerName}</div>
+            <div className="bk-action-item">{booking.itemName}</div>
+          </div>
+          <div className="bk-warning-message" style={{ padding: '0.75rem', background: 'rgba(180,83,9,0.1)', borderRadius: '8px', color: '#b45309' }}>
+            <AlertTriangle size={14} style={{ display: 'inline', marginRight: '8px' }} />
+            This will mark the fitting as completed without creating a rental booking.
+          </div>
+        </div>
+        <div className="inv-modal-footer">
+          <button className="inv-btn-ghost" onClick={onClose} disabled={submitting}>Cancel</button>
+          <button
+            className="inv-btn-primary"
+            style={{ background: '#1d4ed8' }}
+            onClick={async () => {
+              setSubmitting(true);
+              await onConfirm();
+              setSubmitting(false);
+            }}
+            disabled={submitting}
+          >
+            {submitting ? <Loader2 size={13} className="inv-spinner-inline" /> : <CheckCircle size={13} />}
+            Confirm Completion
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── BulkActionModal ─────────────────────────────────────────────────────────
 
 function BulkActionModal({ selectedCount, action, onConfirm, onClose }) {
@@ -224,8 +273,8 @@ function BulkActionModal({ selectedCount, action, onConfirm, onClose }) {
 
   const actionConfig = {
     'Approve': { icon: CheckCircle, color: '#15803d', label: `Approve ${selectedCount} booking${selectedCount > 1 ? 's' : ''}` },
-    'Cancel': { icon: XCircle, color: '#991b1b', label: `Cancel ${selectedCount} booking${selectedCount > 1 ? 's' : ''}` },
-    'Reject': { icon: AlertCircle, color: '#b45309', label: `Reject ${selectedCount} booking${selectedCount > 1 ? 's' : ''}` },
+    'Cancel':  { icon: XCircle,     color: '#991b1b', label: `Cancel ${selectedCount} booking${selectedCount > 1 ? 's' : ''}` },
+    'Reject':  { icon: AlertCircle, color: '#b45309', label: `Reject ${selectedCount} booking${selectedCount > 1 ? 's' : ''}` },
   };
 
   const config = actionConfig[action];
@@ -281,83 +330,76 @@ function EditFittingModal({ booking, onSave, onClose, workingHours }) {
   const [time, setTime] = useState(booking.fittingTime || '');
   const [saving, setSaving] = useState(false);
   const [availabilityError, setAvailabilityError] = useState('');
+  const [availableSlots, setAvailableSlots] = useState([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
 
   const isWorkingHour = useCallback((dateStr, timeStr) => {
     if (!workingHours?.enabled) return { valid: true };
-    
     const dt = new Date(`${dateStr}T${timeStr}`);
     const hour = dt.getHours();
     const dayOfWeek = dt.getDay();
-    
     if (!workingHours.workingDays?.includes(dayOfWeek)) {
       return { valid: false, message: 'Selected day is not a working day' };
     }
-    
     if (hour < workingHours.startHour || hour >= workingHours.endHour) {
       return { valid: false, message: `Selected time is outside working hours (${workingHours.startHour}:00 - ${workingHours.endHour}:00)` };
     }
-    
     return { valid: true };
   }, [workingHours]);
 
-  const checkAvailability = async (dateStr, timeStr) => {
+  const loadAvailableSlots = async (selectedDate) => {
+    if (!selectedDate) return;
+    setLoadingSlots(true);
     try {
-      const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
-      const res = await fetch(`http://localhost:8080/api/admin/bookings/fitting/${booking.id}/check-availability?date=${dateStr}&time=${timeStr}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      const data = await res.json();
-      return data.available;
-    } catch (e) {
-      console.error('Availability check failed:', e);
-      return true;
+      const slots = await getAvailableTimeSlots(selectedDate);
+      setAvailableSlots(slots || []);
+    } catch (error) {
+      console.error('Failed to load available slots:', error);
+      setAvailableSlots([]);
+    } finally {
+      setLoadingSlots(false);
     }
-  };
-
-  const validateSchedule = async (dateStr, timeStr) => {
-    const workingHourCheck = isWorkingHour(dateStr, timeStr);
-    if (!workingHourCheck.valid) {
-      setAvailabilityError(workingHourCheck.message);
-      return false;
-    }
-    
-    const isAvailable = await checkAvailability(dateStr, timeStr);
-    if (!isAvailable) {
-      setAvailabilityError('This time slot is fully booked. Please choose another time.');
-      return false;
-    }
-    
-    return true;
   };
 
   const handleDateChange = (e) => {
     const newDate = e.target.value;
     setDate(newDate);
     setAvailabilityError('');
-    if (newDate && time) {
-      validateSchedule(newDate, time);
-    }
+    setTime('');
+    if (newDate) loadAvailableSlots(newDate);
   };
 
   const handleTimeChange = (e) => {
     const newTime = e.target.value;
     setTime(newTime);
     setAvailabilityError('');
-    if (date && newTime) {
-      validateSchedule(date, newTime);
-    }
+    const workingHourCheck = isWorkingHour(date, newTime);
+    if (!workingHourCheck.valid) setAvailabilityError(workingHourCheck.message);
   };
 
   const handle = async () => {
     if (!date || !time) return;
-    
-    const isValid = await validateSchedule(date, time);
-    if (!isValid) return;
-    
+    const workingHourCheck = isWorkingHour(date, time);
+    if (!workingHourCheck.valid) return;
     setSaving(true);
     await onSave({ fittingDate: date, fittingTime: time });
     setSaving(false);
   };
+
+  const generateTimeSlots = () => {
+    const slots = [];
+    for (let hour = 9; hour <= 17; hour++) {
+      if (hour === 17) {
+        slots.push(`${hour.toString().padStart(2, '0')}:00`);
+      } else {
+        slots.push(`${hour.toString().padStart(2, '0')}:00`);
+        slots.push(`${hour.toString().padStart(2, '0')}:30`);
+      }
+    }
+    return slots;
+  };
+
+  const allTimeSlots = generateTimeSlots();
 
   return (
     <div className="inv-overlay" onClick={onClose}>
@@ -385,10 +427,23 @@ function EditFittingModal({ booking, onSave, onClose, workingHours }) {
             </div>
             <div className="inv-field">
               <label className="inv-field-label"><AlarmClock size={11} /> New Time</label>
-              <input
-                type="time" className="inv-input"
-                value={time} onChange={handleTimeChange}
-              />
+              <select
+                className="inv-select"
+                value={time}
+                onChange={handleTimeChange}
+                disabled={!date || loadingSlots}
+              >
+                <option value="">Select time</option>
+                {allTimeSlots.map(slot => {
+                  const isAvailable = availableSlots.includes(slot) || slot === booking.fittingTime;
+                  return (
+                    <option key={slot} value={slot} disabled={!isAvailable}>
+                      {slot} {!isAvailable && '(Full)'}
+                    </option>
+                  );
+                })}
+              </select>
+              {loadingSlots && <Loader2 size={12} className="inv-spinner-inline" style={{ marginTop: 4 }} />}
             </div>
           </div>
           {availabilityError && (
@@ -405,6 +460,10 @@ function EditFittingModal({ booking, onSave, onClose, workingHours }) {
               })}
             </div>
           )}
+          <div className="bk-info-note" style={{ marginTop: '0.5rem', fontSize: '0.7rem' }}>
+            <Clock size={12} />
+            Fitting sessions are 30 minutes long. Maximum 5 bookings per time slot.
+          </div>
         </div>
         <div className="inv-modal-footer">
           <button className="inv-btn-ghost" onClick={onClose} disabled={saving}>Cancel</button>
@@ -426,10 +485,8 @@ function EditFittingModal({ booking, onSave, onClose, workingHours }) {
 
 function MediaViewer({ file }) {
   if (!file) return null;
-  
   const isVideo = file.fileType?.startsWith('video/');
   const src = file.fileData ? `data:${file.fileType};base64,${file.fileData}` : file.url;
-  
   if (isVideo) {
     return (
       <video className="bk-media-player" controls>
@@ -437,13 +494,12 @@ function MediaViewer({ file }) {
       </video>
     );
   }
-  
   return <img src={src} alt="Item" className="bk-media-img" />;
 }
 
 // ─── BookingDrawer ────────────────────────────────────────────────────────────
 
-function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, isFitting, workingHours }) {
+function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, onCompleteNoLease, onProceedToLease, isFitting, workingHours }) {
   const [itemDetails, setItemDetails] = useState(null);
   const [loadingItem, setLoadingItem] = useState(false);
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
@@ -456,20 +512,31 @@ function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, is
   const canCancel = CANCELLABLE.includes(booking.status);
   const isTerminal = TERMINAL.includes(booking.status);
   const pastFitting = isFitting && isFittingPast(booking);
+  const hasLeaseStarted = booking.leaseStarted || booking.leaseBookingId;
+  const isCompletedWithoutLease = isFitting && booking.status === 'COMPLETED' && !hasLeaseStarted;
+  const canCompleteNoLease = isFitting && booking.status === 'CONFIRMED' && !hasLeaseStarted;
 
   useEffect(() => {
+    let cancelled = false;
     const load = async () => {
       const itemId = booking.itemId || booking.inventoryItemId;
       if (!itemId) return;
       setLoadingItem(true);
-      try { 
+      try {
         const item = await fetchItemById(itemId);
-        setItemDetails(item);
-        setCurrentMediaIndex(0);
-      } catch (e) { console.error(e); }
-      finally { setLoadingItem(false); }
+        if (!cancelled) {
+          setItemDetails(item);
+          setCurrentMediaIndex(0);
+        }
+      } catch (e) {
+        console.warn('Could not load item details:', e.message);
+        if (!cancelled) setItemDetails(null);
+      } finally {
+        if (!cancelled) setLoadingItem(false);
+      }
     };
     load();
+    return () => { cancelled = true; };
   }, [booking.itemId, booking.inventoryItemId]);
 
   const resendConfirmationEmail = async () => {
@@ -501,6 +568,11 @@ function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, is
   const nextMedia = () => setCurrentMediaIndex((prev) => (prev + 1) % mediaFiles.length);
   const prevMedia = () => setCurrentMediaIndex((prev) => (prev - 1 + mediaFiles.length) % mediaFiles.length);
 
+  // ── FIX: resolve display name — prefer booking.itemName, fall back to
+  //    itemDetails.name (fetched from inventory) for old records where
+  //    itemName was never saved to the booking row
+  const displayItemName = booking.itemName || itemDetails?.name || 'Unknown Item';
+
   return (
     <div className="bk-drawer-overlay" onClick={onClose}>
       <div className="bk-drawer" onClick={e => e.stopPropagation()}>
@@ -531,7 +603,7 @@ function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, is
         </div>
 
         <div className="bk-drawer-body">
-          
+
           {activeTab === 'details' && (
             <>
               {emailStatus && (
@@ -545,6 +617,13 @@ function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, is
                 <div className="bk-damage-warning" style={{ background: 'rgba(29,78,216,0.07)', borderColor: 'rgba(29,78,216,0.2)', color: '#1d4ed8' }}>
                   <AlertTriangle size={13} />
                   <span>This fitting appointment has passed. Mark it as Done or reschedule.</span>
+                </div>
+              )}
+
+              {hasLeaseStarted && (
+                <div className="bk-damage-warning" style={{ background: 'rgba(124,58,237,0.07)', borderColor: 'rgba(124,58,237,0.2)', color: '#7c3aed' }}>
+                  <PackageCheck size={13} />
+                  <span>Rental booking #{booking.leaseBookingId?.slice(-8)} has been created from this fitting.</span>
                 </div>
               )}
 
@@ -575,7 +654,11 @@ function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, is
                     )}
                   </div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 700, fontSize: '0.95rem', marginBottom: '0.3rem' }}>{booking.itemName}</div>
+                    {/* Uses displayItemName which falls back to itemDetails.name
+                        for old records that have empty itemName in the DB */}
+                    <div style={{ fontWeight: 700, fontSize: '0.95rem', marginBottom: '0.3rem' }}>
+                      {displayItemName}
+                    </div>
                     {itemDetails && (
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginBottom: '0.3rem' }}>
                         <span className="inv-cat-tag">{itemDetails.category}</span>
@@ -609,9 +692,9 @@ function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, is
                   {booking.customerEmail && (
                     <div className="bk-info-row">
                       <Mail size={12} /><span>{booking.customerEmail}</span>
-                      <button 
-                        className="bk-resend-email-btn" 
-                        onClick={resendConfirmationEmail} 
+                      <button
+                        className="bk-resend-email-btn"
+                        onClick={resendConfirmationEmail}
                         disabled={emailSending}
                         title="Resend confirmation email"
                       >
@@ -626,7 +709,7 @@ function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, is
                 <div className="bk-detail-section">
                   <div className="bk-section-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <span>Fitting Schedule</span>
-                    {!isTerminal && (
+                    {!isTerminal && !hasLeaseStarted && (
                       <button
                         className="inv-btn-sm outline"
                         style={{ fontSize: '0.68rem', padding: '0.2rem 0.6rem' }}
@@ -703,7 +786,7 @@ function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, is
         </div>
 
         <div className="bk-drawer-footer">
-          {canCancel && (
+          {canCancel && !hasLeaseStarted && (
             <button
               className="inv-btn-sm danger"
               onClick={() => onCancel(booking.id, isFitting)}
@@ -712,7 +795,28 @@ function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, is
             </button>
           )}
           <div style={{ flex: 1 }} />
-          {actionDef && !isTerminal && (
+
+          {canCompleteNoLease && (
+            <button
+              className="inv-btn-sm outline"
+              style={{ borderColor: '#1d4ed8', color: '#1d4ed8' }}
+              onClick={() => onCompleteNoLease(booking)}
+            >
+              <XCircle size={12} /> Did Not Proceed
+            </button>
+          )}
+
+          {isCompletedWithoutLease && (
+            <button
+              className="inv-btn-primary"
+              style={{ background: '#15803d' }}
+              onClick={() => onProceedToLease(booking)}
+            >
+              <PackageCheck size={13} /> Proceed to Rental <ChevronRight size={13} />
+            </button>
+          )}
+
+          {actionDef && !isTerminal && !hasLeaseStarted && (
             <button
               className="inv-btn-primary"
               style={{ background: actionDef.color }}
@@ -727,20 +831,120 @@ function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, is
   );
 }
 
-// ─── Toast ────────────────────────────────────────────────────────────────────
+// ─── BookingCard ──────────────────────────────────────────────────────────────
 
-function Toast({ toast, onClose }) {
-  useEffect(() => {
-    if (toast.show) {
-      const t = setTimeout(onClose, 4000);
-      return () => clearTimeout(t);
-    }
-  }, [toast.show, onClose]);
-  if (!toast.show) return null;
+function BookingCard({ booking, isFitting, onOpen, onAction, selected, onSelect }) {
+  const nextActions = isFitting ? FITTING_NEXT_ACTIONS : DIRECT_NEXT_ACTIONS;
+  const actionDef = nextActions[booking.status];
+  const isPast = isFitting && isFittingPast(booking) && booking.status === 'Approved';
+  const hasLeaseStarted = booking.leaseStarted || booking.leaseBookingId;
+  const isCompletedWithoutLease = isFitting && booking.status === 'COMPLETED' && !hasLeaseStarted;
+
   return (
-    <div className={`dashboard-toast ${toast.type}`}>
-      {toast.type === 'success' ? <CheckCircle size={15} /> : <AlertCircle size={15} />}
-      <span>{toast.message}</span>
+    <div className={`bk-card ${isPast ? 'bk-card--alert' : ''}`}>
+      <div className="bk-card-select" onClick={e => e.stopPropagation()}>
+        <button className="bk-checkbox-btn" onClick={() => onSelect(booking.id)}>
+          {selected ? <CheckSquare size={16} color="#c4717f" /> : <Square size={16} />}
+        </button>
+      </div>
+      <div className="bk-card-left" onClick={() => onOpen(booking)}>
+        <div className="bk-card-avatar">{booking.customerName?.charAt(0)?.toUpperCase() || 'U'}</div>
+        <div className="bk-card-info">
+          <div className="bk-card-customer">
+            {booking.customerName}
+            {isPast && (
+              <span className="bk-overdue-badge"><AlertTriangle size={9} /> Past Due</span>
+            )}
+            {isCompletedWithoutLease && (
+              <span className="bk-overdue-badge" style={{ background: 'rgba(29,78,216,0.1)', color: '#1d4ed8' }}>
+                <CheckCircle size={9} /> Fitting Done
+              </span>
+            )}
+            {hasLeaseStarted && (
+              <span className="bk-overdue-badge" style={{ background: 'rgba(124,58,237,0.1)', color: '#7c3aed' }}>
+                <PackageCheck size={9} /> Lease Created
+              </span>
+            )}
+          </div>
+          <div className="bk-card-item">{booking.itemName}</div>
+          <div className="bk-card-meta">
+            <span>
+              {isFitting
+                ? <><Calendar size={10} /> {booking.fittingDate} at {booking.fittingTime}</>
+                : <><Calendar size={10} /> {booking.startDate} — {booking.endDate}</>}
+            </span>
+            <span>
+              <span className="inv-badge-dot" style={{ background: isFitting ? '#c4717f' : '#3b82f6' }} />
+              {isFitting ? 'Fitting' : 'Rental'}
+            </span>
+          </div>
+        </div>
+      </div>
+      <div className="bk-card-right">
+        <StatusBadge status={booking.status} />
+        {(booking.finalPrice || booking.basePrice) ? (
+          <div className="bk-card-amount">₱{(booking.finalPrice || booking.basePrice || 0).toLocaleString()}</div>
+        ) : null}
+        {actionDef && !TERMINAL.includes(booking.status) && !hasLeaseStarted && (
+          <button
+            className="inv-btn-sm"
+            style={{ background: actionDef.color, fontSize: '0.7rem' }}
+            onClick={e => { e.stopPropagation(); onAction(booking, actionDef); }}
+          >
+            <actionDef.icon size={10} /> {actionDef.label}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── ExportModal ─────────────────────────────────────────────────────────────
+
+function ExportModal({ bookings, onClose, onExport }) {
+  const [format, setFormat] = useState('csv');
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = async () => {
+    setExporting(true);
+    await onExport(bookings, format);
+    setExporting(false);
+    onClose();
+  };
+
+  return (
+    <div className="inv-overlay" onClick={onClose}>
+      <div className="inv-modal inv-modal-sm" onClick={e => e.stopPropagation()}>
+        <div className="inv-modal-header">
+          <h3><Download size={15} style={{ marginRight: 6 }} />Export Bookings</h3>
+          <button className="inv-modal-close" onClick={onClose}><X size={15} /></button>
+        </div>
+        <div className="inv-modal-body">
+          <div className="inv-field">
+            <label className="inv-field-label">Export Format</label>
+            <div className="bk-export-options">
+              <label className="bk-radio-label">
+                <input type="radio" value="csv" checked={format === 'csv'} onChange={() => setFormat('csv')} />
+                <FileText size={14} /> CSV (.csv)
+              </label>
+              <label className="bk-radio-label">
+                <input type="radio" value="json" checked={format === 'json'} onChange={() => setFormat('json')} />
+                <FileText size={14} /> JSON (.json)
+              </label>
+            </div>
+          </div>
+          <div className="bk-export-summary">
+            Exporting {bookings.length} booking{bookings.length !== 1 ? 's' : ''}
+          </div>
+        </div>
+        <div className="inv-modal-footer">
+          <button className="inv-btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="inv-btn-primary" onClick={handleExport} disabled={exporting}>
+            {exporting ? <Loader2 size={13} className="inv-spinner-inline" /> : <Download size={13} />}
+            Export
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -868,108 +1072,20 @@ function SettingsModal({ settings, onSave, onClose }) {
   );
 }
 
-// ─── BookingCard ──────────────────────────────────────────────────────────────
+// ─── Toast ────────────────────────────────────────────────────────────────────
 
-function BookingCard({ booking, isFitting, onOpen, onAction, selected, onSelect }) {
-  const nextActions = isFitting ? FITTING_NEXT_ACTIONS : DIRECT_NEXT_ACTIONS;
-  const actionDef = nextActions[booking.status];
-  const isPast = isFitting && isFittingPast(booking) && booking.status === 'Approved';
-
+function Toast({ toast, onClose }) {
+  useEffect(() => {
+    if (toast.show) {
+      const t = setTimeout(onClose, 4000);
+      return () => clearTimeout(t);
+    }
+  }, [toast.show, onClose]);
+  if (!toast.show) return null;
   return (
-    <div className={`bk-card ${isPast ? 'bk-card--alert' : ''}`}>
-      <div className="bk-card-select" onClick={e => e.stopPropagation()}>
-        <button className="bk-checkbox-btn" onClick={() => onSelect(booking.id)}>
-          {selected ? <CheckSquare size={16} color="#c4717f" /> : <Square size={16} />}
-        </button>
-      </div>
-      <div className="bk-card-left" onClick={() => onOpen(booking)}>
-        <div className="bk-card-avatar">{booking.customerName?.charAt(0)?.toUpperCase() || 'U'}</div>
-        <div className="bk-card-info">
-          <div className="bk-card-customer">
-            {booking.customerName}
-            {isPast && (
-              <span className="bk-overdue-badge"><AlertTriangle size={9} /> Past Due</span>
-            )}
-          </div>
-          <div className="bk-card-item">{booking.itemName}</div>
-          <div className="bk-card-meta">
-            <span>
-              {isFitting
-                ? <><Calendar size={10} /> {booking.fittingDate} at {booking.fittingTime}</>
-                : <><Calendar size={10} /> {booking.startDate} — {booking.endDate}</>}
-            </span>
-            <span>
-              <span className="inv-badge-dot" style={{ background: isFitting ? '#c4717f' : '#3b82f6' }} />
-              {isFitting ? 'Fitting' : 'Rental'}
-            </span>
-          </div>
-        </div>
-      </div>
-      <div className="bk-card-right">
-        <StatusBadge status={booking.status} />
-        {(booking.finalPrice || booking.basePrice) ? (
-          <div className="bk-card-amount">₱{(booking.finalPrice || booking.basePrice || 0).toLocaleString()}</div>
-        ) : null}
-        {actionDef && !TERMINAL.includes(booking.status) && (
-          <button
-            className="inv-btn-sm"
-            style={{ background: actionDef.color, fontSize: '0.7rem' }}
-            onClick={e => { e.stopPropagation(); onAction(booking, actionDef); }}
-          >
-            <actionDef.icon size={10} /> {actionDef.label}
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─── ExportModal ─────────────────────────────────────────────────────────────
-
-function ExportModal({ bookings, onClose, onExport }) {
-  const [format, setFormat] = useState('csv');
-  const [exporting, setExporting] = useState(false);
-
-  const handleExport = async () => {
-    setExporting(true);
-    await onExport(bookings, format);
-    setExporting(false);
-    onClose();
-  };
-
-  return (
-    <div className="inv-overlay" onClick={onClose}>
-      <div className="inv-modal inv-modal-sm" onClick={e => e.stopPropagation()}>
-        <div className="inv-modal-header">
-          <h3><Download size={15} style={{ marginRight: 6 }} />Export Bookings</h3>
-          <button className="inv-modal-close" onClick={onClose}><X size={15} /></button>
-        </div>
-        <div className="inv-modal-body">
-          <div className="inv-field">
-            <label className="inv-field-label">Export Format</label>
-            <div className="bk-export-options">
-              <label className="bk-radio-label">
-                <input type="radio" value="csv" checked={format === 'csv'} onChange={() => setFormat('csv')} />
-                <FileText size={14} /> CSV (.csv)
-              </label>
-              <label className="bk-radio-label">
-                <input type="radio" value="json" checked={format === 'json'} onChange={() => setFormat('json')} />
-                <FileText size={14} /> JSON (.json)
-              </label>
-            </div>
-          </div>
-          <div className="bk-export-summary">
-            Exporting {bookings.length} booking{bookings.length !== 1 ? 's' : ''}
-          </div>
-        </div>
-        <div className="inv-modal-footer">
-          <button className="inv-btn-ghost" onClick={onClose}>Cancel</button>
-          <button className="inv-btn-primary" onClick={handleExport} disabled={exporting}>
-            {exporting ? <Loader2 size={13} className="inv-spinner-inline" /> : <Download size={13} />}
-            Export
-          </button>
-        </div>
-      </div>
+    <div className={`dashboard-toast ${toast.type}`}>
+      {toast.type === 'success' ? <CheckCircle size={15} /> : <AlertCircle size={15} />}
+      <span>{toast.message}</span>
     </div>
   );
 }
@@ -977,7 +1093,6 @@ function ExportModal({ bookings, onClose, onExport }) {
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function BookingsManagement() {
-  // State declarations
   const [fittingBookings, setFittingBookings] = useState([]);
   const [directBookings, setDirectBookings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -989,6 +1104,9 @@ export default function BookingsManagement() {
   const [drawer, setDrawer] = useState(null);
   const [actionModal, setActionModal] = useState(null);
   const [editFittingModal, setEditFittingModal] = useState(null);
+  const [noLeaseModal, setNoLeaseModal] = useState(null);
+  const [leaseModal, setLeaseModal] = useState(null);
+  const [itemDetailsForLease, setItemDetailsForLease] = useState(null);
   const [toast, setToast] = useState({ show: false, type: 'success', message: '' });
   const [showSettings, setShowSettings] = useState(false);
   const [showExport, setShowExport] = useState(false);
@@ -998,33 +1116,31 @@ export default function BookingsManagement() {
   const [dateRangeFilter, setDateRangeFilter] = useState({ start: '', end: '' });
   const [priceRangeFilter, setPriceRangeFilter] = useState({ min: '', max: '' });
   const [autoRefresh, setAutoRefresh] = useState(true);
-  
+
   const [workingHours, setWorkingHours] = useState(() => {
-    try { 
+    try {
       const saved = localStorage.getItem('bookingWorkingHours');
       return saved ? { ...DEFAULT_WORKING_HOURS, ...JSON.parse(saved) } : DEFAULT_WORKING_HOURS;
-    }
-    catch { return DEFAULT_WORKING_HOURS; }
+    } catch { return DEFAULT_WORKING_HOURS; }
   });
 
   const showToastMsg = useCallback((type, msg) => {
     setToast({ show: true, type, message: msg });
   }, []);
 
-  // Load Data
   const loadData = useCallback(async (showRefreshIndicator = false) => {
     if (showRefreshIndicator) setRefreshing(true);
     else setLoading(true);
-    
+
     try {
       const [fRes, dRes] = await Promise.all([
         getAllFittingBookings(0, 500),
         getAllDirectBookings(0, 500),
       ]);
-      
+
       let fitting = Array.isArray(fRes?.content) ? fRes.content : [];
       let direct = Array.isArray(dRes?.content) ? dRes.content : [];
-      
+
       let fittingUpdated = false;
       fitting = fitting.map(booking => {
         if (booking.status === 'Approved' && isFittingPast(booking)) {
@@ -1032,15 +1148,15 @@ export default function BookingsManagement() {
           updateFittingBookingStatus(booking.id, 'Completed').catch(console.error);
           return { ...booking, status: 'Completed', history: booking.history || [] };
         }
-        return { ...booking, history: booking.history || [] };
+        return { ...booking, history: booking.history || [], leaseStarted: booking.leaseStarted || false, leaseBookingId: booking.leaseBookingId };
       });
-      
+
       direct = direct.map(booking => ({ ...booking, history: booking.history || [] }));
-      
+
       if (fittingUpdated) {
         showToastMsg('success', `${fittingUpdated} past fitting${fittingUpdated > 1 ? 's were' : ' was'} auto-completed`);
       }
-      
+
       setFittingBookings(fitting);
       setDirectBookings(direct);
     } catch (e) {
@@ -1052,18 +1168,29 @@ export default function BookingsManagement() {
     }
   }, [showToastMsg]);
 
-  // Auto-refresh
   useEffect(() => {
     if (!autoRefresh) return;
-    const interval = setInterval(() => {
-      loadData(false);
-    }, 60000);
+    const interval = setInterval(() => { loadData(false); }, 60000);
     return () => clearInterval(interval);
   }, [autoRefresh, loadData]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  // Computed values
+  const fetchItemForLease = useCallback(async (itemId) => {
+    try {
+      const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+      const response = await fetch(`http://localhost:8080/api/inventory/items/${itemId}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (response.ok) {
+        const item = await response.json();
+        setItemDetailsForLease(item);
+      }
+    } catch (error) {
+      console.error('Error fetching item details:', error);
+    }
+  }, []);
+
   const allBookings = useMemo(() => {
     const fitting = fittingBookings.map(b => ({ ...b, _type: 'fitting', status: b.status }));
     const direct = directBookings.map(b => ({ ...b, _type: 'direct', status: b.bookingStatus }));
@@ -1085,7 +1212,7 @@ export default function BookingsManagement() {
     );
 
     if (filterStat !== 'All') combined = combined.filter(b => b.status === filterStat);
-    
+
     if (dateRangeFilter.start) {
       combined = combined.filter(b => {
         const date = b.fittingDate || b.startDate;
@@ -1098,14 +1225,10 @@ export default function BookingsManagement() {
         return date <= dateRangeFilter.end;
       });
     }
-    
+
     const price = (b) => b.finalPrice || b.basePrice || 0;
-    if (priceRangeFilter.min) {
-      combined = combined.filter(b => price(b) >= parseFloat(priceRangeFilter.min));
-    }
-    if (priceRangeFilter.max) {
-      combined = combined.filter(b => price(b) <= parseFloat(priceRangeFilter.max));
-    }
+    if (priceRangeFilter.min) combined = combined.filter(b => price(b) >= parseFloat(priceRangeFilter.min));
+    if (priceRangeFilter.max) combined = combined.filter(b => price(b) <= parseFloat(priceRangeFilter.max));
 
     combined.sort((a, b) => {
       const aPast = a._type === 'fitting' && isFittingPast(a) && a.status === 'Approved';
@@ -1118,15 +1241,14 @@ export default function BookingsManagement() {
   }, [fittingBookings, directBookings, bookingType, viewTab, search, filterStat, dateRangeFilter, priceRangeFilter]);
 
   const stats = useMemo(() => {
-    const pendingFit = fittingBookings.filter(b => b.status === 'Pending').length;
-    const pendingDir = directBookings.filter(b => b.bookingStatus === 'Pending').length;
-    const approvedFit = fittingBookings.filter(b => b.status === 'Approved').length;
-    const approvedDir = directBookings.filter(b => b.bookingStatus === 'Approved').length;
-    const activeLease = directBookings.filter(b => b.bookingStatus === 'Active Lease').length;
+    const pendingFit   = fittingBookings.filter(b => b.status === 'Pending').length;
+    const pendingDir   = directBookings.filter(b => b.bookingStatus === 'Pending').length;
+    const approvedFit  = fittingBookings.filter(b => b.status === 'Approved').length;
+    const approvedDir  = directBookings.filter(b => b.bookingStatus === 'Approved').length;
+    const activeLease  = directBookings.filter(b => b.bookingStatus === 'Active Lease').length;
     const completedFit = fittingBookings.filter(b => b.status === 'Completed').length;
     const completedDir = directBookings.filter(b => b.bookingStatus === 'Completed').length;
-    const pastFitting = fittingBookings.filter(b => isFittingPast(b) && b.status === 'Approved').length;
-    
+    const pastFitting  = fittingBookings.filter(b => isFittingPast(b) && b.status === 'Approved').length;
     return {
       pending: pendingFit + pendingDir,
       approved: approvedFit + approvedDir,
@@ -1136,7 +1258,6 @@ export default function BookingsManagement() {
     };
   }, [fittingBookings, directBookings]);
 
-  // Handlers that depend on allBookings
   const toggleSelectAll = useCallback(() => {
     if (selectedBookings.size === allBookings.length) {
       setSelectedBookings(new Set());
@@ -1148,11 +1269,8 @@ export default function BookingsManagement() {
   const toggleSelect = useCallback((id) => {
     setSelectedBookings(prev => {
       const newSet = new Set(prev);
-      if (newSet.has(id)) {
-        newSet.delete(id);
-      } else {
-        newSet.add(id);
-      }
+      if (newSet.has(id)) newSet.delete(id);
+      else newSet.add(id);
       return newSet;
     });
   }, []);
@@ -1162,7 +1280,7 @@ export default function BookingsManagement() {
     const actions = [];
     if (selectedStatuses.has('Pending')) {
       actions.push({ label: 'Approve', action: 'Approve', color: '#15803d' });
-      actions.push({ label: 'Reject', action: 'Reject', color: '#991b1b' });
+      actions.push({ label: 'Reject',  action: 'Reject',  color: '#991b1b' });
     }
     if (selectedStatuses.has('Pending') || selectedStatuses.has('Approved')) {
       actions.push({ label: 'Cancel', action: 'Cancel', color: '#6b7280' });
@@ -1170,18 +1288,14 @@ export default function BookingsManagement() {
     return actions;
   }, [allBookings, selectedBookings]);
 
-  // Status update handlers
   const updateFittingStatus = useCallback(async (id, status, note) => {
     try {
       await updateFittingBookingStatus(id, status);
       setFittingBookings(prev => prev.map(b => {
         if (b.id === id) {
           const newHistory = [...(b.history || []), {
-            oldStatus: b.status,
-            newStatus: status,
-            timestamp: new Date().toISOString(),
-            actor: 'Admin',
-            note: note
+            oldStatus: b.status, newStatus: status,
+            timestamp: new Date().toISOString(), actor: 'Admin', note,
           }];
           return { ...b, status, history: newHistory };
         }
@@ -1203,11 +1317,8 @@ export default function BookingsManagement() {
       setDirectBookings(prev => prev.map(b => {
         if (b.id === id) {
           const newHistory = [...(b.history || []), {
-            oldStatus: b.bookingStatus,
-            newStatus: status,
-            timestamp: new Date().toISOString(),
-            actor: 'Admin',
-            note: note
+            oldStatus: b.bookingStatus, newStatus: status,
+            timestamp: new Date().toISOString(), actor: 'Admin', note,
           }];
           return { ...b, bookingStatus: status, history: newHistory };
         }
@@ -1223,77 +1334,67 @@ export default function BookingsManagement() {
     }
   }, [showToastMsg, drawer]);
 
-  const bulkUpdateStatus = useCallback(async (status, note) => {
-    const selectedIds = Array.from(selectedBookings);
-    const fittingToUpdate = fittingBookings.filter(b => selectedIds.includes(b.id));
-    const directToUpdate = directBookings.filter(b => selectedIds.includes(b.id));
-    
-    let successCount = 0;
-    let errorCount = 0;
-    
-    for (const booking of fittingToUpdate) {
-      try {
-        await updateFittingBookingStatus(booking.id, status);
-        setFittingBookings(prev => prev.map(b => {
-          if (b.id === booking.id) {
-            const newHistory = [...(b.history || []), {
-              oldStatus: b.status,
-              newStatus: status,
-              timestamp: new Date().toISOString(),
-              actor: 'Admin (Bulk)',
-              note: note
-            }];
-            return { ...b, status, history: newHistory };
-          }
-          return b;
-        }));
-        successCount++;
-      } catch (e) {
-        errorCount++;
+  const handleCompleteNoLease = useCallback(async (booking) => {
+    try {
+      await completeFittingWithoutLease(booking.id);
+      setFittingBookings(prev => prev.map(b => {
+        if (b.id === booking.id) {
+          const newHistory = [...(b.history || []), {
+            oldStatus: b.status, newStatus: 'COMPLETED',
+            timestamp: new Date().toISOString(), actor: 'Admin',
+            note: 'Fitting completed without proceeding to lease',
+          }];
+          return { ...b, status: 'COMPLETED', history: newHistory };
+        }
+        return b;
+      }));
+      if (drawer?.id === booking.id) {
+        setDrawer(prev => prev ? { ...prev, status: 'COMPLETED' } : null);
       }
+      showToastMsg('success', 'Fitting marked as completed without lease');
+      setNoLeaseModal(null);
+    } catch (error) {
+      console.error('Error completing fitting without lease:', error);
+      showToastMsg('error', 'Failed to complete fitting');
     }
-    
-    for (const booking of directToUpdate) {
-      try {
-        await updateDirectBookingStatus(booking.id, status);
-        setDirectBookings(prev => prev.map(b => {
-          if (b.id === booking.id) {
-            const newHistory = [...(b.history || []), {
-              oldStatus: b.bookingStatus,
-              newStatus: status,
-              timestamp: new Date().toISOString(),
-              actor: 'Admin (Bulk)',
-              note: note
-            }];
-            return { ...b, bookingStatus: status, history: newHistory };
-          }
-          return b;
-        }));
-        successCount++;
-      } catch (e) {
-        errorCount++;
+  }, [showToastMsg, drawer]);
+
+  const handleProceedToLease = useCallback((booking) => {
+    fetchItemForLease(booking.itemId);
+    setLeaseModal(booking);
+  }, [fetchItemForLease]);
+
+  const handleLeaseConfirm = useCallback(async (result) => {
+    try {
+      const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+      await fetch(`http://localhost:8080/api/admin/bookings/fitting/${leaseModal.id}/lease-started`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ directBookingId: result.id }),
+      });
+      setFittingBookings(prev => prev.map(b =>
+        b.id === leaseModal.id
+          ? { ...b, leaseStarted: true, leaseBookingId: result.id, status: 'LEASE_CONVERTED' }
+          : b
+      ));
+      if (result) {
+        setDirectBookings(prev => [...prev, { ...result, _type: 'direct', bookingStatus: result.status || 'Pending' }]);
       }
+      showToastMsg('success', 'Rental booking created successfully!');
+      setLeaseModal(null);
+      setItemDetailsForLease(null);
+      setDrawer(null);
+    } catch (error) {
+      console.error('Error updating fitting booking:', error);
+      showToastMsg('error', 'Rental booking created but failed to update fitting record');
     }
-    
-    showToastMsg('success', `Updated ${successCount} booking${successCount !== 1 ? 's' : ''}${errorCount > 0 ? ` (${errorCount} failed)` : ''}`);
-    setSelectedBookings(new Set());
-    setBulkAction(null);
-  }, [selectedBookings, fittingBookings, directBookings, showToastMsg]);
+  }, [leaseModal, showToastMsg]);
 
   const saveFittingSchedule = useCallback(async ({ fittingDate, fittingTime }) => {
     const booking = editFittingModal;
     if (!booking) return;
     try {
-      const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
-      const res = await fetch(`http://localhost:8080/api/admin/bookings/fitting/${booking.id}/reschedule`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ fittingDate, fittingTime }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await rescheduleFitting(booking.id, fittingDate, fittingTime);
       setFittingBookings(prev => prev.map(b =>
         b.id === booking.id ? { ...b, fittingDate, fittingTime } : b
       ));
@@ -1308,6 +1409,51 @@ export default function BookingsManagement() {
     }
   }, [editFittingModal, drawer, showToastMsg]);
 
+  const bulkUpdateStatus = useCallback(async (status, note) => {
+    const selectedIds = Array.from(selectedBookings);
+    const fittingToUpdate = fittingBookings.filter(b => selectedIds.includes(b.id));
+    const directToUpdate  = directBookings.filter(b => selectedIds.includes(b.id));
+    let successCount = 0, errorCount = 0;
+
+    for (const booking of fittingToUpdate) {
+      try {
+        await updateFittingBookingStatus(booking.id, status);
+        setFittingBookings(prev => prev.map(b => {
+          if (b.id === booking.id) {
+            const newHistory = [...(b.history || []), {
+              oldStatus: b.status, newStatus: status,
+              timestamp: new Date().toISOString(), actor: 'Admin (Bulk)', note,
+            }];
+            return { ...b, status, history: newHistory };
+          }
+          return b;
+        }));
+        successCount++;
+      } catch { errorCount++; }
+    }
+
+    for (const booking of directToUpdate) {
+      try {
+        await updateDirectBookingStatus(booking.id, status);
+        setDirectBookings(prev => prev.map(b => {
+          if (b.id === booking.id) {
+            const newHistory = [...(b.history || []), {
+              oldStatus: b.bookingStatus, newStatus: status,
+              timestamp: new Date().toISOString(), actor: 'Admin (Bulk)', note,
+            }];
+            return { ...b, bookingStatus: status, history: newHistory };
+          }
+          return b;
+        }));
+        successCount++;
+      } catch { errorCount++; }
+    }
+
+    showToastMsg('success', `Updated ${successCount} booking${successCount !== 1 ? 's' : ''}${errorCount > 0 ? ` (${errorCount} failed)` : ''}`);
+    setSelectedBookings(new Set());
+    setBulkAction(null);
+  }, [selectedBookings, fittingBookings, directBookings, showToastMsg]);
+
   const cancelFitting = useCallback(async (id) => {
     await updateFittingStatus(id, 'Cancelled', 'Cancelled by admin');
     setDrawer(null);
@@ -1318,9 +1464,7 @@ export default function BookingsManagement() {
     setDrawer(null);
   }, [updateDirectStatus]);
 
-  const handleRefresh = useCallback(() => {
-    loadData(true);
-  }, [loadData]);
+  const handleRefresh = useCallback(() => { loadData(true); }, [loadData]);
 
   const handleExport = useCallback((bookingsToExport, format) => {
     const exportData = bookingsToExport.map(b => ({
@@ -1343,7 +1487,7 @@ export default function BookingsManagement() {
       Notes: b.notes,
       CreatedAt: b.createdAt,
     }));
-    
+
     if (format === 'csv') {
       const headers = Object.keys(exportData[0]).join(',');
       const rows = exportData.map(row => Object.values(row).map(v => `"${v || ''}"`).join(','));
@@ -1364,7 +1508,6 @@ export default function BookingsManagement() {
       a.click();
       URL.revokeObjectURL(url);
     }
-    
     showToastMsg('success', `Exported ${exportData.length} bookings`);
   }, [showToastMsg]);
 
@@ -1395,12 +1538,7 @@ export default function BookingsManagement() {
             <Clock size={14} />
             <span>{fmtHours()}</span>
           </div>
-          <button 
-            className="inv-icon-btn" 
-            onClick={handleRefresh} 
-            disabled={refreshing} 
-            title="Refresh now"
-          >
+          <button className="inv-icon-btn" onClick={handleRefresh} disabled={refreshing} title="Refresh now">
             <RefreshCw size={16} className={refreshing ? 'inv-spinner-inline' : ''} />
           </button>
           <button className="inv-btn-primary" onClick={() => setShowSettings(true)}>
@@ -1411,10 +1549,10 @@ export default function BookingsManagement() {
 
       <div className="inv-stats">
         {[
-          { label: 'Pending',      value: stats.pending,    icon: Clock,        color: '#b45309' },
-          { label: 'Approved',     value: stats.approved,   icon: CheckCircle,  color: '#15803d' },
-          { label: 'Active Lease', value: stats.active,     icon: PackageCheck, color: '#7c3aed' },
-          { label: 'Completed',    value: stats.completed,  icon: Star,         color: '#1d4ed8' },
+          { label: 'Pending',      value: stats.pending,   icon: Clock,        color: '#b45309' },
+          { label: 'Approved',     value: stats.approved,  icon: CheckCircle,  color: '#15803d' },
+          { label: 'Active Lease', value: stats.active,    icon: PackageCheck, color: '#7c3aed' },
+          { label: 'Completed',    value: stats.completed, icon: Star,         color: '#1d4ed8' },
         ].map(({ label, value, icon: Icon, color }) => (
           <div className="inv-stat-card" key={label}>
             <div className="inv-stat-icon" style={{ background: `${color}18`, color }}><Icon size={18} /></div>
@@ -1482,10 +1620,11 @@ export default function BookingsManagement() {
                   <option value="Completed">Completed</option>
                   <option value="Rejected">Rejected</option>
                   <option value="Cancelled">Cancelled</option>
+                  <option value="LEASE_CONVERTED">Lease Converted</option>
                 </>
               )}
             </select>
-            <button 
+            <button
               className={`inv-icon-btn ${showAdvancedFilters ? 'active' : ''}`}
               onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
               title="Advanced Filters"
@@ -1502,7 +1641,7 @@ export default function BookingsManagement() {
             <Download size={13} /> Export
           </button>
         </div>
-        
+
         {showAdvancedFilters && (
           <div className="bk-advanced-filters">
             <div className="bk-filter-group">
@@ -1521,13 +1660,10 @@ export default function BookingsManagement() {
                 <input type="number" placeholder="Max" value={priceRangeFilter.max} onChange={e => setPriceRangeFilter(prev => ({ ...prev, max: e.target.value }))} />
               </div>
             </div>
-            <button 
-              className="inv-btn-sm" 
-              onClick={() => {
-                setDateRangeFilter({ start: '', end: '' });
-                setPriceRangeFilter({ min: '', max: '' });
-              }}
-            >
+            <button className="inv-btn-sm" onClick={() => {
+              setDateRangeFilter({ start: '', end: '' });
+              setPriceRangeFilter({ min: '', max: '' });
+            }}>
               Clear Filters
             </button>
           </div>
@@ -1585,6 +1721,8 @@ export default function BookingsManagement() {
           onAction={(b, a) => setActionModal({ booking: b, actionDef: a, isFitting: b._type === 'fitting' })}
           onCancel={(id, isFit) => isFit ? cancelFitting(id) : cancelDirect(id)}
           onEditFitting={setEditFittingModal}
+          onCompleteNoLease={setNoLeaseModal}
+          onProceedToLease={handleProceedToLease}
           onClose={() => setDrawer(null)}
           workingHours={workingHours}
         />
@@ -1607,6 +1745,14 @@ export default function BookingsManagement() {
         />
       )}
 
+      {noLeaseModal && (
+        <NoLeaseConfirmModal
+          booking={noLeaseModal}
+          onConfirm={() => handleCompleteNoLease(noLeaseModal)}
+          onClose={() => setNoLeaseModal(null)}
+        />
+      )}
+
       {bulkAction && (
         <BulkActionModal
           selectedCount={selectedBookings.size}
@@ -1615,8 +1761,8 @@ export default function BookingsManagement() {
             let status;
             switch (bulkAction) {
               case 'Approve': status = 'Approved'; break;
-              case 'Cancel': status = 'Cancelled'; break;
-              case 'Reject': status = 'Rejected'; break;
+              case 'Cancel':  status = 'Cancelled'; break;
+              case 'Reject':  status = 'Rejected'; break;
               default: return;
             }
             await bulkUpdateStatus(status, note);
@@ -1631,6 +1777,18 @@ export default function BookingsManagement() {
           onSave={saveFittingSchedule}
           onClose={() => setEditFittingModal(null)}
           workingHours={workingHours}
+        />
+      )}
+
+      {leaseModal && itemDetailsForLease && (
+        <FittingToLeaseModal
+          booking={leaseModal}
+          itemDetails={itemDetailsForLease}
+          onConfirm={handleLeaseConfirm}
+          onClose={() => {
+            setLeaseModal(null);
+            setItemDetailsForLease(null);
+          }}
         />
       )}
 

@@ -1011,3 +1011,106 @@
     text-align: center;
   }
 }
+
+/* Additional styles for Fitting to Lease workflow */
+
+.bk-price-display {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 0.6rem 0.85rem;
+  background: #faf9f7;
+  border-radius: 10px;
+  border: 1px solid #eeecea;
+}
+
+.bk-currency {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #6b2d39;
+}
+
+.bk-amount {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.bk-per-day {
+  font-size: 0.7rem;
+  color: #aaa;
+  margin-left: auto;
+}
+
+.bk-price-summary {
+  background: #faf9f7;
+  border: 1px solid #eeecea;
+  border-radius: 12px;
+  padding: 0.9rem 1rem;
+  margin-top: 0.5rem;
+}
+
+.bk-summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.4rem 0;
+  font-size: 0.85rem;
+  color: #555;
+}
+
+.bk-summary-row.total {
+  border-top: 1px solid #e4e2df;
+  margin-top: 0.5rem;
+  padding-top: 0.65rem;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #1a1a1a;
+}
+
+.bk-total-price {
+  color: #15803d;
+  font-size: 1.1rem;
+}
+
+.bk-info-note {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.85rem;
+  background: rgba(21, 128, 61, 0.06);
+  border-radius: 8px;
+  font-size: 0.75rem;
+  color: #15803d;
+  margin-top: 0.5rem;
+}
+
+.bk-loading-message {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  color: #6b2d39;
+  font-size: 0.75rem;
+}
+
+.bk-error-message {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.75rem;
+  background: rgba(220, 38, 38, 0.06);
+  border-radius: 8px;
+  color: #dc2626;
+  font-size: 0.75rem;
+}
+
+/* Status badge for LEASE_CONVERTED */
+.inv-badge[data-status="LEASE_CONVERTED"] {
+  color: #7c3aed;
+  background: rgba(124, 58, 237, 0.1);
+}
+
+.inv-badge[data-status="LEASE_CONVERTED"] .inv-badge-dot {
+  background: #8b5cf6;
+}

@@ -33,10 +33,74 @@ export const getUserBookings = async () => {
       notes: booking.notes,
       status: booking.status,
       createdAt: booking.createdAt,
+      leaseStarted: booking.leaseStarted,
+      leaseBookingId: booking.leaseBookingId,
     }));
   } catch (error) {
     console.error('Error fetching user bookings:', error);
     return [];
+  }
+};
+
+// ── Fitting Availability ────────────────────────────────────────────────────
+
+export const checkFittingAvailability = async (date, time) => {
+  try {
+    const response = await authFetch(`/inventory/fitting/availability?date=${date}&time=${time}`);
+    return response;
+  } catch (error) {
+    console.error('Error checking fitting availability:', error);
+    return { available: false, message: 'Unable to check availability' };
+  }
+};
+
+export const getAvailableTimeSlots = async (date) => {
+  try {
+    const response = await authFetch(`/inventory/fitting/available-slots?date=${date}`);
+    return response;
+  } catch (error) {
+    console.error('Error fetching available time slots:', error);
+    return [];
+  }
+};
+
+// ── Fitting to Lease ────────────────────────────────────────────────────────
+
+export const completeFittingWithoutLease = async (bookingId) => {
+  try {
+    const response = await authFetch(`/admin/bookings/fitting/${bookingId}/complete-no-lease`, {
+      method: 'PUT',
+    });
+    return response;
+  } catch (error) {
+    console.error('Error completing fitting without lease:', error);
+    throw error;
+  }
+};
+
+export const rescheduleFitting = async (bookingId, fittingDate, fittingTime) => {
+  try {
+    const response = await authFetch(`/admin/bookings/fitting/${bookingId}/reschedule`, {
+      method: 'PUT',
+      body: JSON.stringify({ fittingDate, fittingTime }),
+    });
+    return response;
+  } catch (error) {
+    console.error('Error rescheduling fitting:', error);
+    throw error;
+  }
+};
+
+export const markLeaseStarted = async (bookingId, directBookingId) => {
+  try {
+    const response = await authFetch(`/admin/bookings/fitting/${bookingId}/lease-started`, {
+      method: 'PUT',
+      body: JSON.stringify({ directBookingId }),
+    });
+    return response;
+  } catch (error) {
+    console.error('Error marking lease started:', error);
+    throw error;
   }
 };
 
@@ -46,6 +110,7 @@ export const createDirectBooking = async (bookingData) => {
   try {
     const payload = {
       inventoryItemId: bookingData.itemId,
+      itemName: bookingData.itemName ?? '',
       startDate: bookingData.startDate,
       endDate: bookingData.endDate,
       totalDays: bookingData.totalDays,
@@ -56,7 +121,8 @@ export const createDirectBooking = async (bookingData) => {
       customerName: bookingData.customerName,
       customerEmail: bookingData.customerEmail,
       customerPhone: bookingData.customerPhone,
-      preferredSize: bookingData.preferredSize || ''
+      preferredSize: bookingData.preferredSize || '',
+      fittingBookingId: bookingData.fittingBookingId,
     };
     const response = await authFetch('/direct-bookings', {
       method: 'POST',
