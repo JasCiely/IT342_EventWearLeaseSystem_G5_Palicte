@@ -18,19 +18,39 @@ public interface DirectBookingRepository extends JpaRepository<DirectBooking, St
 
     Page<DirectBooking> findByBookingStatus(String status, Pageable pageable);
 
+    // Completed and Returned bookings free the item — exclude them from blocking checks
     @Query("SELECT db FROM DirectBooking db WHERE db.inventoryItemId = :itemId AND " +
-            "((db.startDate <= :endDate AND db.endDate >= :startDate) OR " +
-            "(db.startDate <= :startDate AND db.endDate >= :startDate)) AND " +
-            "db.bookingStatus NOT IN ('Rejected', 'Cancelled')")
+            "(db.startDate <= :endDate AND db.endDate >= :startDate) AND " +
+            "db.bookingStatus NOT IN ('Rejected', 'Cancelled', 'Completed', 'Returned')")
     List<DirectBooking> findOverlappingBookings(@Param("itemId") String itemId,
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate);
 
     @Query("SELECT COUNT(db) > 0 FROM DirectBooking db WHERE db.inventoryItemId = :itemId AND " +
-            "((db.startDate <= :endDate AND db.endDate >= :startDate) OR " +
-            "(db.startDate <= :startDate AND db.endDate >= :startDate)) AND " +
-            "db.bookingStatus NOT IN ('Rejected', 'Cancelled')")
+            "(db.startDate <= :endDate AND db.endDate >= :startDate) AND " +
+            "db.bookingStatus NOT IN ('Rejected', 'Cancelled', 'Completed', 'Returned')")
     boolean hasOverlappingBookings(@Param("itemId") String itemId,
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate);
+
+    // For lease extension: same overlap logic but excludes the booking being extended
+    @Query("SELECT COUNT(db) > 0 FROM DirectBooking db WHERE db.inventoryItemId = :itemId AND " +
+            "db.id <> :excludeId AND " +
+            "(db.startDate <= :endDate AND db.endDate >= :startDate) AND " +
+            "db.bookingStatus NOT IN ('Rejected', 'Cancelled', 'Completed', 'Returned')")
+    boolean hasOverlappingBookingsExcluding(@Param("itemId") String itemId,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate,
+            @Param("excludeId") String excludeId);
+
+    // Finds Approved bookings whose rental start date has arrived — used by the auto-activation scheduler
+    @Query("SELECT db FROM DirectBooking db WHERE db.bookingStatus = 'Approved' AND db.startDate <= :today")
+    List<DirectBooking> findApprovedBookingsToActivate(@Param("today") LocalDate today);
+
+    // Returns all active (blocking) bookings for an item, optionally excluding one booking (for extend UX)
+    @Query("SELECT db FROM DirectBooking db WHERE db.inventoryItemId = :itemId AND " +
+            "db.bookingStatus NOT IN ('Rejected', 'Cancelled', 'Completed', 'Returned') AND " +
+            "(:excludeId IS NULL OR db.id <> :excludeId)")
+    List<DirectBooking> findActiveBookingsForItem(@Param("itemId") String itemId,
+            @Param("excludeId") String excludeId);
 }

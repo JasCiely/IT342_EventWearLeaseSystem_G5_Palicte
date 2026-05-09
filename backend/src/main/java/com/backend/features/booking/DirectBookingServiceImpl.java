@@ -16,6 +16,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -30,12 +34,10 @@ public class DirectBookingServiceImpl implements DirectBookingService {
     public DirectBookingResponse createDirectBooking(String userId, DirectBookingRequest request) {
         log.info("Creating direct booking for user {} and item {}", userId, request.getInventoryItemId());
 
-        // Validate dates
         if (request.getStartDate().isAfter(request.getEndDate())) {
             throw new IllegalArgumentException("Start date cannot be after end date");
         }
 
-        // Validate customer information
         if (request.getCustomerName() == null || request.getCustomerName().trim().isEmpty()) {
             throw new IllegalArgumentException("Customer name is required");
         }
@@ -46,15 +48,12 @@ public class DirectBookingServiceImpl implements DirectBookingService {
             throw new IllegalArgumentException("Customer phone is required");
         }
 
-        // Check availability
         if (!isItemAvailable(request.getInventoryItemId(), request.getStartDate(), request.getEndDate())) {
             throw new IllegalArgumentException("Item is not available for the selected dates");
         }
 
-        // Calculate total days
         int totalDays = (int) ChronoUnit.DAYS.between(request.getStartDate(), request.getEndDate()) + 1;
 
-        // Validate pricing
         if (request.getBasePrice() == null || request.getBasePrice().compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("Base price must be greater than zero");
         }
@@ -67,7 +66,6 @@ public class DirectBookingServiceImpl implements DirectBookingService {
             request.setFinalPrice(request.getBasePrice().subtract(request.getDiscountAmount()));
         }
 
-        // Create booking entity
         DirectBooking booking = new DirectBooking();
         booking.setUserId(userId);
         booking.setInventoryItemId(request.getInventoryItemId());
@@ -79,21 +77,15 @@ public class DirectBookingServiceImpl implements DirectBookingService {
         booking.setFinalPrice(request.getFinalPrice());
         booking.setNotes(request.getNotes());
         booking.setBookingStatus("Pending");
-
-        // Set customer information
         booking.setCustomerName(request.getCustomerName());
         booking.setCustomerEmail(request.getCustomerEmail());
         booking.setCustomerPhone(request.getCustomerPhone());
         booking.setPreferredSize(request.getPreferredSize());
-
-        // Set item name from request (passed by caller — avoids cross-feature dependency)
         booking.setItemName(request.getItemName() != null ? request.getItemName() : "");
 
         DirectBooking savedBooking = directBookingRepository.save(booking);
-
         log.info("Direct booking created successfully with ID: {}", savedBooking.getId());
 
-        // Send confirmation email
         try {
             emailService.sendDirectBookingConfirmation(
                     savedBooking.getCustomerEmail(),
@@ -104,7 +96,6 @@ public class DirectBookingServiceImpl implements DirectBookingService {
                     savedBooking.getEndDate().toString(),
                     savedBooking.getTotalDays(),
                     savedBooking.getFinalPrice());
-            log.info("Confirmation email sent for booking: {}", savedBooking.getId());
         } catch (Exception e) {
             log.warn("Failed to send confirmation email for booking {}: {}", savedBooking.getId(), e.getMessage());
         }
@@ -143,7 +134,6 @@ public class DirectBookingServiceImpl implements DirectBookingService {
 
         log.info("Updated booking {} status from {} to {}", bookingId, oldStatus, status);
 
-        // Send status update email only if status changed to Approved or Rejected
         try {
             if ("Approved".equals(status) || "Rejected".equals(status)) {
                 emailService.sendDirectBookingStatusUpdate(
@@ -152,7 +142,6 @@ public class DirectBookingServiceImpl implements DirectBookingService {
                         updatedBooking.getItemName(),
                         status,
                         updatedBooking.getId());
-                log.info("Status update email sent for booking: {}", bookingId);
             }
         } catch (Exception e) {
             log.warn("Failed to send status update email for booking {}: {}", bookingId, e.getMessage());
@@ -164,6 +153,98 @@ public class DirectBookingServiceImpl implements DirectBookingService {
     @Override
     public boolean isItemAvailable(String itemId, LocalDate startDate, LocalDate endDate) {
         return !directBookingRepository.hasOverlappingBookings(itemId, startDate, endDate);
+    }
+
+    @Override
+    @Transactional
+    public DirectBookingResponse returnAndCompleteLease(String bookingId) {
+        DirectBooking booking = directBookingRepository.findById(bookingId)
+                .orElseThrow(() -> new IllegalArgumentException("Booking not found"));
+
+        if (!"Active Lease".equals(booking.getBookingStatus())) {
+            throw new IllegalArgumentException("Only active leases can be returned");
+        }
+
+        // ACTIVE → RETURNED → COMPLETED in one transaction
+        booking.setBookingStatus("Returned");
+        directBookingRepository.save(booking);
+
+        booking.setBookingStatus("Completed");
+        DirectBooking completed = directBookingRepository.save(booking);
+
+        log.info("Lease {} returned and completed", bookingId);
+
+        try {
+            emailService.sendLeaseCompletedEmail(
+                    completed.getCustomerEmail(),
+                    completed.getCustomerName(),
+                    completed.getItemName(),
+                    completed.getId());
+        } catch (Exception e) {
+            log.warn("Failed to send lease completed email for booking {}: {}", bookingId, e.getMessage());
+        }
+
+        return mapToResponse(completed);
+    }
+
+    @Override
+    @Transactional
+    public DirectBookingResponse extendLease(String bookingId, LocalDate newEndDate) {
+        DirectBooking booking = directBookingRepository.findById(bookingId)
+                .orElseThrow(() -> new IllegalArgumentException("Booking not found"));
+
+        if (!"Active Lease".equals(booking.getBookingStatus())) {
+            throw new IllegalArgumentException("Only active leases can be extended");
+        }
+
+        if (!newEndDate.isAfter(booking.getEndDate())) {
+            throw new IllegalArgumentException("New end date must be after current end date");
+        }
+
+        // Check for conflicts in the extension window only (day after current end to new end)
+        if (directBookingRepository.hasOverlappingBookingsExcluding(
+                booking.getInventoryItemId(),
+                booking.getEndDate().plusDays(1),
+                newEndDate,
+                bookingId)) {
+            throw new IllegalArgumentException("The selected extension dates conflict with another booking");
+        }
+
+        LocalDate oldEndDate = booking.getEndDate();
+        booking.setEndDate(newEndDate);
+        booking.setTotalDays((int) ChronoUnit.DAYS.between(booking.getStartDate(), newEndDate) + 1);
+
+        DirectBooking updated = directBookingRepository.save(booking);
+        log.info("Lease {} extended from {} to {}", bookingId, oldEndDate, newEndDate);
+
+        return mapToResponse(updated);
+    }
+
+    @Override
+    public List<Map<String, String>> getUnavailableDateRanges(String itemId, String excludeBookingId) {
+        List<DirectBooking> active = directBookingRepository.findActiveBookingsForItem(itemId, excludeBookingId);
+        List<Map<String, String>> ranges = new ArrayList<>();
+        for (DirectBooking b : active) {
+            Map<String, String> range = new HashMap<>();
+            range.put("startDate", b.getStartDate().toString());
+            range.put("endDate", b.getEndDate().toString());
+            ranges.add(range);
+        }
+        return ranges;
+    }
+
+    @Override
+    @Transactional
+    public void activateDueLeases() {
+        List<DirectBooking> due = directBookingRepository.findApprovedBookingsToActivate(LocalDate.now());
+        for (DirectBooking booking : due) {
+            booking.setBookingStatus("Active Lease");
+            directBookingRepository.save(booking);
+            log.info("Auto-activated lease for booking {} (item: {})", booking.getId(), booking.getItemName());
+        }
+        if (!due.isEmpty()) {
+            log.info("Auto-activated {} lease(s)", due.size());
+        }
     }
 
     private DirectBookingResponse mapToResponse(DirectBooking booking) {

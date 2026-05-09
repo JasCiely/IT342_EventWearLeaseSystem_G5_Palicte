@@ -2,14 +2,19 @@ package com.backend.features.booking;
 
 import com.backend.features.booking.dto.request.FittingBookingRequest;
 import com.backend.features.booking.dto.response.FittingBookingResponse;
+import com.backend.features.booking.settings.BookingTimeSettingsService;
+import com.backend.features.booking.settings.dto.BookingTimeSettingsDto;
 import com.backend.shared.entity.Booking;
 import com.backend.shared.email.EmailService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -21,20 +26,48 @@ public class BookingServiceImpl implements BookingService {
 
     private final BookingRepository bookingRepository;
     private final EmailService emailService;
+    private final BookingTimeSettingsService settingsService;
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-    private static final int MAX_SLOTS_PER_TIME = 5; // Max 5 fittings per 30-minute slot
-    private static final int FITTING_DURATION_MINUTES = 30;
+    private static final int MAX_SLOTS_PER_TIME = 5;
+
+    // ── Create Fitting Booking ────────────────────────────────────────────────
 
     @Transactional
     public FittingBookingResponse createBooking(FittingBookingRequest request) {
+        BookingTimeSettingsDto settings = settingsService.getSettings();
         String bookingId = "FT" + System.currentTimeMillis();
         String today = LocalDate.now().format(DATE_FORMATTER);
 
-        // Check if user already has a booking for this item (future date)
+        // Validate working day
+        if (settings.isEnableTimeRestrictions()) {
+            LocalDate date = LocalDate.parse(request.getFittingDate(), DATE_FORMATTER);
+            int dayOfWeek = date.getDayOfWeek().getValue() % 7; // Convert to 0=Sun..6=Sat
+            if (!settings.getWorkingDays().contains(dayOfWeek)) {
+                FittingBookingResponse response = new FittingBookingResponse();
+                response.setBookingId(null);
+                response.setStatus("FAILED");
+                response.setMessage("Fittings are not available on this day.");
+                return response;
+            }
+
+            // Validate working hours
+            LocalTime slotTime = LocalTime.parse(request.getFittingTime());
+            LocalTime openTime = LocalTime.parse(settings.getShopOpenTime());
+            LocalTime closeTime = LocalTime.parse(settings.getShopCloseTime());
+            if (slotTime.isBefore(openTime) || slotTime.isAfter(closeTime.minusMinutes(1))) {
+                FittingBookingResponse response = new FittingBookingResponse();
+                response.setBookingId(null);
+                response.setStatus("FAILED");
+                response.setMessage("Selected time is outside working hours (" +
+                        settings.getShopOpenTime() + " – " + settings.getShopCloseTime() + ").");
+                return response;
+            }
+        }
+
+        // Duplicate check
         boolean hasExisting = bookingRepository.existsActiveBookingByItemAndCustomer(
                 request.getItemId(), request.getCustomerEmail(), today);
-
         if (hasExisting) {
             log.warn("User {} already has active booking for item {}", request.getCustomerEmail(), request.getItemId());
             FittingBookingResponse response = new FittingBookingResponse();
@@ -44,7 +77,7 @@ public class BookingServiceImpl implements BookingService {
             return response;
         }
 
-        // Check time slot availability (max 5 per 30-min slot)
+        // Slot capacity check
         long slotCount = bookingRepository.countConfirmedByFittingDateAndTime(
                 request.getFittingDate(), request.getFittingTime());
         if (slotCount >= MAX_SLOTS_PER_TIME) {
@@ -56,18 +89,17 @@ public class BookingServiceImpl implements BookingService {
             return response;
         }
 
-        // Validate time slot is within working hours (already validated in controller)
-        // Validate time slot is on a 30-minute boundary
-        if (!isValidTimeSlot(request.getFittingTime())) {
-            log.warn("Invalid time slot format: {}", request.getFittingTime());
+        // Validate time slot boundary (must align with fitting duration)
+        if (!isValidTimeSlot(request.getFittingTime(), settings.getFittingDurationMinutes())) {
+            log.warn("Invalid time slot: {}", request.getFittingTime());
             FittingBookingResponse response = new FittingBookingResponse();
             response.setBookingId(null);
             response.setStatus("FAILED");
-            response.setMessage("Fitting slots are available every 30 minutes (e.g., 09:00, 09:30, 10:00).");
+            response.setMessage("Fitting slots are available every " +
+                    settings.getFittingDurationMinutes() + " minutes.");
             return response;
         }
 
-        // Create and save booking
         Booking booking = new Booking();
         booking.setBookingId(bookingId);
         booking.setItemId(request.getItemId());
@@ -84,18 +116,13 @@ public class BookingServiceImpl implements BookingService {
         booking.setLeaseStarted(false);
 
         Booking savedBooking = bookingRepository.save(booking);
-        log.info("Booking saved to database: {} for customer: {}", bookingId, request.getCustomerEmail());
+        log.info("Booking saved: {} for customer: {}", bookingId, request.getCustomerEmail());
 
-        // Send confirmation email
         try {
             emailService.sendFittingConfirmation(
-                    request.getCustomerEmail(),
-                    request.getCustomerName(),
-                    bookingId,
-                    request.getItemName(),
-                    request.getFittingDate(),
-                    request.getFittingTime());
-            log.info("Confirmation email sent to {}", request.getCustomerEmail());
+                    request.getCustomerEmail(), request.getCustomerName(),
+                    bookingId, request.getItemName(),
+                    request.getFittingDate(), request.getFittingTime());
         } catch (Exception e) {
             log.error("Failed to send email: {}", e.getMessage());
         }
@@ -104,82 +131,100 @@ public class BookingServiceImpl implements BookingService {
         response.setBookingId(bookingId);
         response.setStatus("CONFIRMED");
         response.setMessage("Fitting booked successfully");
-
         return response;
     }
+
+    // ── Complete without lease ────────────────────────────────────────────────
 
     @Transactional
     public Booking completeFittingWithoutLease(String bookingId) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new IllegalArgumentException("Booking not found"));
-
         if (!"CONFIRMED".equals(booking.getStatus())) {
             throw new IllegalStateException("Only confirmed bookings can be completed");
         }
-
         booking.setStatus("COMPLETED");
         Booking saved = bookingRepository.save(booking);
-
-        // Send email notification
         try {
             emailService.sendFittingCompletedNoLease(
-                    booking.getCustomerEmail(),
-                    booking.getCustomerName(),
-                    booking.getBookingId(),
-                    booking.getItemName());
-            log.info("Fitting completed (no lease) email sent to {}", booking.getCustomerEmail());
+                    booking.getCustomerEmail(), booking.getCustomerName(), booking.getItemName());
         } catch (Exception e) {
             log.error("Failed to send fitting completed email: {}", e.getMessage());
         }
-
         return saved;
     }
+
+    // ── Lease conversion ──────────────────────────────────────────────────────
 
     @Transactional
     public Booking markLeaseStartedFromFitting(String bookingId, String directBookingId) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new IllegalArgumentException("Booking not found"));
-
         if (!"CONFIRMED".equals(booking.getStatus())) {
             throw new IllegalStateException("Only confirmed bookings can be converted to lease");
         }
-
         booking.setLeaseStarted(true);
         booking.setLeaseBookingId(directBookingId);
         booking.setStatus("LEASE_CONVERTED");
-
         return bookingRepository.save(booking);
     }
+
+    // ── Availability ──────────────────────────────────────────────────────────
 
     public boolean checkAvailability(String fittingDate, String fittingTime, String excludeId) {
         long slotCount;
         if (excludeId != null && !excludeId.isEmpty()) {
-            slotCount = bookingRepository.countConfirmedByFittingDateAndTimeExcludingId(fittingDate, fittingTime,
-                    excludeId);
+            slotCount = bookingRepository.countConfirmedByFittingDateAndTimeExcludingId(
+                    fittingDate, fittingTime, excludeId);
         } else {
             slotCount = bookingRepository.countConfirmedByFittingDateAndTime(fittingDate, fittingTime);
         }
         return slotCount < MAX_SLOTS_PER_TIME;
     }
 
+    /**
+     * Returns available time slots for a given date using the DB settings:
+     * - only working days
+     * - only within shop open/close hours
+     * - slots spaced by fittingDurationMinutes
+     * - excludes slots that are fully booked
+     */
     public List<String> getAvailableTimeSlots(String fittingDate) {
-        return bookingRepository.findAvailableTimeSlots(fittingDate, MAX_SLOTS_PER_TIME);
+        BookingTimeSettingsDto settings = settingsService.getSettings();
+        List<String> slots = new ArrayList<>();
+
+        // If time restrictions enabled, validate working day
+        if (settings.isEnableTimeRestrictions()) {
+            try {
+                LocalDate date = LocalDate.parse(fittingDate, DATE_FORMATTER);
+                int dayOfWeek = date.getDayOfWeek().getValue() % 7;
+                if (!settings.getWorkingDays().contains(dayOfWeek)) {
+                    return slots; // No slots on non-working days
+                }
+            } catch (Exception e) {
+                log.warn("Invalid fittingDate: {}", fittingDate);
+                return slots;
+            }
+        }
+
+        // Generate time slots from open to close
+        LocalTime current = LocalTime.parse(settings.getShopOpenTime());
+        LocalTime closeTime = LocalTime.parse(settings.getShopCloseTime());
+        int duration = settings.getFittingDurationMinutes() > 0 ? settings.getFittingDurationMinutes() : 30;
+
+        while (!current.isAfter(closeTime.minusMinutes(duration))) {
+            String slot = current.format(DateTimeFormatter.ofPattern("HH:mm"));
+            long count = bookingRepository.countConfirmedByFittingDateAndTime(fittingDate, slot);
+            if (count < MAX_SLOTS_PER_TIME) {
+                slots.add(slot);
+            }
+            current = current.plusMinutes(duration);
+        }
+
+        return slots;
     }
 
-    private boolean isValidTimeSlot(String time) {
-        if (time == null)
-            return false;
-        String[] parts = time.split(":");
-        if (parts.length < 2)
-            return false;
-        try {
-            int hour = Integer.parseInt(parts[0]);
-            int minute = Integer.parseInt(parts[1]);
-            return minute == 0 || minute == 30;
-        } catch (NumberFormatException e) {
-            return false;
-        }
-    }
+    // ── Query helpers ─────────────────────────────────────────────────────────
 
     public List<Booking> getBookingsByEmail(String email) {
         return bookingRepository.findByCustomerEmailOrderByCreatedAtDesc(email);
@@ -204,5 +249,21 @@ public class BookingServiceImpl implements BookingService {
                 .orElseThrow(() -> new IllegalArgumentException("Booking not found"));
         booking.setStatus(status);
         return bookingRepository.save(booking);
+    }
+
+    // ── Internal helpers ──────────────────────────────────────────────────────
+
+    private boolean isValidTimeSlot(String time, int durationMinutes) {
+        if (time == null)
+            return false;
+        String[] parts = time.split(":");
+        if (parts.length < 2)
+            return false;
+        try {
+            int minute = Integer.parseInt(parts[1]);
+            return minute % durationMinutes == 0;
+        } catch (NumberFormatException e) {
+            return false;
+        }
     }
 }

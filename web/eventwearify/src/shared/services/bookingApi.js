@@ -205,3 +205,42 @@ export const updateDirectBookingStatus = async (bookingId, status) => {
     throw error;
   }
 };
+
+// Transitions Active Lease → Returned → Completed and frees inventory.
+export const returnLease = async (bookingId) => {
+  try {
+    const response = await authFetch(`/direct-bookings/${bookingId}/return`, { method: 'PUT' });
+    return response;
+  } catch (error) {
+    console.error('Error returning lease:', error);
+    throw error;
+  }
+};
+
+// Extends an active lease to a new end date (backend validates conflicts).
+export const extendLease = async (bookingId, newEndDate) => {
+  try {
+    const response = await authFetch(`/direct-bookings/${bookingId}/extend`, {
+      method: 'PUT',
+      body: JSON.stringify({ newEndDate }),
+    });
+    return response;
+  } catch (error) {
+    console.error('Error extending lease:', error);
+    throw error;
+  }
+};
+
+// Returns date ranges blocked by other bookings for an item.
+// excludeBookingId omits the booking being extended so it doesn't block itself.
+export const getUnavailableDates = async (itemId, excludeBookingId = null) => {
+  try {
+    const params = new URLSearchParams({ itemId });
+    if (excludeBookingId) params.append('excludeBookingId', excludeBookingId);
+    const response = await authFetch(`/direct-bookings/unavailable-dates?${params.toString()}`);
+    return response;
+  } catch (error) {
+    console.error('Error fetching unavailable dates:', error);
+    return [];
+  }
+};

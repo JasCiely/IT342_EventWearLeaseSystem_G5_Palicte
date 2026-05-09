@@ -19,8 +19,12 @@ import {
   completeFittingWithoutLease,
   rescheduleFitting,
   checkFittingAvailability,
-  getAvailableTimeSlots
+  getAvailableTimeSlots,
+  returnLease,
+  extendLease,
+  getUnavailableDates,
 } from '../services/inventoryApi';
+import { fetchBookingSettings, saveBookingSettings, getDefaultSettings } from '../services/bookingSettingsApi';
 import FittingToLeaseModal from './FittingToLeaseModal';
 
 // ─── Status meta ────────────────────────────────────────────────────────────
@@ -44,24 +48,16 @@ const FITTING_NEXT_ACTIONS = {
 };
 
 const DIRECT_FLOW_STEPS = ['Pending', 'Approved', 'Active Lease', 'Returned', 'Completed'];
+// Active Lease uses two dedicated buttons (Returned + Extend) rendered separately.
+// Approved → Active Lease is handled automatically by the backend scheduler.
 const DIRECT_NEXT_ACTIONS = {
-  'Pending':      { label: 'Approve Booking',  icon: CheckCircle,  next: 'Approved',     color: '#15803d' },
-  'Approved':     { label: 'Start Lease',      icon: PackageCheck, next: 'Active Lease', color: '#b45309' },
-  'Active Lease': { label: 'Mark Returned',    icon: RotateCcw,    next: 'Returned',     color: '#7c3aed' },
-  'Returned':     { label: 'Complete',         icon: Star,         next: 'Completed',    color: '#15803d' },
+  'Pending': { label: 'Approve Booking', icon: CheckCircle, next: 'Approved', color: '#15803d' },
 };
 
 const CANCELLABLE = ['Pending', 'Approved'];
 const TERMINAL    = ['Completed', 'Cancelled', 'Rejected', 'LEASE_CONVERTED'];
 
-const DEFAULT_WORKING_HOURS = {
-  enabled: true,
-  startHour: 9, startMinute: 0,
-  endHour: 17,  endMinute: 0,
-  workingDays: [1, 2, 3, 4, 5],
-  timezone: 'Asia/Manila',
-  autoApproveThreshold: 500,
-};
+// Default settings are now provided by getDefaultSettings() from bookingSettingsApi
 
 const DAYS = [
   { value: 0, label: 'Sunday' },  { value: 1, label: 'Monday' },
@@ -255,6 +251,177 @@ function NoLeaseConfirmModal({ booking, onConfirm, onClose }) {
   );
 }
 
+// ─── ReturnLeaseModal ─────────────────────────────────────────────────────────
+
+function ReturnLeaseModal({ booking, onConfirm, onClose }) {
+  const [submitting, setSubmitting] = useState(false);
+
+  return (
+    <div className="inv-overlay" onClick={onClose}>
+      <div className="inv-modal inv-modal-sm" onClick={e => e.stopPropagation()}>
+        <div className="inv-modal-header">
+          <h3><RotateCcw size={15} style={{ marginRight: 6 }} />Confirm Return</h3>
+          <button className="inv-modal-close" onClick={onClose}><X size={15} /></button>
+        </div>
+        <div className="inv-modal-body">
+          <div className="bk-action-context">
+            <div className="bk-action-customer">{booking.customerName}</div>
+            <div className="bk-action-item">{booking.itemName}</div>
+            <div className="bk-action-dates">{booking.startDate} → {booking.endDate}</div>
+          </div>
+          <div style={{ padding: '0.75rem', background: 'rgba(14,116,144,0.08)', borderRadius: 8, color: '#0e7490', fontSize: '0.82rem' }}>
+            <PackageCheck size={13} style={{ display: 'inline', marginRight: 6 }} />
+            This will mark the item as <strong>Returned</strong> then immediately <strong>Completed</strong>.
+            Inventory availability will be restored.
+          </div>
+        </div>
+        <div className="inv-modal-footer">
+          <button className="inv-btn-ghost" onClick={onClose} disabled={submitting}>Cancel</button>
+          <button
+            className="inv-btn-primary"
+            style={{ background: '#0e7490' }}
+            onClick={async () => { setSubmitting(true); await onConfirm(); setSubmitting(false); }}
+            disabled={submitting}
+          >
+            {submitting ? <Loader2 size={13} className="inv-spinner-inline" /> : <RotateCcw size={13} />}
+            Mark Returned &amp; Complete
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── ExtendLeaseModal ─────────────────────────────────────────────────────────
+
+function ExtendLeaseModal({ booking, onConfirm, onClose }) {
+  const [newEndDate, setNewEndDate] = useState('');
+  const [unavailableRanges, setUnavailableRanges] = useState([]);
+  const [loadingDates, setLoadingDates] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [dateError, setDateError] = useState('');
+
+  const currentEndDate = booking.endDate;
+
+  // minDate = day after current end
+  const minDate = useMemo(() => {
+    const d = new Date(currentEndDate + 'T12:00:00');
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().split('T')[0];
+  }, [currentEndDate]);
+
+  // maxDate = day before the first future conflict (if any), enforced by the native date input
+  const maxDate = useMemo(() => {
+    const future = unavailableRanges
+      .filter(r => r.startDate > currentEndDate)
+      .sort((a, b) => a.startDate.localeCompare(b.startDate));
+    if (future.length === 0) return '';
+    const d = new Date(future[0].startDate + 'T12:00:00');
+    d.setDate(d.getDate() - 1);
+    return d.toISOString().split('T')[0];
+  }, [unavailableRanges, currentEndDate]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      setLoadingDates(true);
+      try {
+        const ranges = await getUnavailableDates(booking.inventoryItemId, booking.id);
+        if (!cancelled) setUnavailableRanges(ranges || []);
+      } catch (e) {
+        console.error('Failed to load unavailable dates:', e);
+      } finally {
+        if (!cancelled) setLoadingDates(false);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [booking.inventoryItemId, booking.id]);
+
+  const handleDateChange = (e) => {
+    const val = e.target.value;
+    setNewEndDate(val);
+    setDateError('');
+    if (val && maxDate && val > maxDate) {
+      setDateError('Selected date conflicts with another booking for this item.');
+    }
+  };
+
+  const handle = async () => {
+    if (!newEndDate || dateError) return;
+    setSubmitting(true);
+    await onConfirm(newEndDate);
+    setSubmitting(false);
+  };
+
+  return (
+    <div className="inv-overlay" onClick={onClose}>
+      <div className="inv-modal inv-modal-sm" onClick={e => e.stopPropagation()}>
+        <div className="inv-modal-header">
+          <h3><CalendarIcon size={15} style={{ marginRight: 6 }} />Extend Lease</h3>
+          <button className="inv-modal-close" onClick={onClose}><X size={15} /></button>
+        </div>
+        <div className="inv-modal-body">
+          <div className="bk-action-context">
+            <div className="bk-action-customer">{booking.customerName}</div>
+            <div className="bk-action-item">{booking.itemName}</div>
+            <div className="bk-action-dates">Current end: <strong>{currentEndDate}</strong></div>
+          </div>
+
+          {loadingDates && (
+            <div style={{ fontSize: '0.75rem', color: '#aaa', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Loader2 size={12} className="inv-spinner-inline" /> Checking availability…
+            </div>
+          )}
+
+          {!loadingDates && maxDate && (
+            <div style={{ fontSize: '0.72rem', color: '#b45309', background: 'rgba(180,83,9,0.08)', borderRadius: 6, padding: '0.5rem 0.75rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <AlertTriangle size={11} />
+              Max extension: <strong>{maxDate}</strong> — next booking starts after this date
+            </div>
+          )}
+          {!loadingDates && !maxDate && (
+            <div style={{ fontSize: '0.72rem', color: '#15803d', background: 'rgba(21,128,61,0.08)', borderRadius: 6, padding: '0.5rem 0.75rem', marginBottom: '0.5rem' }}>
+              No upcoming conflicts — item is free after {currentEndDate}.
+            </div>
+          )}
+
+          <div className="inv-field">
+            <label className="inv-field-label"><CalendarIcon size={11} /> New End Date</label>
+            <input
+              type="date"
+              className="inv-input"
+              value={newEndDate}
+              min={minDate}
+              max={maxDate || undefined}
+              onChange={handleDateChange}
+              disabled={loadingDates}
+            />
+          </div>
+
+          {dateError && (
+            <div style={{ color: '#dc2626', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: 4, marginTop: '0.25rem' }}>
+              <AlertTriangle size={11} /> {dateError}
+            </div>
+          )}
+        </div>
+        <div className="inv-modal-footer">
+          <button className="inv-btn-ghost" onClick={onClose} disabled={submitting}>Cancel</button>
+          <button
+            className="inv-btn-primary"
+            style={{ background: '#7c3aed' }}
+            onClick={handle}
+            disabled={submitting || !newEndDate || !!dateError || loadingDates}
+          >
+            {submitting ? <Loader2 size={13} className="inv-spinner-inline" /> : <CalendarIcon size={13} />}
+            Extend Lease
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── BulkActionModal ─────────────────────────────────────────────────────────
 
 function BulkActionModal({ selectedCount, action, onConfirm, onClose }) {
@@ -388,13 +555,17 @@ function EditFittingModal({ booking, onSave, onClose, workingHours }) {
 
   const generateTimeSlots = () => {
     const slots = [];
-    for (let hour = 9; hour <= 17; hour++) {
-      if (hour === 17) {
-        slots.push(`${hour.toString().padStart(2, '0')}:00`);
-      } else {
-        slots.push(`${hour.toString().padStart(2, '0')}:00`);
-        slots.push(`${hour.toString().padStart(2, '0')}:30`);
-      }
+    const startH = workingHours?.startHour ?? 9;
+    const endH   = workingHours?.endHour   ?? 17;
+    const dur    = workingHours?.fittingDurationMinutes ?? 30;
+    let currentH = startH;
+    let currentM = workingHours?.startMinute ?? 0;
+
+    while (currentH < endH || (currentH === endH && currentM === 0)) {
+      const slot = `${String(currentH).padStart(2, '0')}:${String(currentM).padStart(2, '0')}`;
+      slots.push(slot);
+      currentM += dur;
+      if (currentM >= 60) { currentH += Math.floor(currentM / 60); currentM = currentM % 60; }
     }
     return slots;
   };
@@ -462,7 +633,7 @@ function EditFittingModal({ booking, onSave, onClose, workingHours }) {
           )}
           <div className="bk-info-note" style={{ marginTop: '0.5rem', fontSize: '0.7rem' }}>
             <Clock size={12} />
-            Fitting sessions are 30 minutes long. Maximum 5 bookings per time slot.
+            Fitting sessions are {workingHours?.fittingDurationMinutes ?? 30} minutes long. Maximum 5 bookings per time slot.
           </div>
         </div>
         <div className="inv-modal-footer">
@@ -499,7 +670,7 @@ function MediaViewer({ file }) {
 
 // ─── BookingDrawer ────────────────────────────────────────────────────────────
 
-function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, onCompleteNoLease, onProceedToLease, isFitting, workingHours }) {
+function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, onCompleteNoLease, onProceedToLease, onReturn, onExtend, isFitting, workingHours }) {
   const [itemDetails, setItemDetails] = useState(null);
   const [loadingItem, setLoadingItem] = useState(false);
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
@@ -816,7 +987,27 @@ function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, on
             </button>
           )}
 
-          {actionDef && !isTerminal && !hasLeaseStarted && (
+          {/* Active Lease: two dedicated action buttons replace the single next-action pattern */}
+          {!isFitting && booking.status === 'Active Lease' && (
+            <>
+              <button
+                className="inv-btn-primary"
+                style={{ background: '#0e7490' }}
+                onClick={() => onReturn(booking)}
+              >
+                <RotateCcw size={13} /> Returned <ChevronRight size={13} />
+              </button>
+              <button
+                className="inv-btn-primary"
+                style={{ background: '#7c3aed' }}
+                onClick={() => onExtend(booking)}
+              >
+                <CalendarIcon size={13} /> Extend <ChevronRight size={13} />
+              </button>
+            </>
+          )}
+
+          {actionDef && !isTerminal && !hasLeaseStarted && booking.status !== 'Active Lease' && (
             <button
               className="inv-btn-primary"
               style={{ background: actionDef.color }}
@@ -833,7 +1024,7 @@ function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, on
 
 // ─── BookingCard ──────────────────────────────────────────────────────────────
 
-function BookingCard({ booking, isFitting, onOpen, onAction, selected, onSelect }) {
+function BookingCard({ booking, isFitting, onOpen, onAction, onReturn, onExtend, selected, onSelect }) {
   const nextActions = isFitting ? FITTING_NEXT_ACTIONS : DIRECT_NEXT_ACTIONS;
   const actionDef = nextActions[booking.status];
   const isPast = isFitting && isFittingPast(booking) && booking.status === 'Approved';
@@ -885,14 +1076,33 @@ function BookingCard({ booking, isFitting, onOpen, onAction, selected, onSelect 
         {(booking.finalPrice || booking.basePrice) ? (
           <div className="bk-card-amount">₱{(booking.finalPrice || booking.basePrice || 0).toLocaleString()}</div>
         ) : null}
-        {actionDef && !TERMINAL.includes(booking.status) && !hasLeaseStarted && (
-          <button
-            className="inv-btn-sm"
-            style={{ background: actionDef.color, fontSize: '0.7rem' }}
-            onClick={e => { e.stopPropagation(); onAction(booking, actionDef); }}
-          >
-            <actionDef.icon size={10} /> {actionDef.label}
-          </button>
+        {!isFitting && booking.status === 'Active Lease' ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <button
+              className="inv-btn-sm"
+              style={{ background: '#0e7490', fontSize: '0.68rem' }}
+              onClick={e => { e.stopPropagation(); onReturn(booking); }}
+            >
+              <RotateCcw size={10} /> Returned
+            </button>
+            <button
+              className="inv-btn-sm"
+              style={{ background: '#7c3aed', fontSize: '0.68rem' }}
+              onClick={e => { e.stopPropagation(); onExtend(booking); }}
+            >
+              <CalendarIcon size={10} /> Extend
+            </button>
+          </div>
+        ) : (
+          actionDef && !TERMINAL.includes(booking.status) && !hasLeaseStarted && (
+            <button
+              className="inv-btn-sm"
+              style={{ background: actionDef.color, fontSize: '0.7rem' }}
+              onClick={e => { e.stopPropagation(); onAction(booking, actionDef); }}
+            >
+              <actionDef.icon size={10} /> {actionDef.label}
+            </button>
+          )
         )}
       </div>
     </div>
@@ -1055,6 +1265,20 @@ function SettingsModal({ settings, onSave, onClose }) {
             </div>
           </div>
 
+          <div className="inv-field">
+            <label className="inv-field-label"><Clock size={12} /> Fitting Duration (minutes)</label>
+            <input
+              type="number"
+              className="inv-input"
+              value={local.fittingDurationMinutes}
+              min={5}
+              max={120}
+              step={5}
+              onChange={e => setLocal(p => ({ ...p, fittingDurationMinutes: +e.target.value || 30 }))}
+              style={{ width: '100px' }}
+            />
+          </div>
+
           <div className="bk-settings-summary">
             <Sun size={14} />
             <span>{local.enabled ? 'Bookings accepted only during working hours on working days.' : 'Time restrictions disabled — bookings accepted anytime.'}</span>
@@ -1108,6 +1332,8 @@ export default function BookingsManagement() {
   const [leaseModal, setLeaseModal] = useState(null);
   const [itemDetailsForLease, setItemDetailsForLease] = useState(null);
   const [toast, setToast] = useState({ show: false, type: 'success', message: '' });
+  const [returnModal, setReturnModal] = useState(null);
+  const [extendModal, setExtendModal] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [selectedBookings, setSelectedBookings] = useState(new Set());
@@ -1117,12 +1343,12 @@ export default function BookingsManagement() {
   const [priceRangeFilter, setPriceRangeFilter] = useState({ min: '', max: '' });
   const [autoRefresh, setAutoRefresh] = useState(true);
 
-  const [workingHours, setWorkingHours] = useState(() => {
-    try {
-      const saved = localStorage.getItem('bookingWorkingHours');
-      return saved ? { ...DEFAULT_WORKING_HOURS, ...JSON.parse(saved) } : DEFAULT_WORKING_HOURS;
-    } catch { return DEFAULT_WORKING_HOURS; }
-  });
+  const [workingHours, setWorkingHours] = useState(getDefaultSettings);
+
+  // Load settings from backend on mount
+  useEffect(() => {
+    fetchBookingSettings().then(setWorkingHours).catch(console.error);
+  }, []);
 
   const showToastMsg = useCallback((type, msg) => {
     setToast({ show: true, type, message: msg });
@@ -1363,6 +1589,52 @@ export default function BookingsManagement() {
     fetchItemForLease(booking.itemId);
     setLeaseModal(booking);
   }, [fetchItemForLease]);
+
+  const handleReturnLease = useCallback((booking) => {
+    setReturnModal(booking);
+  }, []);
+
+  const confirmReturnLease = useCallback(async () => {
+    if (!returnModal) return;
+    try {
+      await returnLease(returnModal.id);
+      setDirectBookings(prev => prev.map(b =>
+        b.id === returnModal.id ? { ...b, bookingStatus: 'Completed' } : b
+      ));
+      showToastMsg('success', 'Lease returned and completed');
+      setReturnModal(null);
+      setDrawer(null);
+    } catch (e) {
+      console.error(e);
+      showToastMsg('error', 'Failed to return lease');
+    }
+  }, [returnModal, showToastMsg]);
+
+  const handleExtendLease = useCallback((booking) => {
+    setExtendModal(booking);
+  }, []);
+
+  const confirmExtendLease = useCallback(async (newEndDate) => {
+    if (!extendModal) return;
+    try {
+      const updated = await extendLease(extendModal.id, newEndDate);
+      setDirectBookings(prev => prev.map(b =>
+        b.id === extendModal.id
+          ? { ...b, endDate: updated.endDate || newEndDate, totalDays: updated.totalDays }
+          : b
+      ));
+      if (drawer?.id === extendModal.id) {
+        setDrawer(prev => prev
+          ? { ...prev, endDate: updated.endDate || newEndDate, totalDays: updated.totalDays }
+          : null);
+      }
+      showToastMsg('success', `Lease extended to ${newEndDate}`);
+      setExtendModal(null);
+    } catch (e) {
+      console.error(e);
+      showToastMsg('error', 'Extension failed — dates may conflict with another booking');
+    }
+  }, [extendModal, drawer, showToastMsg]);
 
   const handleLeaseConfirm = useCallback(async (result) => {
     try {
@@ -1708,6 +1980,8 @@ export default function BookingsManagement() {
             isFitting={b._type === 'fitting'}
             onOpen={setDrawer}
             onAction={(booking, actionDef) => setActionModal({ booking, actionDef, isFitting: booking._type === 'fitting' })}
+            onReturn={handleReturnLease}
+            onExtend={handleExtendLease}
             selected={selectedBookings.has(b.id)}
             onSelect={toggleSelect}
           />
@@ -1723,6 +1997,8 @@ export default function BookingsManagement() {
           onEditFitting={setEditFittingModal}
           onCompleteNoLease={setNoLeaseModal}
           onProceedToLease={handleProceedToLease}
+          onReturn={handleReturnLease}
+          onExtend={handleExtendLease}
           onClose={() => setDrawer(null)}
           workingHours={workingHours}
         />
@@ -1750,6 +2026,22 @@ export default function BookingsManagement() {
           booking={noLeaseModal}
           onConfirm={() => handleCompleteNoLease(noLeaseModal)}
           onClose={() => setNoLeaseModal(null)}
+        />
+      )}
+
+      {returnModal && (
+        <ReturnLeaseModal
+          booking={returnModal}
+          onConfirm={confirmReturnLease}
+          onClose={() => setReturnModal(null)}
+        />
+      )}
+
+      {extendModal && (
+        <ExtendLeaseModal
+          booking={extendModal}
+          onConfirm={confirmExtendLease}
+          onClose={() => setExtendModal(null)}
         />
       )}
 
@@ -1796,9 +2088,14 @@ export default function BookingsManagement() {
         <SettingsModal
           settings={workingHours}
           onSave={async (s) => {
-            localStorage.setItem('bookingWorkingHours', JSON.stringify(s));
-            setWorkingHours(s);
-            showToastMsg('success', 'Settings saved');
+            try {
+              const saved = await saveBookingSettings(s);
+              setWorkingHours(saved);
+              showToastMsg('success', 'Settings saved');
+            } catch (e) {
+              console.error(e);
+              showToastMsg('error', 'Failed to save settings');
+            }
             setShowSettings(false);
           }}
           onClose={() => setShowSettings(false)}

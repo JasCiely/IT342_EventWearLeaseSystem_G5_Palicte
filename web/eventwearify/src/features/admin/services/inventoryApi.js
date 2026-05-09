@@ -29,4 +29,7 @@ export {
   completeFittingWithoutLease,
   rescheduleFitting,
   markLeaseStarted,
+  returnLease,
+  extendLease,
+  getUnavailableDates,
 } from '../../../shared/services/bookingApi.js';

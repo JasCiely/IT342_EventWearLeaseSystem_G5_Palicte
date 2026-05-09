@@ -143,6 +143,18 @@ public class EmailService {
         }
     }
 
+    /**
+     * Called from BookingServiceImpl.completeFittingWithoutLease() with 3 params:
+     * emailService.sendFittingCompletedNoLease(email, customerName, itemName)
+     *
+     * The old 4-param version (with bookingId) is kept as an overload so any
+     * other callers in the codebase continue to compile without changes.
+     */
+    public void sendFittingCompletedNoLease(String toEmail, String customerName,
+            String itemName) {
+        sendFittingCompletedNoLease(toEmail, customerName, null, itemName);
+    }
+
     public void sendFittingCompletedNoLease(String toEmail, String customerName,
             String bookingId, String itemName) {
         try {
@@ -151,7 +163,8 @@ public class EmailService {
 
             helper.setFrom(fromEmail, appName);
             helper.setTo(toEmail);
-            helper.setSubject(appName + " – Fitting Completed #" + bookingId);
+            helper.setSubject(appName + " – Fitting Completed"
+                    + (bookingId != null ? " #" + bookingId : ""));
 
             String htmlContent = String.format(
                     """
@@ -171,19 +184,16 @@ public class EmailService {
                                     <div style="background-color: #f9f9f9; padding: 15px; border-radius: 8px; margin: 20px 0;">
                                         <h3 style="margin: 0 0 10px 0; color: #1d4ed8;">Fitting Details</h3>
                                         <table style="width: 100%%; border-collapse: collapse;">
+                                            %s
                                             <tr>
-                                                <td style="padding: 8px 0; width: 120px;"><strong>Booking ID:</strong></td>
-                                                <td style="padding: 8px 0;">%s</td>
-                                            </tr>
-                                            <tr>
-                                                <td style="padding: 8px 0;"><strong>Item:</strong></td>
+                                                <td style="padding: 8px 0; width: 120px;"><strong>Item:</strong></td>
                                                 <td style="padding: 8px 0;">%s</td>
                                             </tr>
                                         </table>
                                     </div>
 
                                     <div style="background-color: #e8f5e9; padding: 15px; border-radius: 8px; border-left: 4px solid #15803d; margin: 20px 0;">
-                                        <strong>✅ What's Next?</strong>
+                                        <strong>&#x2705; What's Next?</strong>
                                         <p style="margin: 10px 0 0 0;">You can book this item for rental at any time. Visit our website to proceed with your rental.</p>
                                     </div>
 
@@ -198,7 +208,16 @@ public class EmailService {
                             </body>
                             </html>
                             """,
-                    appName, customerName, itemName, bookingId, itemName, appName, appName);
+                    appName,
+                    customerName,
+                    itemName,
+                    bookingId != null
+                            ? "<tr><td style=\"padding: 8px 0; width: 120px;\"><strong>Booking ID:</strong></td>"
+                                    + "<td style=\"padding: 8px 0;\">" + bookingId + "</td></tr>"
+                            : "",
+                    itemName,
+                    appName,
+                    appName);
 
             helper.setText(htmlContent, true);
             mailSender.send(message);
@@ -255,13 +274,13 @@ public class EmailService {
                                             </tr>
                                             <tr>
                                                 <td style="padding: 8px 0;"><strong>Total Amount:</strong></td>
-                                                <td style="padding: 8px 0;"><strong style="color: #15803d; font-size: 16px;">₱%s</strong></td>
+                                                <td style="padding: 8px 0;"><strong style="color: #15803d; font-size: 16px;">&#x20B1;%s</strong></td>
                                             </tr>
                                         </table>
                                     </div>
 
                                     <div style="background-color: #e8f5e9; padding: 15px; border-radius: 8px; border-left: 4px solid #15803d; margin: 20px 0;">
-                                        <strong>💰 Payment Information:</strong>
+                                        <strong>&#x1F4B0; Payment Information:</strong>
                                         <ul style="margin: 10px 0 0 20px;">
                                             <li>Full payment is required to confirm your rental</li>
                                             <li>Payment methods: GCash, Bank Transfer, or Cash on Pickup</li>
@@ -339,13 +358,13 @@ public class EmailService {
                                             </tr>
                                             <tr>
                                                 <td style="padding: 8px 0;"><strong>Total Amount:</strong></td>
-                                                <td style="padding: 8px 0;"><strong style="color: #15803d; font-size: 16px;">₱%s</strong></td>
+                                                <td style="padding: 8px 0;"><strong style="color: #15803d; font-size: 16px;">&#x20B1;%s</strong></td>
                                             </tr>
                                         </table>
                                     </div>
 
                                     <div style="background-color: #fff3e0; padding: 15px; border-radius: 8px; border-left: 4px solid #f59e0b; margin: 20px 0;">
-                                        <strong>📌 Next Steps:</strong>
+                                        <strong>&#x1F4CC; Next Steps:</strong>
                                         <ul style="margin: 10px 0 0 20px;">
                                             <li>Our team will review your booking within <strong>24 hours</strong></li>
                                             <li>You will receive another email once your booking is approved</li>
@@ -354,7 +373,7 @@ public class EmailService {
                                     </div>
 
                                     <div style="background-color: #e8f5e9; padding: 15px; border-radius: 8px; border-left: 4px solid #15803d; margin: 20px 0;">
-                                        <strong>💰 Payment Information:</strong>
+                                        <strong>&#x1F4B0; Payment Information:</strong>
                                         <ul style="margin: 10px 0 0 20px;">
                                             <li>Full payment is required upon approval</li>
                                             <li>Payment methods: GCash, Bank Transfer, or Cash on Pickup</li>
@@ -381,6 +400,61 @@ public class EmailService {
             log.info("Direct booking confirmation email sent to {}", toEmail);
         } catch (Exception e) {
             log.error("Failed to send direct booking confirmation email to {}: {}", toEmail, e.getMessage());
+        }
+    }
+
+    public void sendLeaseCompletedEmail(String toEmail, String customerName,
+            String itemName, String bookingId) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setFrom(fromEmail, appName);
+            helper.setTo(toEmail);
+            helper.setSubject(appName + " – Rental Completed #" + bookingId);
+
+            String htmlContent = String.format(
+                    """
+                            <!DOCTYPE html>
+                            <html>
+                            <head><meta charset="UTF-8"></head>
+                            <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                                <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
+                                    <div style="text-align: center; border-bottom: 2px solid #0e7490; padding-bottom: 10px; margin-bottom: 20px;">
+                                        <h2 style="color: #0e7490; margin: 0;">%s</h2>
+                                        <p style="margin: 5px 0 0; color: #666;">Rental Completed</p>
+                                    </div>
+                                    <p>Dear <strong>%s</strong>,</p>
+                                    <p>Your rental of <strong>%s</strong> has been marked as <strong style="color: #0e7490;">returned and completed</strong>.</p>
+                                    <div style="background-color: #f9f9f9; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                                        <table style="width: 100%%; border-collapse: collapse;">
+                                            <tr>
+                                                <td style="padding: 8px 0; width: 140px;"><strong>Booking ID:</strong></td>
+                                                <td style="padding: 8px 0;">%s</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 8px 0;"><strong>Item:</strong></td>
+                                                <td style="padding: 8px 0;">%s</td>
+                                            </tr>
+                                        </table>
+                                    </div>
+                                    <p>Thank you for choosing %s! We hope to see you again.</p>
+                                    <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;">
+                                    <p style="font-size: 12px; color: #999; text-align: center;">
+                                        Need help? Contact us at support@eventwear.com<br>
+                                        – The %s Team
+                                    </p>
+                                </div>
+                            </body>
+                            </html>
+                            """,
+                    appName, customerName, itemName, bookingId, itemName, appName, appName);
+
+            helper.setText(htmlContent, true);
+            mailSender.send(message);
+            log.info("Lease completed email sent to {}", toEmail);
+        } catch (Exception e) {
+            log.error("Failed to send lease completed email to {}: {}", toEmail, e.getMessage());
         }
     }
 
@@ -430,7 +504,7 @@ public class EmailService {
             if (status.equals("Approved")) {
                 htmlContent += """
                         <div style="background-color: #e8f5e9; padding: 15px; border-radius: 8px; border-left: 4px solid #15803d; margin: 20px 0;">
-                            <strong>✅ What's Next?</strong>
+                            <strong>&#x2705; What's Next?</strong>
                             <ul style="margin: 10px 0 0 20px;">
                                 <li>Our team will contact you within 24 hours for payment arrangements</li>
                                 <li>Once payment is confirmed, your booking will be finalized</li>
@@ -441,7 +515,7 @@ public class EmailService {
             } else if (status.equals("Rejected")) {
                 htmlContent += """
                         <div style="background-color: #fee2e2; padding: 15px; border-radius: 8px; border-left: 4px solid #dc2626; margin: 20px 0;">
-                            <strong>❌ Booking Rejected</strong>
+                            <strong>&#x274C; Booking Rejected</strong>
                             <ul style="margin: 10px 0 0 20px;">
                                 <li>The item may no longer be available for your selected dates</li>
                                 <li>Please try booking different dates or browse other items</li>
