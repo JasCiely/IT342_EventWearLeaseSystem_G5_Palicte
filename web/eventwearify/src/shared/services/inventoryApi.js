@@ -1,0 +1,144 @@
+import { authFetch, API_BASE_URL_ROOT } from './apiClient.js';
+
+// ── Items ──────────────────────────────────────────────────────────────────
+
+export const fetchItems = async () => {
+  try {
+    const response = await authFetch('/inventory/items');
+    const itemsArray = Array.isArray(response) ? response : (response.content || response.items || []);
+    return itemsArray.map(item => ({
+      id: item.id,
+      name: item.name,
+      category: item.category,
+      subtype: item.subtype || '',
+      size: item.size,
+      color: item.color,
+      price: item.price,
+      status: item.status,
+      ageRange: item.ageRange || '',
+      description: item.description || '',
+      mediaFiles: item.mediaFiles || [],
+    }));
+  } catch (error) {
+    console.error('Error fetching items:', error);
+    throw error;
+  }
+};
+
+export const fetchItemById = async (id) => {
+  try {
+    const response = await authFetch(`/inventory/items/${id}`);
+    return {
+      id: response.id,
+      name: response.name,
+      category: response.category,
+      subtype: response.subtype || '',
+      size: response.size,
+      color: response.color,
+      price: response.price,
+      status: response.status,
+      ageRange: response.ageRange || '',
+      description: response.description || '',
+      mediaFiles: response.mediaFiles || [],
+    };
+  } catch (error) {
+    console.error('Error fetching item:', error);
+    throw error;
+  }
+};
+
+// ── Promotions ─────────────────────────────────────────────────────────────
+
+export const fetchPromotions = async () => {
+  try {
+    const response = await authFetch('/inventory/promotions');
+    const promosArray = Array.isArray(response) ? response : (response.content || response.promotions || []);
+    return promosArray.map(promo => ({
+      id: promo.id,
+      code: promo.code,
+      type: promo.type,
+      value: promo.value,
+      items: promo.items || [],
+      start: promo.startDate || promo.start,
+      end: promo.endDate || promo.end,
+      active: promo.active,
+    }));
+  } catch (error) {
+    console.error('Error fetching promotions:', error);
+    return [];
+  }
+};
+
+// ── Misc ───────────────────────────────────────────────────────────────────
+
+export const testBackendConnection = async () => {
+  try {
+    const response = await fetch(`${API_BASE_URL_ROOT}/inventory/items`, { method: 'HEAD' });
+    return response.ok;
+  } catch (error) {
+    console.error('Backend connection test failed:', error);
+    return false;
+  }
+};
+
+// ── Items (mutations) ──────────────────────────────────────────────────────
+
+export const createItem = async (itemData, files = []) => {
+  const fd = new FormData();
+  fd.append('data', JSON.stringify(itemData));
+  files.forEach(f => fd.append('files', f));
+  const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+  const res = await fetch(`${API_BASE_URL_ROOT}/inventory/items`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: fd,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || 'Failed to create item');
+  }
+  return res.json();
+};
+
+export const updateItem = async (id, itemData, newFiles = [], keepUrls = []) => {
+  const fd = new FormData();
+  fd.append('data', JSON.stringify(itemData));
+  fd.append('keepUrls', JSON.stringify(keepUrls));
+  newFiles.forEach(f => fd.append('files', f));
+  const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+  const res = await fetch(`${API_BASE_URL_ROOT}/inventory/items/${id}`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}` },
+    body: fd,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || 'Failed to update item');
+  }
+  return res.json();
+};
+
+export const deleteItem = async (id) => {
+  const res = await authFetch(`/inventory/items/${id}`, { method: 'DELETE' });
+  return res;
+};
+
+// ── Promotions (mutations) ─────────────────────────────────────────────────
+
+export const createPromotion = async (promoData) => {
+  return authFetch('/inventory/promotions', {
+    method: 'POST',
+    body: JSON.stringify(promoData),
+  });
+};
+
+export const updatePromotion = async (id, promoData) => {
+  return authFetch(`/inventory/promotions/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(promoData),
+  });
+};
+
+export const deletePromotion = async (id) => {
+  return authFetch(`/inventory/promotions/${id}`, { method: 'DELETE' });
+};

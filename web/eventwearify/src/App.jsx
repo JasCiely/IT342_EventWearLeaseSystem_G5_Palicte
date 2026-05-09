@@ -1,11 +1,13 @@
+import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import Index from './pages/Index';
-import Auth from './pages/Auth';
-import AdminChangePassword from './pages/admin/AdminChangePassword';
-import AdminDashboard from './pages/admin/AdminDashboard';
-import CustomerDashboard from './pages/customer/CustomerDashboard';
-import OAuth2Callback from './pages/OAuth2Callback';
-import ForgotPassword from './pages/ForgotPassword';
+import { API_BASE_URL_ROOT } from './shared/services/apiClient.js';
+import Index from './features/home/pages/Index';
+import Auth from './features/auth/pages/Auth';
+import ForgotPassword from './features/auth/pages/ForgotPassword';
+import OAuth2Callback from './features/auth/pages/OAuth2Callback';
+import AdminChangePassword from './features/admin/pages/AdminChangePassword';
+import AdminDashboard from './features/admin/pages/AdminDashboard';
+import CustomerDashboard from './features/customer/pages/CustomerDashboard';
 
 const AdminRoute = ({ children }) => {
   const role = localStorage.getItem('userRole');
@@ -45,6 +47,83 @@ const CustomerRoute = ({ children }) => {
 };
 
 function App() {
+  const [isValidatingToken, setIsValidatingToken] = useState(true);
+
+  useEffect(() => {
+    const validateToken = async () => {
+      const token = localStorage.getItem('token');
+      const isAuth = localStorage.getItem('isAuthenticated');
+      
+      // Skip validation if on auth pages or no token
+      const isAuthPage = window.location.pathname.includes('/auth') || 
+                         window.location.pathname.includes('/oauth2/callback') ||
+                         window.location.pathname === '/';
+      
+      if (!token || isAuth !== 'true' || isAuthPage) {
+        setIsValidatingToken(false);
+        return;
+      }
+      
+      try {
+        console.log('Validating token...');
+        
+        // Try to validate token with a simple API call
+        const response = await fetch(`${API_BASE_URL_ROOT}/auth/validate-token`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (!response.ok) {
+          console.warn('Token validation failed - clearing session');
+          localStorage.clear();
+          sessionStorage.clear();
+          window.location.href = '/auth';
+        } else {
+          console.log('Token is valid');
+        }
+      } catch (error) {
+        console.error('Token validation error:', error);
+        // On network error, allow user to continue
+        // They'll get 401 on first API call if token is actually invalid
+      }
+      
+      setIsValidatingToken(false);
+    };
+
+    validateToken();
+  }, []);
+
+  if (isValidatingToken) {
+    return (
+      <div style={{ 
+        minHeight: '100vh', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        backgroundColor: '#f9fafb'
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{
+            width: '48px',
+            height: '48px',
+            border: '3px solid #e0e0e0',
+            borderTop: '3px solid #c4717f',
+            borderRadius: '50%',
+            margin: '0 auto 16px',
+            animation: 'spin 0.8s linear infinite'
+          }}></div>
+          <p style={{ color: '#6b7280', fontSize: '14px', fontFamily: 'sans-serif' }}>
+            Validating session...
+          </p>
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+      </div>
+    );
+  }
+
   const handleLogin = () => {
     // Logic for post-login actions if needed
   };
@@ -61,10 +140,7 @@ function App() {
           element={<OAuth2Callback onLogin={handleLogin} />}
         />
 
-        {/* UPDATED: Customer dashboard paths.
-            We use /customer/* so that /customer/outfits, /customer/profile, etc. 
-            all load the CustomerDashboard component.
-        */}
+        {/* Customer dashboard paths */}
         <Route
           path="/customer/*"
           element={
@@ -95,10 +171,10 @@ function App() {
         />
 
         <Route path="/forgot-password" element={<ForgotPassword />} />
-        
-        {/* Default Redirect: If user goes to /dashboard, send to the new /customer/dashboard path */}
+
+        {/* Default Redirect */}
         <Route path="/dashboard" element={<Navigate to="/customer/dashboard" replace />} />
-        
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
