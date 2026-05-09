@@ -184,4 +184,12 @@ public class DirectBookingController {
             return ResponseEntity.ok(response);
         }
     }
+
+    @GetMapping("/my-all-bookings")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public ResponseEntity<List<DirectBookingResponse>> getAllMyDirectBookings(Authentication authentication) {
+        String userId = authentication.getName();
+        List<DirectBookingResponse> bookings = directBookingService.getAllUserBookingsList(userId);
+        return ResponseEntity.ok(bookings);
+    }
 }

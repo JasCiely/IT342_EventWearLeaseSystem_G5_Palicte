@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -201,7 +202,8 @@ public class DirectBookingServiceImpl implements DirectBookingService {
             throw new IllegalArgumentException("New end date must be after current end date");
         }
 
-        // Check for conflicts in the extension window only (day after current end to new end)
+        // Check for conflicts in the extension window only (day after current end to
+        // new end)
         if (directBookingRepository.hasOverlappingBookingsExcluding(
                 booking.getInventoryItemId(),
                 booking.getEndDate().plusDays(1),
@@ -280,5 +282,14 @@ public class DirectBookingServiceImpl implements DirectBookingService {
         response.setCustomerPhone(booking.getCustomerPhone());
         response.setPreferredSize(booking.getPreferredSize());
         return response;
+    }
+
+    @Override
+    public List<DirectBookingResponse> getAllUserBookingsList(String userId) {
+        Pageable unlimited = Pageable.unpaged();
+        Page<DirectBooking> page = directBookingRepository.findByUserId(userId, unlimited);
+        return page.getContent().stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 }

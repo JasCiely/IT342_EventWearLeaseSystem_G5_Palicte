@@ -23,13 +23,13 @@ import '../styles/CustomerDashboardUnique.css';
 import DashboardFragment from '../fragments/DashboardFragment';
 import BrowseOutfitsFragment from '../fragments/BrowseOutfitsFragment';
 import ManageProfileFragment from '../fragments/ManageProfileFragment';
-import PastBookingsFragment from '../fragments/PastBookingsFragment';
+import MyBookingsFragment from '../fragments/MyBookingsFragment';
 
 const NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/customer/dashboard' },
   { key: 'outfits', label: 'Browse Outfits', icon: ShoppingBag, path: '/customer/outfits' },
   { key: 'profile', label: 'My Profile', icon: UserCircle, path: '/customer/profile' },
-  { key: 'history', label: 'Past Bookings', icon: History, path: '/customer/history' },
+  { key: 'history', label: 'My Bookings', icon: History, path: '/customer/history' },
 ];
 
 const renderFragment = (key) => {
@@ -37,7 +37,7 @@ const renderFragment = (key) => {
     case 'dashboard': return <DashboardFragment />;
     case 'outfits': return <BrowseOutfitsFragment />;
     case 'profile': return <ManageProfileFragment />;
-    case 'history': return <PastBookingsFragment />;
+    case 'history': return <MyBookingsFragment />;
     default: return <DashboardFragment />;
   }
 };
