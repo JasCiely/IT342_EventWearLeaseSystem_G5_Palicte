@@ -13,7 +13,16 @@ import {
   getBookedFittingSlots,   // ← NEW: add to your bookingApi re-export
   getOccupiedDirectDates,  // ← NEW: add to your bookingApi re-export
 } from '../services/inventoryApi';
+import { getProfile } from '../services/userService';
 import { useBookingSettings } from "../../../shared/hooks/useBookingSettings";
+
+// ────────────────────────────────────────────────────────────────────────────
+// Validation helpers
+// ────────────────────────────────────────────────────────────────────────────
+const validatePhilippinePhone = (phone) => {
+  const stripped = phone.replace(/\s/g, '');
+  return /^\+63\d{10}$/.test(stripped);
+};
 
 // ────────────────────────────────────────────────────────────────────────────
 // Leasing helpers
@@ -448,13 +457,25 @@ function FittingDatePicker({ value, onChange, minDate, bookingSettings, itemId, 
 // ────────────────────────────────────────────────────────────────────────────
 // Direct Booking Modal  (with date-overlap warnings)
 // ────────────────────────────────────────────────────────────────────────────
-function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, currentUser, bookingSettings }) {
+function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, currentUser, bookingSettings, userProfile }) {
   const [form, setForm] = useState({
     startDate: '', endDate: '', notes: '',
     name: currentUser?.name || '',
     email: currentUser?.email || '',
     phone: '', preferredSize: '',
   });
+
+  // Prefill name, email, and phone (phone only if present) from user profile
+  useEffect(() => {
+    if (!userProfile) return;
+    const fullName = [userProfile.firstName, userProfile.lastName].filter(Boolean).join(' ');
+    setForm(p => ({
+      ...p,
+      ...(fullName ? { name: fullName } : {}),
+      email: userProfile.email || p.email,
+      ...(userProfile.phone ? { phone: userProfile.phone } : {}),
+    }));
+  }, [userProfile]);
   const [submitting, setSubmitting]       = useState(false);
   const [availability, setAvailability]   = useState(null);
   const [checkingAvail, setCheckingAvail] = useState(false);
@@ -521,6 +542,7 @@ function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, c
     if (overlapStatus === 'blocked') { showToast('error', 'Selected dates are not available — another booking is confirmed for those dates.'); return; }
     if (availability === false) { showToast('error', 'Selected dates are no longer available. Please choose different dates.'); return; }
     if (!form.name || !form.email || !form.phone) { showToast('error', 'Please fill in your contact information.'); return; }
+    if (!validatePhilippinePhone(form.phone)) { showToast('error', 'Invalid Philippine mobile number. Use +63 followed by 10 digits.'); return; }
 
     setSubmitting(true);
     try {
@@ -757,7 +779,7 @@ function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, c
               </div>
               <div className="inv-field">
                 <label className="inv-field-label">Phone <span className="inv-required">*</span></label>
-                <input className="inv-input" type="tel" placeholder="0912 345 6789" value={form.phone} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))} disabled={submitting} />
+                <input className="inv-input" type="tel" placeholder="+63 912 345 6789" value={form.phone} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))} disabled={submitting} />
               </div>
             </div>
             <div className="inv-field">
@@ -870,6 +892,7 @@ export default function BrowseOutfitsFragment() {
   const currentUser = useMemo(() => JSON.parse(localStorage.getItem('user') || '{}'), []);
   const authToken   = useMemo(() => localStorage.getItem('accessToken') || localStorage.getItem('token'), []);
   const isLoggedIn  = !!authToken;
+  const [userProfile, setUserProfile] = useState(null);
   
 
   // ── NEW: derived time slots from booking settings ────────────────────────
@@ -900,6 +923,10 @@ export default function BrowseOutfitsFragment() {
       .catch(()  => setIsPromosLoaded(true));
 
     if (isLoggedIn) {
+      getProfile()
+        .then(data => setUserProfile(data))
+        .catch(() => {});
+
       getUserBookings()
         .then(data => setUserBookings(data))
         .catch(err  => console.error('Error loading user bookings:', err));
@@ -947,6 +974,18 @@ export default function BrowseOutfitsFragment() {
         : (p.fittingTime || firstAvail || ''),
     }));
   }, [bookedFittingSlots, timeSlots]);
+
+  // Prefill fitting booking contact fields from user profile when form opens
+  useEffect(() => {
+    if (modal !== 'booking' || !userProfile) return;
+    const fullName = [userProfile.firstName, userProfile.lastName].filter(Boolean).join(' ');
+    setBooking(p => ({
+      ...p,
+      ...(fullName ? { name: fullName } : {}),
+      email: userProfile.email || p.email,
+      ...(userProfile.phone ? { phone: userProfile.phone } : {}),
+    }));
+  }, [modal, userProfile]);
 
   const showToast  = (type, message) => setToast({ show: true, type, message });
   const closeToast = () => setToast({ show: false, type: 'success', message: '' });
@@ -1040,6 +1079,7 @@ const hasUserDirectBookedItem = useCallback(itemId => {
     if (!isLoggedIn) { showToast('error', 'Please login first to book a fitting.'); return; }
     if (!booking.fittingDate || !booking.fittingTime) { showToast('error', 'Please select a fitting date and time.'); return; }
     if (!booking.name || !booking.email || !booking.phone) { showToast('error', 'Please fill in your contact information.'); return; }
+    if (!validatePhilippinePhone(booking.phone)) { showToast('error', 'Invalid Philippine mobile number. Use +63 followed by 10 digits.'); return; }
 
     // Working-day check
     if (bookingSettings.enableTimeRestrictions && !isWorkingDay(booking.fittingDate, bookingSettings)) {
@@ -1570,7 +1610,7 @@ const hasUserDirectBookedItem = useCallback(itemId => {
                   </div>
                   <div className="inv-field">
                     <label className="inv-field-label">Phone <span className="inv-required">*</span></label>
-                    <input className="inv-input" type="tel" placeholder="0912 345 6789" value={booking.phone} onChange={e => setBooking(p => ({ ...p, phone: e.target.value }))} disabled={submitting} />
+                    <input className="inv-input" type="tel" placeholder="+63 912 345 6789" value={booking.phone} onChange={e => setBooking(p => ({ ...p, phone: e.target.value }))} disabled={submitting} />
                   </div>
                 </div>
                 <div className="inv-field">
@@ -1668,6 +1708,7 @@ const hasUserDirectBookedItem = useCallback(itemId => {
           showToast={showToast}
           currentUser={currentUser}
           bookingSettings={bookingSettings}
+          userProfile={userProfile}
           onSuccess={confirmed => {
             getUserDirectBookings()
               .then(data => {
