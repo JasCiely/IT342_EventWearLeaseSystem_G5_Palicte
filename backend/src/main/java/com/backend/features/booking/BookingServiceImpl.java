@@ -89,6 +89,18 @@ public class BookingServiceImpl implements BookingService {
             return response;
         }
 
+        // Per-item uniqueness check: same item cannot be booked at the same date+time twice
+        boolean itemSlotTaken = bookingRepository.existsByItemIdAndFittingDateAndFittingTimeAndStatus(
+                request.getItemId(), request.getFittingDate(), request.getFittingTime(), "CONFIRMED");
+        if (itemSlotTaken) {
+            log.warn("Item {} is already booked at {} {}", request.getItemId(), request.getFittingDate(), request.getFittingTime());
+            FittingBookingResponse response = new FittingBookingResponse();
+            response.setBookingId(null);
+            response.setStatus("FAILED");
+            response.setMessage("This time slot is already booked for this item.");
+            return response;
+        }
+
         // Validate time slot boundary (must align with fitting duration)
         if (!isValidTimeSlot(request.getFittingTime(), settings.getFittingDurationMinutes())) {
             log.warn("Invalid time slot: {}", request.getFittingTime());
@@ -222,6 +234,11 @@ public class BookingServiceImpl implements BookingService {
         }
 
         return slots;
+    }
+
+    @Override
+    public List<String> getBookedFittingSlots(String itemId, String date) {
+        return bookingRepository.findBookedTimesByItemAndDate(itemId, date);
     }
 
     // ── Query helpers ─────────────────────────────────────────────────────────

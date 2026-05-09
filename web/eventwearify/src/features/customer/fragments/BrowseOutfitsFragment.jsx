@@ -2,21 +2,32 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   Search, LayoutGrid, List, Eye, Calendar,
-  CheckCircle, AlertCircle, X, ChevronLeft, ChevronRight,
+  CheckCircle, AlertCircle, X, ChevronLeft, ChevronRight, ChevronDown,
   Play, Sparkles, Clock, AlertTriangle,
-  Loader2, ShoppingBag
+  Loader2, ShoppingBag, Info
 } from 'lucide-react';
 import '../styles/BrowseOutfitsFragment.css';
 import {
   fetchItems, fetchPromotions, bookFitting, getUserBookings,
-  createDirectBooking, checkDirectBookingAvailability, getUserDirectBookings
+  createDirectBooking, checkDirectBookingAvailability, getUserDirectBookings,
+  getBookedFittingSlots,   // ← NEW: add to your bookingApi re-export
+  getOccupiedDirectDates,  // ← NEW: add to your bookingApi re-export
 } from '../services/inventoryApi';
+import { useBookingSettings } from "../../../shared/hooks/useBookingSettings";
 
 // ────────────────────────────────────────────────────────────────────────────
 // Leasing helpers
 // ────────────────────────────────────────────────────────────────────────────
 const DEFAULT_LEASING = { minLeaseDays: 2, weeklyDiscount: 100, monthlyDiscountCap: 300 };
 
+const to24Hour = (time12) => {
+  const [time, period] = time12.split(' ');
+  let [hours, minutes] = time.split(':').map(Number);
+  if (period === 'AM' && hours === 12) hours = 0;
+  if (period === 'PM' && hours !== 12) hours += 12;
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+};
+ 
 function getLeasingSettings() {
   try {
     const saved = localStorage.getItem('leasingSettings');
@@ -28,26 +39,96 @@ function getLeasingSettings() {
 
 function calculateLeasePricing(dailyRate, startDateStr, endDateStr) {
   if (!startDateStr || !endDateStr) return null;
-
   const start = new Date(startDateStr);
   const end   = new Date(endDateStr);
   if (isNaN(start) || isNaN(end) || end < start) return null;
-
   const settings  = getLeasingSettings();
   const totalDays = Math.round((end - start) / 86_400_000) + 1;
-
   if (totalDays < settings.minLeaseDays) {
     return { isValid: false, totalDays, minLeaseDays: settings.minLeaseDays };
   }
-
   const basePrice  = dailyRate * totalDays;
   const weeks      = Math.floor(totalDays / 7);
   const rawDisc    = weeks * settings.weeklyDiscount;
   const discount   = Math.min(rawDisc, settings.monthlyDiscountCap);
   const finalPrice = Math.max(0, basePrice - discount);
   const savings    = discount > 0 ? `You saved ₱${discount.toLocaleString()} from weekly discounts` : '';
-
   return { isValid: true, totalDays, weeks, basePrice, discount, finalPrice, savingsText: savings, minLeaseDays: settings.minLeaseDays };
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Time-slot generation helpers
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Format total-minutes-from-midnight → "h:mm AM/PM" label.
+ */
+function min2label(totalMin) {
+  const h24 = Math.floor(totalMin / 60);
+  const m   = totalMin % 60;
+  const period = h24 >= 12 ? 'PM' : 'AM';
+  const h12    = h24 % 12 || 12;
+  return `${h12}:${String(m).padStart(2, '0')} ${period}`;
+}
+
+/**
+ * Build the array of time-slot strings that the shop offers based on
+ * BookingTimeSettings (open time, close time, fittingDurationMinutes).
+ * The last slot must START before (closeTime - duration) so the fitting
+ * still finishes within shop hours.
+ *
+ * Returns string[] e.g. ["9:00 AM", "9:30 AM", …, "4:30 PM"]
+ */
+function buildTimeSlots(settings) {
+  const openMin  = (settings.startHour  ?? 9)  * 60 + (settings.startMinute  ?? 0);
+  const closeMin = (settings.endHour    ?? 17) * 60 + (settings.endMinute    ?? 0);
+  const step     = settings.fittingDurationMinutes || 30;
+  const slots    = [];
+  for (let t = openMin; t + step <= closeMin; t += step) {
+    slots.push(min2label(t));
+  }
+  return slots;
+}
+
+/**
+ * Return true if a given date string (YYYY-MM-DD) is a working day
+ * according to the backend settings.
+ * workingDays uses JS convention: 0 = Sunday … 6 = Saturday.
+ */
+function isWorkingDay(dateStr, settings) {
+  if (!settings?.enabled) return true;
+  if (!dateStr) return true;
+  const dow = new Date(dateStr + 'T00:00:00').getDay(); // 0=Sun…6=Sat
+  return (settings.workingDays || [1, 2, 3, 4, 5]).includes(dow);
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Direct booking date-range overlap helpers
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Check whether [s1,e1] overlaps [s2,e2] (inclusive, YYYY-MM-DD strings).
+ */
+function datesOverlap(s1, e1, s2, e2) {
+  return s1 <= e2 && e1 >= s2;
+}
+
+/**
+ * Classify how a proposed [startDate, endDate] sits among occupiedRanges.
+ * Returns:
+ *   'blocked'  — overlaps at least one Approved/Confirmed range
+ *   'pending'  — overlaps at least one Pending range (but no blocked)
+ *   'free'     — no overlap at all
+ */
+function classifyDateRange(startDate, endDate, occupiedRanges) {
+  if (!startDate || !endDate || !occupiedRanges?.length) return 'free';
+  let hasPending = false;
+  for (const r of occupiedRanges) {
+    if (!datesOverlap(startDate, endDate, r.startDate, r.endDate)) continue;
+    if (r.status === 'Approved' || r.status === 'Confirmed') return 'blocked';
+    if (r.status === 'Pending') hasPending = true;
+  }
+  return hasPending ? 'pending' : 'free';
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -62,8 +143,8 @@ const ITEM_STATUS_META = {
 
 const CAT_COLORS = { Gown: '#c4717f', Suit: '#6b2d39', Traditional: '#b45309', Accessories: '#486581' };
 
-const todayStr  = () => new Date().toISOString().split('T')[0];
-const fmtDate   = d  => d ? new Date(d).toLocaleDateString('en-PH', { year:'numeric', month:'short', day:'numeric' }) : '';
+const todayStr    = () => new Date().toISOString().split('T')[0];
+const fmtDate     = d => d ? new Date(d).toLocaleDateString('en-PH', { year:'numeric', month:'short', day:'numeric' }) : '';
 const fmtDateTime = (d, t) => d ? `${fmtDate(d)} at ${t}` : '';
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -119,7 +200,6 @@ function MediaGallery({ item, startIndex = 0, onClose }) {
 
   if (!files.length) return null;
   const current = files[idx];
-
   return (
     <div className="inv-lightbox" onClick={onClose}>
       <button className="inv-lightbox-close" onClick={onClose}><X size={18} /></button>
@@ -203,21 +283,188 @@ function FastSkeletonRow() {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Direct Booking Modal
+// Fitting Date Picker — compact popup calendar
 // ────────────────────────────────────────────────────────────────────────────
-function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, currentUser }) {
-  const [form, setForm] = useState({ 
-    startDate: '', 
-    endDate: '', 
-    notes: '',
+const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const DOW_LABELS  = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+
+function FittingDatePicker({ value, onChange, minDate, bookingSettings, itemId, timeSlots, slotCacheRef, disabled }) {
+  const today = minDate || todayStr();
+
+  const [open, setOpen]             = useState(false);
+  const wrapRef                     = useRef(null);
+  const [view, setView]             = useState(() => {
+    const d = value ? new Date(value + 'T00:00:00') : new Date();
+    return { year: d.getFullYear(), month: d.getMonth() };
+  });
+  const [localCache, setLocalCache] = useState({});
+  const [loadingSet, setLoadingSet] = useState(new Set());
+
+  // Close popup on outside click
+  useEffect(() => {
+    if (!open) return;
+    const h = e => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [open]);
+
+  // Keep view in sync with selected value
+  useEffect(() => {
+    if (value) {
+      const d = new Date(value + 'T00:00:00');
+      setView({ year: d.getFullYear(), month: d.getMonth() });
+    }
+  }, [value]);
+
+  const { year, month } = view;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDow    = new Date(year, month, 1).getDay();
+
+  // Batch-fetch booked slots for all visible working days
+  useEffect(() => {
+    if (!itemId || !timeSlots.length) return;
+    const toFetch = [];
+    for (let d = 1; d <= daysInMonth; d++) {
+      const ds = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      if (ds < today) continue;
+      if (!isWorkingDay(ds, bookingSettings)) continue;
+      const cKey = `${itemId}__${ds}`;
+      if (localCache[ds] !== undefined || slotCacheRef?.current?.[cKey] !== undefined) continue;
+      toFetch.push(ds);
+    }
+    if (!toFetch.length) return;
+
+    setLoadingSet(prev => new Set([...prev, ...toFetch]));
+    Promise.all(
+      toFetch.map(ds =>
+        getBookedFittingSlots(itemId, ds)
+          .then(slots => ({ ds, slots }))
+          .catch(()    => ({ ds, slots: [] }))
+      )
+    ).then(results => {
+      const patch = {};
+      results.forEach(({ ds, slots }) => {
+        patch[ds] = slots;
+        if (slotCacheRef) slotCacheRef.current[`${itemId}__${ds}`] = slots;
+      });
+      setLocalCache(prev => ({ ...prev, ...patch }));
+      setLoadingSet(prev => {
+        const next = new Set(prev);
+        results.forEach(({ ds }) => next.delete(ds));
+        return next;
+      });
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [year, month, itemId, timeSlots.length]);
+
+  const getSlots = ds => {
+    if (localCache[ds] !== undefined) return localCache[ds];
+    return slotCacheRef?.current?.[`${itemId}__${ds}`];
+  };
+
+  const prevMonth = () => setView(v => { const d = new Date(v.year, v.month - 1, 1); return { year: d.getFullYear(), month: d.getMonth() }; });
+  const nextMonth = () => setView(v => { const d = new Date(v.year, v.month + 1, 1); return { year: d.getFullYear(), month: d.getMonth() }; });
+  const canPrev = new Date(year, month, 0).toISOString().split('T')[0] >= today;
+
+  const cells = [];
+  for (let i = 0; i < firstDow; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+  const handleSelect = ds => { onChange(ds); setOpen(false); };
+
+  return (
+    <div className="fitting-cal-wrap" ref={wrapRef}>
+      {/* Trigger — same height as other inputs */}
+      <button
+        type="button"
+        className={`fitting-cal-trigger${!value ? ' fct-empty' : ''}`}
+        onClick={() => !disabled && setOpen(o => !o)}
+        disabled={disabled}
+      >
+        <Calendar size={13} style={{ color: value ? '#6b2d39' : '#bbb', flexShrink: 0 }} />
+        <span style={{ flex: 1, textAlign: 'left' }}>{value ? fmtDate(value) : 'Select a date'}</span>
+        <ChevronDown size={13} style={{ color: '#bbb', flexShrink: 0, transition: 'transform 0.15s', transform: open ? 'rotate(180deg)' : 'none' }} />
+      </button>
+
+      {/* Popup calendar */}
+      {open && (
+        <div className="fitting-cal-popup">
+          <div className="fitting-cal-header">
+            <button type="button" className="fitting-cal-nav" onClick={prevMonth} disabled={!canPrev}><ChevronLeft size={13} /></button>
+            <span className="fitting-cal-title">{MONTH_NAMES[month]} {year}</span>
+            <button type="button" className="fitting-cal-nav" onClick={nextMonth}><ChevronRight size={13} /></button>
+          </div>
+
+          <div className="fitting-cal-grid">
+            {DOW_LABELS.map(d => <div key={d} className="fitting-cal-dow">{d}</div>)}
+            {cells.map((day, i) => {
+              if (!day) return <div key={`e${i}`} />;
+              const ds         = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+              const isPast     = ds < today;
+              const isNonWork  = !isWorkingDay(ds, bookingSettings);
+              const slots      = getSlots(ds);
+              const isChecking = loadingSet.has(ds);
+              const isFullBook = !isPast && !isNonWork && timeSlots.length > 0 && slots !== undefined && timeSlots.every(t => slots.includes(t));
+              const isSelected = ds === value;
+              const isToday    = ds === today;
+              const clickable  = !isPast && !isNonWork && !isFullBook;
+
+              let cls = 'fitting-cal-day';
+              if (isPast)        cls += ' fcd-past';
+              else if (isNonWork)  cls += ' fcd-closed';
+              else if (isFullBook) cls += ' fcd-full';
+              else               cls += ' fcd-avail';
+              if (isSelected)    cls += ' fcd-selected';
+              if (isToday && !isSelected) cls += ' fcd-today';
+
+              return (
+                <button
+                  key={ds}
+                  type="button"
+                  className={cls}
+                  onClick={() => clickable && handleSelect(ds)}
+                  disabled={!clickable}
+                  title={isPast ? 'Past date' : isNonWork ? 'Closed day' : isFullBook ? 'Fully booked' : undefined}
+                >
+                  {day}
+                  {isChecking && !isPast && !isNonWork && <span className="fcd-dot fcd-dot-checking" />}
+                  {isFullBook && !isChecking && <span className="fcd-dot fcd-dot-full" />}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="fitting-cal-legend">
+            <span><span className="fcl-dot fcl-avail" />Available</span>
+            <span><span className="fcl-dot fcl-full" />Fully Booked</span>
+            <span><span className="fcl-dot fcl-closed" />Closed</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Direct Booking Modal  (with date-overlap warnings)
+// ────────────────────────────────────────────────────────────────────────────
+function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, currentUser, bookingSettings }) {
+  const [form, setForm] = useState({
+    startDate: '', endDate: '', notes: '',
     name: currentUser?.name || '',
     email: currentUser?.email || '',
-    phone: '',
-    preferredSize: ''
+    phone: '', preferredSize: '',
   });
-  const [submitting, setSubmitting] = useState(false);
-  const [availability, setAvailability] = useState(null);
+  const [submitting, setSubmitting]       = useState(false);
+  const [availability, setAvailability]   = useState(null);
   const [checkingAvail, setCheckingAvail] = useState(false);
+  const [occupiedRanges, setOccupiedRanges]   = useState([]);
+  const [loadingOccupied, setLoadingOccupied] = useState(true);
+  // 'free' | 'pending' | 'blocked' | null
+  const [overlapStatus, setOverlapStatus] = useState(null);
+  // true = user confirmed they want to proceed despite pending overlap
+  const [pendingAcknowledged, setPendingAcknowledged] = useState(false);
+
   const debounceRef = useRef(null);
 
   const pricing = useMemo(
@@ -225,8 +472,31 @@ function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, c
     [item.price, form.startDate, form.endDate]
   );
 
+  // Load occupied date ranges for this item once on mount
+  useEffect(() => {
+    setLoadingOccupied(true);
+    getOccupiedDirectDates(item.id)
+      .then(ranges => setOccupiedRanges(ranges))
+      .catch(() => setOccupiedRanges([]))
+      .finally(() => setLoadingOccupied(false));
+  }, [item.id]);
+
+  // Recompute overlap whenever dates change
   useEffect(() => {
     if (!form.startDate || !form.endDate || !pricing?.isValid) {
+      setOverlapStatus(null);
+      setPendingAcknowledged(false);
+      return;
+    }
+    const status = classifyDateRange(form.startDate, form.endDate, occupiedRanges);
+    setOverlapStatus(status);
+    // Reset acknowledgement whenever dates change
+    setPendingAcknowledged(false);
+  }, [form.startDate, form.endDate, pricing?.isValid, occupiedRanges]);
+
+  // Availability check (debounced) — only runs when NOT blocked
+  useEffect(() => {
+    if (!form.startDate || !form.endDate || !pricing?.isValid || overlapStatus === 'blocked') {
       setAvailability(null);
       return;
     }
@@ -243,11 +513,12 @@ function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, c
       }
     }, 500);
     return () => clearTimeout(debounceRef.current);
-  }, [form.startDate, form.endDate, pricing?.isValid, item.id]);
+  }, [form.startDate, form.endDate, pricing?.isValid, overlapStatus, item.id]);
 
   const handleSubmit = async () => {
     if (!isLoggedIn) { showToast('error', 'Please login first to make a booking.'); return; }
     if (!pricing?.isValid) return;
+    if (overlapStatus === 'blocked') { showToast('error', 'Selected dates are not available — another booking is confirmed for those dates.'); return; }
     if (availability === false) { showToast('error', 'Selected dates are no longer available. Please choose different dates.'); return; }
     if (!form.name || !form.email || !form.phone) { showToast('error', 'Please fill in your contact information.'); return; }
 
@@ -269,13 +540,13 @@ function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, c
         preferredSize:  form.preferredSize || item.size,
       });
       onSuccess({
-        id:         result.id,
-        itemName:   item.name,
-        startDate:  form.startDate,
-        endDate:    form.endDate,
-        totalDays:  pricing.totalDays,
-        finalPrice: pricing.finalPrice,
-        customerName: form.name,
+        id:            result.id,
+        itemName:      item.name,
+        startDate:     form.startDate,
+        endDate:       form.endDate,
+        totalDays:     pricing.totalDays,
+        finalPrice:    pricing.finalPrice,
+        customerName:  form.name,
         customerEmail: form.email,
         customerPhone: form.phone,
       });
@@ -286,7 +557,23 @@ function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, c
     }
   };
 
-  const canSubmit = pricing?.isValid && availability !== false && !submitting && !checkingAvail && form.name && form.email && form.phone;
+  // Determine whether the submit button should be active
+  const pendingBlocking = overlapStatus === 'pending' && !pendingAcknowledged;
+  const canSubmit = (
+    pricing?.isValid &&
+    overlapStatus !== 'blocked' &&
+    availability !== false &&
+    !submitting &&
+    !checkingAvail &&
+    !pendingBlocking &&
+    form.name && form.email && form.phone
+  );
+
+  // Build the min date for the date pickers based on working days
+  // We don't grey calendar days (HTML <input type="date"> has no per-day disabling),
+  // but we DO validate on submit and show an inline notice when the date is a non-working day.
+  const startIsNonWorking = form.startDate && !isWorkingDay(form.startDate, bookingSettings);
+  const endIsNonWorking   = form.endDate   && !isWorkingDay(form.endDate,   bookingSettings);
 
   return (
     <div className="inv-overlay" onClick={onClose}>
@@ -310,31 +597,43 @@ function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, c
             <div><strong>Note:</strong> Direct booking requires full payment upon confirmation. You will be contacted for payment and pickup arrangements.</div>
           </div>
 
+          {/* ── Date Pickers ─────────────────────────── */}
           <div className="inv-modal-grid">
             <div className="inv-field">
               <label className="inv-field-label">Rental Start Date <span className="inv-required">*</span></label>
               <input
-                className="inv-input"
+                className={`inv-input${startIsNonWorking ? ' inv-input-warn' : ''}`}
                 type="date"
                 min={todayStr()}
                 value={form.startDate}
                 onChange={e => setForm(p => ({ ...p, startDate: e.target.value, endDate: p.endDate && p.endDate < e.target.value ? '' : p.endDate }))}
                 disabled={submitting}
               />
+              {startIsNonWorking && (
+                <span className="inv-field-hint inv-field-hint-warn">
+                  <AlertTriangle size={11} /> Not a working day
+                </span>
+              )}
             </div>
             <div className="inv-field">
               <label className="inv-field-label">Rental End Date <span className="inv-required">*</span></label>
               <input
-                className="inv-input"
+                className={`inv-input${endIsNonWorking ? ' inv-input-warn' : ''}`}
                 type="date"
                 min={form.startDate || todayStr()}
                 value={form.endDate}
                 onChange={e => setForm(p => ({ ...p, endDate: e.target.value }))}
                 disabled={submitting || !form.startDate}
               />
+              {endIsNonWorking && (
+                <span className="inv-field-hint inv-field-hint-warn">
+                  <AlertTriangle size={11} /> Not a working day
+                </span>
+              )}
             </div>
           </div>
 
+          {/* ── Pricing validation ──────────────────── */}
           {pricing && !pricing.isValid && (
             <div className="inv-warning-box">
               <AlertTriangle size={16} />
@@ -342,22 +641,73 @@ function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, c
             </div>
           )}
 
+          {/* ── Overlap / availability indicators ───── */}
           {pricing?.isValid && (
-            <div style={{ marginBottom: '0.75rem' }}>
-              {checkingAvail && (
-                <div className="inv-warning-box" style={{ borderColor: '#6b2d39' }}>
+            <div style={{ display:'flex', flexDirection:'column', gap:'0.5rem' }}>
+
+              {/* BLOCKED — confirmed/approved booking exists for these dates */}
+              {overlapStatus === 'blocked' && (
+                <div className="inv-warning-box inv-warning-box-blocked">
+                  <AlertTriangle size={16} />
+                  <div>
+                    <strong>Dates not available.</strong> Another booking has already been confirmed
+                    for this item during your selected period. Please choose different dates.
+                  </div>
+                </div>
+              )}
+
+              {/* PENDING — another user has a pending (unconfirmed) booking */}
+              {overlapStatus === 'pending' && !pendingAcknowledged && (
+                <div className="inv-warning-box inv-warning-box-pending">
+                  <Info size={16} style={{ flexShrink: 0, marginTop: 2 }} />
+                  <div style={{ flex: 1 }}>
+                    <strong>Heads up:</strong> Another customer has a <em>pending</em> booking for
+                    this item during your selected dates. Their booking is not yet confirmed.
+                    <br />
+                    Do you still want to continue with these dates?
+                    <div className="inv-overlap-actions">
+                      <button
+                        className="inv-btn-overlap-yes"
+                        onClick={() => setPendingAcknowledged(true)}
+                        disabled={submitting}
+                      >
+                        Yes, continue
+                      </button>
+                      <button
+                        className="inv-btn-overlap-no"
+                        onClick={() => setForm(p => ({ ...p, startDate: '', endDate: '' }))}
+                        disabled={submitting}
+                      >
+                        No, pick different dates
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* PENDING — acknowledged */}
+              {overlapStatus === 'pending' && pendingAcknowledged && (
+                <div className="inv-warning-box" style={{ background:'rgba(245,158,11,0.07)', borderColor:'#f59e0b', color:'#b45309' }}>
+                  <Info size={14} />
+                  <span>Proceeding with dates that have a pending booking. If the other booking is approved first, yours may not be confirmed.</span>
+                </div>
+              )}
+
+              {/* Backend availability check */}
+              {overlapStatus !== 'blocked' && checkingAvail && (
+                <div className="inv-warning-box" style={{ borderColor:'#6b2d39' }}>
                   <Loader2 size={14} className="inv-spinner-inline" />
                   <span>Checking availability…</span>
                 </div>
               )}
-              {!checkingAvail && availability === false && (
+              {overlapStatus !== 'blocked' && !checkingAvail && availability === false && (
                 <div className="inv-warning-box">
                   <AlertTriangle size={16} />
-                  <div>These dates are <strong>not available</strong> for this item. Please choose different dates.</div>
+                  <div>These dates are <strong>not available</strong>. Please choose different dates.</div>
                 </div>
               )}
-              {!checkingAvail && availability === true && (
-                <div className="inv-warning-box" style={{ background: 'rgba(21,128,61,0.07)', borderColor: '#15803d', color: '#15803d' }}>
+              {overlapStatus !== 'blocked' && !checkingAvail && availability === true && overlapStatus !== 'pending' && (
+                <div className="inv-warning-box" style={{ background:'rgba(21,128,61,0.07)', borderColor:'#15803d', color:'#15803d' }}>
                   <CheckCircle size={14} />
                   <span>Dates are available!</span>
                 </div>
@@ -365,6 +715,7 @@ function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, c
             </div>
           )}
 
+          {/* ── Pricing summary ─────────────────────── */}
           {pricing?.isValid && (
             <div className="inv-pricing-summary">
               <div className="inv-pricing-row">
@@ -386,80 +737,46 @@ function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, c
                 <span className="label"><strong>Total Amount:</strong></span>
                 <span className="value"><strong>₱{pricing.finalPrice.toLocaleString()}</strong></span>
               </div>
-              {pricing.savingsText && (
-                <div className="inv-savings-text">{pricing.savingsText}</div>
-              )}
+              {pricing.savingsText && <div className="inv-savings-text">{pricing.savingsText}</div>}
             </div>
           )}
 
-          <div style={{ borderTop: '1px solid #eeecea', marginTop: '0.5rem', paddingTop: '1rem' }}>
-            <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '1rem', display: 'block' }}>
+          {/* ── Customer info ────────────────────────── */}
+          <div style={{ borderTop:'1px solid #eeecea', marginTop:'0.5rem', paddingTop:'1rem' }}>
+            <label style={{ fontSize:'0.75rem', fontWeight:700, color:'#888', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:'1rem', display:'block' }}>
               Customer Information
             </label>
             <div className="inv-field">
               <label className="inv-field-label">Full Name <span className="inv-required">*</span></label>
-              <input
-                className="inv-input"
-                type="text"
-                placeholder="Enter your full name"
-                value={form.name}
-                onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
-                disabled={submitting}
-              />
+              <input className="inv-input" type="text" placeholder="Enter your full name" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} disabled={submitting} />
             </div>
             <div className="inv-modal-grid">
               <div className="inv-field">
                 <label className="inv-field-label">Email <span className="inv-required">*</span></label>
-                <input
-                  className="inv-input"
-                  type="email"
-                  placeholder="you@example.com"
-                  value={form.email}
-                  onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
-                  disabled={submitting}
-                />
+                <input className="inv-input" type="email" placeholder="you@example.com" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} disabled={submitting} />
               </div>
               <div className="inv-field">
                 <label className="inv-field-label">Phone <span className="inv-required">*</span></label>
-                <input
-                  className="inv-input"
-                  type="tel"
-                  placeholder="0912 345 6789"
-                  value={form.phone}
-                  onChange={e => setForm(p => ({ ...p, phone: e.target.value }))}
-                  disabled={submitting}
-                />
+                <input className="inv-input" type="tel" placeholder="0912 345 6789" value={form.phone} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))} disabled={submitting} />
               </div>
             </div>
             <div className="inv-field">
               <label className="inv-field-label">Preferred Size</label>
-              <select
-                className="inv-select"
-                value={form.preferredSize}
-                onChange={e => setForm(p => ({ ...p, preferredSize: e.target.value }))}
-                disabled={submitting}
-                style={{ width: '100%' }}
-              >
+              <select className="inv-select" value={form.preferredSize} onChange={e => setForm(p => ({ ...p, preferredSize: e.target.value }))} disabled={submitting} style={{ width:'100%' }}>
                 <option value="">Select size (optional)</option>
-                {['XS', 'S', 'M', 'L', 'XL', 'XXL'].map(s => <option key={s}>{s}</option>)}
+                {['XS','S','M','L','XL','XXL'].map(s => <option key={s}>{s}</option>)}
               </select>
             </div>
           </div>
 
           <div className="inv-field">
             <label className="inv-field-label">Special Instructions</label>
-            <textarea
-              className="inv-textarea"
-              rows={3}
-              placeholder="Any specific notes or requirements…"
-              value={form.notes}
-              onChange={e => setForm(p => ({ ...p, notes: e.target.value }))}
-              disabled={submitting}
-            />
+            <textarea className="inv-textarea" rows={3} placeholder="Any specific notes or requirements…" value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} disabled={submitting} />
           </div>
 
+          {/* ── Summary box ──────────────────────────── */}
           <div className="bk-payment-summary">
-            <div className="bk-ps-row total" style={{ borderBottom: 'none', marginBottom: 0, paddingBottom: 0 }}>
+            <div className="bk-ps-row total" style={{ borderBottom:'none', marginBottom:0, paddingBottom:0 }}>
               <span><strong>Booking Summary</strong></span>
             </div>
             <div className="bk-ps-row"><span>Item</span><span>{item.name}</span></div>
@@ -470,11 +787,7 @@ function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, c
 
         <div className="inv-modal-footer">
           <button className="inv-btn-ghost" onClick={onClose} disabled={submitting}>Cancel</button>
-          <button
-            className="inv-btn-primary"
-            onClick={handleSubmit}
-            disabled={!canSubmit}
-          >
+          <button className="inv-btn-primary" onClick={handleSubmit} disabled={!canSubmit}>
             {submitting
               ? <><Loader2 size={14} className="inv-spinner-inline" /> Submitting…</>
               : <><ShoppingBag size={13} /> Confirm Booking</>}
@@ -488,9 +801,9 @@ function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, c
 function DirectBookingConfirmModal({ booking, onClose }) {
   return (
     <div className="inv-overlay" onClick={onClose}>
-      <div className="inv-modal" style={{ maxWidth: '500px' }} onClick={e => e.stopPropagation()}>
-        <div className="inv-modal-header" style={{ background: '#15803d08', borderBottomColor: '#15803d20' }}>
-          <h3 style={{ color: '#15803d', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+      <div className="inv-modal" style={{ maxWidth:'500px' }} onClick={e => e.stopPropagation()}>
+        <div className="inv-modal-header" style={{ background:'#15803d08', borderBottomColor:'#15803d20' }}>
+          <h3 style={{ color:'#15803d', display:'flex', alignItems:'center', gap:'0.5rem' }}>
             <CheckCircle size={20} /> Direct Booking Submitted!
           </h3>
           <button className="inv-modal-close" onClick={onClose}><X size={15} /></button>
@@ -507,30 +820,12 @@ function DirectBookingConfirmModal({ booking, onClose }) {
                   <span className="inv-booking-value">#DB-{booking.id.slice(-8).toUpperCase()}</span>
                 </div>
               )}
-              <div className="inv-booking-detail-row">
-                <span className="inv-booking-label">Item:</span>
-                <span className="inv-booking-value">{booking.itemName}</span>
-              </div>
-              <div className="inv-booking-detail-row">
-                <span className="inv-booking-label">Rental Period:</span>
-                <span className="inv-booking-value">{fmtDate(booking.startDate)} – {fmtDate(booking.endDate)}</span>
-              </div>
-              <div className="inv-booking-detail-row">
-                <span className="inv-booking-label">Duration:</span>
-                <span className="inv-booking-value">{booking.totalDays} day{booking.totalDays !== 1 ? 's' : ''}</span>
-              </div>
-              <div className="inv-booking-detail-row">
-                <span className="inv-booking-label">Total Amount:</span>
-                <span className="inv-booking-value">₱{booking.finalPrice.toLocaleString()}</span>
-              </div>
-              <div className="inv-booking-detail-row">
-                <span className="inv-booking-label">Customer:</span>
-                <span className="inv-booking-value">{booking.customerName}</span>
-              </div>
-              <div className="inv-booking-detail-row">
-                <span className="inv-booking-label">Status:</span>
-                <span className="inv-booking-value" style={{ color: '#f59e0b', fontWeight: 600 }}>Pending Approval</span>
-              </div>
+              <div className="inv-booking-detail-row"><span className="inv-booking-label">Item:</span><span className="inv-booking-value">{booking.itemName}</span></div>
+              <div className="inv-booking-detail-row"><span className="inv-booking-label">Rental Period:</span><span className="inv-booking-value">{fmtDate(booking.startDate)} – {fmtDate(booking.endDate)}</span></div>
+              <div className="inv-booking-detail-row"><span className="inv-booking-label">Duration:</span><span className="inv-booking-value">{booking.totalDays} day{booking.totalDays !== 1 ? 's' : ''}</span></div>
+              <div className="inv-booking-detail-row"><span className="inv-booking-label">Total Amount:</span><span className="inv-booking-value">₱{booking.finalPrice.toLocaleString()}</span></div>
+              <div className="inv-booking-detail-row"><span className="inv-booking-label">Customer:</span><span className="inv-booking-value">{booking.customerName}</span></div>
+              <div className="inv-booking-detail-row"><span className="inv-booking-label">Status:</span><span className="inv-booking-value" style={{ color:'#f59e0b', fontWeight:600 }}>Pending Approval</span></div>
             </div>
             <div className="inv-reminder-box">
               <Clock size={14} />
@@ -550,52 +845,65 @@ function DirectBookingConfirmModal({ booking, onClose }) {
 // Main Component
 // ────────────────────────────────────────────────────────────────────────────
 export default function BrowseOutfitsFragment() {
-  const [items, setItems] = useState([]);
-  const [promos, setPromos] = useState([]);
-  const [userBookings, setUserBookings] = useState([]);
+  const [items, setItems]             = useState([]);
+  const [promos, setPromos]           = useState([]);
+  const [userBookings, setUserBookings]     = useState([]);
   const [directBookings, setDirectBookings] = useState([]);
-  const [isItemsLoaded, setIsItemsLoaded] = useState(false);
+  const [isItemsLoaded, setIsItemsLoaded]   = useState(false);
   const [isPromosLoaded, setIsPromosLoaded] = useState(false);
-  const [loadError, setLoadError] = useState('');
+  const [loadError, setLoadError]     = useState('');
 
-  const [viewMode, setViewMode] = useState('grid');
-  const [search, setSearch] = useState('');
-  const [filterCat, setFilterCat] = useState('All');
+  // ── Booking settings from backend ───────────────────────────────────────
+  const { settings: bookingSettings } = useBookingSettings();
+
+  const [viewMode, setViewMode]       = useState('grid');
+  const [search, setSearch]           = useState('');
+  const [filterCat, setFilterCat]     = useState('All');
   const [filterSubcat, setFilterSubcat] = useState('All');
-  const [filterSize, setFilterSize] = useState('All');
+  const [filterSize, setFilterSize]   = useState('All');
 
-  const [selectedItem, setSelectedItem] = useState(null);
-  const [modal, setModal] = useState(null);
-  const [gallery, setGallery] = useState(null);
-  const [toast, setToast] = useState({ show: false, type: 'success', message: '' });
+  const [selectedItem, setSelectedItem]         = useState(null);
+  const [modal, setModal]                       = useState(null);
+  const [gallery, setGallery]                   = useState(null);
+  const [toast, setToast]                       = useState({ show: false, type: 'success', message: '' });
 
   const currentUser = useMemo(() => JSON.parse(localStorage.getItem('user') || '{}'), []);
-  const authToken = useMemo(() => localStorage.getItem('accessToken') || localStorage.getItem('token'), []);
-  const isLoggedIn = !!authToken;
+  const authToken   = useMemo(() => localStorage.getItem('accessToken') || localStorage.getItem('token'), []);
+  const isLoggedIn  = !!authToken;
+  
+
+  // ── NEW: derived time slots from booking settings ────────────────────────
+  const timeSlots = useMemo(() => buildTimeSlots(bookingSettings), [bookingSettings]);
 
   const [booking, setBooking] = useState({
-    fittingDate: '', fittingTime: '10:00 AM',
+    fittingDate: '', fittingTime: '',
     name: currentUser.name || '', email: currentUser.email || '',
     phone: '', preferredSize: '', notes: '',
   });
-  const [bookingConfirmed, setBookingConfirmed] = useState(null);
-  const [submitting, setSubmitting] = useState(false);
+  const [bookingConfirmed, setBookingConfirmed]           = useState(null);
+  const [submitting, setSubmitting]                       = useState(false);
   const [directBookingConfirmed, setDirectBookingConfirmed] = useState(null);
 
+  // ── NEW: booked fitting slots for the selected item+date ────────────────
+  const [bookedFittingSlots, setBookedFittingSlots]       = useState([]);
+  const [loadingFittingSlots, setLoadingFittingSlots]     = useState(false);
+  const slotCacheRef = useRef({});
+
+  // ── Fetch everything on mount ────────────────────────────────────────────
   useEffect(() => {
     fetchItems()
       .then(data => { setItems(data); setIsItemsLoaded(true); })
-      .catch(err => { setLoadError(err.message || 'Failed to load items.'); setIsItemsLoaded(true); });
+      .catch(err  => { setLoadError(err.message || 'Failed to load items.'); setIsItemsLoaded(true); });
 
     fetchPromotions()
       .then(data => { setPromos(data); setIsPromosLoaded(true); })
-      .catch(() => setIsPromosLoaded(true));
+      .catch(()  => setIsPromosLoaded(true));
 
     if (isLoggedIn) {
       getUserBookings()
         .then(data => setUserBookings(data))
-        .catch(err => console.error('Error loading user bookings:', err));
-      
+        .catch(err  => console.error('Error loading user bookings:', err));
+
       getUserDirectBookings()
         .then(data => {
           const bookings = Array.isArray(data) ? data : [];
@@ -606,7 +914,41 @@ export default function BrowseOutfitsFragment() {
     }
   }, [isLoggedIn]);
 
-  const showToast = (type, message) => setToast({ show: true, type, message });
+  // ── NEW: fetch booked slots whenever the item OR fitting date changes ────
+  useEffect(() => {
+    if (modal !== 'booking' || !selectedItem || !booking.fittingDate) {
+      setBookedFittingSlots([]);
+      return;
+    }
+    const key = `${selectedItem.id}__${booking.fittingDate}`;
+    if (slotCacheRef.current[key] !== undefined) {
+      setBookedFittingSlots(slotCacheRef.current[key]);
+      return;
+    }
+    setLoadingFittingSlots(true);
+    getBookedFittingSlots(selectedItem.id, booking.fittingDate)
+      .then(slots => {
+        slotCacheRef.current[key] = slots;
+        setBookedFittingSlots(slots);
+      })
+      .catch(()   => setBookedFittingSlots([]))
+      .finally(()  => setLoadingFittingSlots(false));
+  }, [modal, selectedItem?.id, booking.fittingDate]);
+
+  // Auto-select first available time when slots are loaded or date changes
+  useEffect(() => {
+    if (!timeSlots.length) return;
+    // If current time is booked or doesn't exist, pick the first available
+    const firstAvail = timeSlots.find(t => !bookedFittingSlots.includes(t));
+    setBooking(p => ({
+      ...p,
+      fittingTime: bookedFittingSlots.includes(p.fittingTime)
+        ? (firstAvail || '')
+        : (p.fittingTime || firstAvail || ''),
+    }));
+  }, [bookedFittingSlots, timeSlots]);
+
+  const showToast  = (type, message) => setToast({ show: true, type, message });
   const closeToast = () => setToast({ show: false, type: 'success', message: '' });
 
   const closeModal = () => {
@@ -614,14 +956,15 @@ export default function BrowseOutfitsFragment() {
     setSelectedItem(null);
     setBookingConfirmed(null);
     setDirectBookingConfirmed(null);
+    setBookedFittingSlots([]);
     setBooking({
-      fittingDate: '', fittingTime: '10:00 AM',
+      fittingDate: '', fittingTime: '',
       name: currentUser.name || '', email: currentUser.email || '',
       phone: '', preferredSize: '', notes: '',
     });
   };
 
-  const hasUserDirectBookedItem = useCallback(itemId => {
+const hasUserDirectBookedItem = useCallback(itemId => {
     if (!directBookings.length) return false;
     return directBookings.some(b =>
       String(b.inventoryItemId) === String(itemId) &&
@@ -639,7 +982,7 @@ export default function BrowseOutfitsFragment() {
 
   const hasUserBookedItem = useCallback(itemId => {
     if (!userBookings.length) return false;
-    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const today = new Date(); today.setHours(0,0,0,0);
     return userBookings.some(b =>
       String(b.itemId) === String(itemId) &&
       b.status === 'CONFIRMED' &&
@@ -649,7 +992,7 @@ export default function BrowseOutfitsFragment() {
 
   const getUserBookingForItem = useCallback(itemId => {
     if (!userBookings.length) return null;
-    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const today = new Date(); today.setHours(0,0,0,0);
     return userBookings.find(b =>
       String(b.itemId) === String(itemId) &&
       b.status === 'CONFIRMED' &&
@@ -659,7 +1002,7 @@ export default function BrowseOutfitsFragment() {
 
   const activePromo = useCallback(item => {
     if (!isPromosLoaded || !promos.length) return null;
-    const now = todayStr();
+    const now    = todayStr();
     const itemId = typeof item.id === 'string' ? parseInt(item.id) : item.id;
     return promos.find(p => {
       if (!p.active || !p.items?.length) return false;
@@ -676,8 +1019,8 @@ export default function BrowseOutfitsFragment() {
   }, [activePromo]);
 
   const availableItems = useMemo(() => items.filter(i => i.status === 'Available' || i.status === 'Reserved'), [items]);
-  const categories = useMemo(() => [...new Set(availableItems.map(i => i.category))], [availableItems]);
-  const subcategories = useMemo(() => {
+  const categories     = useMemo(() => [...new Set(availableItems.map(i => i.category))], [availableItems]);
+  const subcategories  = useMemo(() => {
     if (filterCat === 'All') return [];
     return [...new Set(availableItems.filter(i => i.category === filterCat).map(i => i.subtype).filter(Boolean))].sort();
   }, [availableItems, filterCat]);
@@ -686,31 +1029,42 @@ export default function BrowseOutfitsFragment() {
 
   const visibleItems = useMemo(() => availableItems.filter(i => {
     const q = search.toLowerCase();
-    return (!q || i.name.toLowerCase().includes(q) || i.category.toLowerCase().includes(q) || (i.subtype || '').toLowerCase().includes(q))
-      && (filterCat === 'All' || i.category === filterCat)
-      && (filterSubcat === 'All' || i.subtype === filterSubcat)
-      && (filterSize === 'All' || i.size === filterSize);
+    return (!q || i.name.toLowerCase().includes(q) || i.category.toLowerCase().includes(q) || (i.subtype||'').toLowerCase().includes(q))
+      && (filterCat === 'All'    || i.category === filterCat)
+      && (filterSubcat === 'All' || i.subtype  === filterSubcat)
+      && (filterSize === 'All'   || i.size     === filterSize);
   }), [availableItems, search, filterCat, filterSubcat, filterSize]);
 
+  // ── Fitting booking submit ───────────────────────────────────────────────
   const handleBookingSubmit = async () => {
     if (!isLoggedIn) { showToast('error', 'Please login first to book a fitting.'); return; }
     if (!booking.fittingDate || !booking.fittingTime) { showToast('error', 'Please select a fitting date and time.'); return; }
     if (!booking.name || !booking.email || !booking.phone) { showToast('error', 'Please fill in your contact information.'); return; }
 
+    // Working-day check
+    if (bookingSettings.enableTimeRestrictions && !isWorkingDay(booking.fittingDate, bookingSettings)) {
+      showToast('error', 'The selected date is not a working day. Please choose a different date.'); return;
+    }
+
     const selDate = new Date(booking.fittingDate);
-    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const today   = new Date(); today.setHours(0,0,0,0);
     if (selDate < today) { showToast('error', 'Fitting date cannot be in the past.'); return; }
-    
+
     if (hasUserBookedItem(selectedItem.id) || hasUserDirectBookedItem(selectedItem.id)) {
-      showToast('error', `You already have a booking for ${selectedItem.name}. You cannot book another.`);
-      return;
+      showToast('error', `You already have a booking for ${selectedItem.name}. You cannot book another.`); return;
+    }
+
+    // Slot already booked?
+    if (bookedFittingSlots.includes(booking.fittingTime)) {
+      showToast('error', `The time slot ${booking.fittingTime} is already booked. Please select another time.`); return;
     }
 
     setSubmitting(true);
     try {
       const response = await bookFitting({
         itemId: selectedItem.id, itemName: selectedItem.name,
-        fittingDate: booking.fittingDate, fittingTime: booking.fittingTime,
+        fittingDate: booking.fittingDate,
+        fittingTime: to24Hour(booking.fittingTime),  
         customerName: booking.name, customerEmail: booking.email, customerPhone: booking.phone,
         preferredSize: booking.preferredSize || selectedItem.size,
         notes: booking.notes, userId: currentUser.id || null,
@@ -736,6 +1090,7 @@ export default function BrowseOutfitsFragment() {
     }
   };
 
+  // ── Error state ──────────────────────────────────────────────────────────
   if (loadError && isItemsLoaded) {
     return (
       <div className="inv-root">
@@ -750,6 +1105,29 @@ export default function BrowseOutfitsFragment() {
 
   const showSkeletons = !isItemsLoaded;
 
+  // ── Helpers for button labels (shared between grid + list) ───────────────
+  const getItemButtonState = (item) => {
+    const hasFittingBooking = hasUserBookedItem(item.id);
+    const hasDirectBooking  = hasUserDirectBookedItem(item.id);
+    const hasAnyBooking     = hasFittingBooking || hasDirectBooking;
+    const userFittingBooking = getUserBookingForItem(item.id);
+    const userDirectBooking  = getUserDirectBookingForItem(item.id);
+    const isFittingDisabled  = item.status !== 'Available' || !isLoggedIn || hasAnyBooking;
+    const isDirectDisabled   = item.status !== 'Available' || !isLoggedIn || hasAnyBooking;
+
+    let fittingLabel = 'Book Fitting';
+    let directLabel  = 'Book Direct';
+    if (hasFittingBooking) {
+      fittingLabel = 'Fitting Booked';
+      directLabel  = 'Unavailable';
+    } else if (hasDirectBooking) {
+      fittingLabel = 'Unavailable';
+      directLabel  = userDirectBooking?.bookingStatus === 'Approved' ? 'Booking Approved' : 'Booking Pending';
+    }
+    return { hasFittingBooking, hasDirectBooking, hasAnyBooking, userFittingBooking, userDirectBooking, isFittingDisabled, isDirectDisabled, fittingLabel, directLabel };
+  };
+
+  // ── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="inv-root">
       <div className="inv-top">
@@ -788,11 +1166,12 @@ export default function BrowseOutfitsFragment() {
             </select>
           </div>
           <div className="inv-view-toggle">
-            <button className={`inv-view-btn${viewMode === 'grid' ? ' active' : ''}`} onClick={() => setViewMode('grid')}><LayoutGrid size={15} /></button>
-            <button className={`inv-view-btn${viewMode === 'list' ? ' active' : ''}`} onClick={() => setViewMode('list')}><List size={15} /></button>
+            <button className={`inv-view-btn${viewMode==='grid'?' active':''}`} onClick={() => setViewMode('grid')}><LayoutGrid size={15} /></button>
+            <button className={`inv-view-btn${viewMode==='list'?' active':''}`} onClick={() => setViewMode('list')}><List size={15} /></button>
           </div>
         </div>
 
+        {/* ── GRID VIEW ────────────────────────────────────────────────────── */}
         {viewMode === 'grid' && (
           <div className="inv-grid">
             {showSkeletons && [...Array(12)].map((_, i) => <FastSkeletonCard key={i} />)}
@@ -801,25 +1180,7 @@ export default function BrowseOutfitsFragment() {
               const promo = activePromo(item);
               const price = discPrice(item);
               const files = item.mediaFiles?.length || 0;
-              const hasFittingBooking = hasUserBookedItem(item.id);
-              const hasDirectBooking = hasUserDirectBookedItem(item.id);
-              const hasAnyBooking = hasFittingBooking || hasDirectBooking;
-              const userFittingBooking = getUserBookingForItem(item.id);
-              const userDirectBooking = getUserDirectBookingForItem(item.id);
-              
-              const isFittingDisabled = item.status !== 'Available' || !isLoggedIn || hasAnyBooking;
-              const isDirectDisabled = item.status !== 'Available' || !isLoggedIn || hasAnyBooking;
-
-              let fittingButtonLabel = 'Book Fitting';
-              let directButtonLabel = 'Book Direct';
-              
-              if (hasFittingBooking) {
-                fittingButtonLabel = 'Fitting Booked';
-                directButtonLabel = 'Unavailable';
-              } else if (hasDirectBooking) {
-                fittingButtonLabel = 'Unavailable';
-                directButtonLabel = userDirectBooking?.bookingStatus === 'Approved' ? 'Booking Approved' : 'Booking Pending';
-              }
+              const { hasFittingBooking, hasDirectBooking, hasAnyBooking, userFittingBooking, userDirectBooking, isFittingDisabled, isDirectDisabled, fittingLabel, directLabel } = getItemButtonState(item);
 
               return (
                 <div key={item.id} className="inv-grid-card">
@@ -834,12 +1195,10 @@ export default function BrowseOutfitsFragment() {
                       </div>
                     )}
                     {hasAnyBooking && (
-                      <div className="inv-grid-booked-badge" style={{ background: hasFittingBooking ? '#6b2d39' : '#c4717f', color: '#fff' }}>
-                        {hasFittingBooking ? (
-                          <><Calendar size={10} /> Fitting: {fmtDate(userFittingBooking.fittingDate)}</>
-                        ) : (
-                          <><ShoppingBag size={10} /> {userDirectBooking?.bookingStatus === 'Approved' ? 'Approved' : 'Pending'}</>
-                        )}
+                      <div className="inv-grid-booked-badge" style={{ background: hasFittingBooking ? '#6b2d39' : '#c4717f', color:'#fff' }}>
+                        {hasFittingBooking
+                          ? <><Calendar size={10} /> Fitting: {fmtDate(userFittingBooking.fittingDate)}</>
+                          : <><ShoppingBag size={10} /> {userDirectBooking?.bookingStatus === 'Approved' ? 'Approved' : 'Pending'}</>}
                       </div>
                     )}
                   </div>
@@ -851,53 +1210,43 @@ export default function BrowseOutfitsFragment() {
                       <span className="inv-grid-size">{item.size}</span>
                     </div>
                     <div className="inv-grid-price-row">
-                      {promo ? (
-                        <><span className="inv-price-old">₱{item.price.toLocaleString()}</span><span className="inv-price-new">₱{Math.round(price).toLocaleString()}</span></>
-                      ) : (
-                        <span className="inv-price">₱{item.price.toLocaleString()}</span>
-                      )}
+                      {promo
+                        ? <><span className="inv-price-old">₱{item.price.toLocaleString()}</span><span className="inv-price-new">₱{Math.round(price).toLocaleString()}</span></>
+                        : <span className="inv-price">₱{item.price.toLocaleString()}</span>}
                     </div>
-                    {promo && (
-                      <div className="inv-promo-code-pill"><Sparkles size={9} /><span>{promo.code}</span></div>
-                    )}
+                    {promo && <div className="inv-promo-code-pill"><Sparkles size={9} /><span>{promo.code}</span></div>}
                   </div>
                   <div className="inv-grid-actions">
                     <button className="inv-icon-btn" onClick={() => { setSelectedItem(item); setModal('view'); }}><Eye size={13} /></button>
                     <button
-                      className={`inv-btn-book ${hasFittingBooking ? 'inv-btn-booked' : ''}`}
+                      className={`inv-btn-book${hasFittingBooking?' inv-btn-booked':''}`}
                       onClick={() => {
                         if (hasAnyBooking) {
-                          if (hasFittingBooking) {
-                            showToast('error', `You already have a fitting booked for this item on ${fmtDate(userFittingBooking.fittingDate)}.`);
-                          } else if (hasDirectBooking) {
-                            showToast('error', `You already have a direct booking for this item.`);
-                          }
+                          showToast('error', hasFittingBooking
+                            ? `You already have a fitting booked for this item on ${fmtDate(userFittingBooking.fittingDate)}.`
+                            : `You already have a direct booking for this item.`);
                         } else {
-                          setSelectedItem(item);
-                          setModal('booking');
+                          setSelectedItem(item); setModal('booking');
                         }
                       }}
                       disabled={isFittingDisabled}
                     >
-                      <Calendar size={13} /> {fittingButtonLabel}
+                      <Calendar size={13} /> {fittingLabel}
                     </button>
                     <button
-                      className={`inv-btn-direct-book ${hasDirectBooking ? 'inv-btn-directbooked' : ''}`}
+                      className={`inv-btn-direct-book${hasDirectBooking?' inv-btn-directbooked':''}`}
                       onClick={() => {
                         if (hasAnyBooking) {
-                          if (hasDirectBooking) {
-                            showToast('error', `You already have a direct booking for this item.`);
-                          } else if (hasFittingBooking) {
-                            showToast('error', `You already have a fitting booked for this item on ${fmtDate(userFittingBooking.fittingDate)}.`);
-                          }
+                          showToast('error', hasDirectBooking
+                            ? `You already have a direct booking for this item.`
+                            : `You already have a fitting booked for this item on ${fmtDate(userFittingBooking.fittingDate)}.`);
                         } else {
-                          setSelectedItem(item);
-                          setModal('directBooking');
+                          setSelectedItem(item); setModal('directBooking');
                         }
                       }}
                       disabled={isDirectDisabled}
                     >
-                      <ShoppingBag size={13} /> {directButtonLabel}
+                      <ShoppingBag size={13} /> {directLabel}
                     </button>
                   </div>
                 </div>
@@ -906,53 +1255,31 @@ export default function BrowseOutfitsFragment() {
           </div>
         )}
 
+        {/* ── LIST VIEW ───────────────────────────────────────────────────── */}
         {viewMode === 'list' && (
           <div className="inv-table-wrap">
             <table className="inv-table">
               <thead>
                 <tr>
-                  <th style={{ width: 72 }}>Photo</th>
-                  <th>Name</th>
-                  <th>Category</th>
-                  <th>Type</th>
-                  <th>Size</th>
-                  <th>Price</th>
-                  <th>Status</th>
-                  <th style={{ width: 200 }}>Action</th>
+                  <th style={{ width:72 }}>Photo</th>
+                  <th>Name</th><th>Category</th><th>Type</th><th>Size</th><th>Price</th><th>Status</th>
+                  <th style={{ width:200 }}>Action</th>
                 </tr>
               </thead>
               <tbody>
                 {showSkeletons && [...Array(8)].map((_, i) => <FastSkeletonRow key={i} />)}
                 {!showSkeletons && visibleItems.length === 0 && (
-                  <tr>
-                    <td colSpan={8} className="inv-empty">No items found. </td>
-                  </tr>
+                  <tr><td colSpan={8} className="inv-empty">No items found.</td></tr>
                 )}
                 {!showSkeletons && visibleItems.map(item => {
                   const promo = activePromo(item);
                   const price = discPrice(item);
-                  const hasFittingBooking = hasUserBookedItem(item.id);
-                  const hasDirectBooking = hasUserDirectBookedItem(item.id);
-                  const hasAnyBooking = hasFittingBooking || hasDirectBooking;
-                  const userFittingBooking = getUserBookingForItem(item.id);
-                  const userDirectBooking = getUserDirectBookingForItem(item.id);
-                  
-                  const isFittingDisabled = item.status !== 'Available' || !isLoggedIn || hasAnyBooking;
-                  const isDirectDisabled = item.status !== 'Available' || !isLoggedIn || hasAnyBooking;
-
-                  let fittingButtonLabel = 'Book Fitting';
-                  let directButtonLabel = 'Book Direct';
-                  
-                  if (hasFittingBooking) {
-                    fittingButtonLabel = 'Booked';
-                    directButtonLabel = 'N/A';
-                  } else if (hasDirectBooking) {
-                    fittingButtonLabel = 'N/A';
-                    directButtonLabel = userDirectBooking?.bookingStatus === 'Approved' ? 'Approved' : 'Pending';
-                  }
+                  const { hasFittingBooking, hasDirectBooking, hasAnyBooking, userFittingBooking, userDirectBooking, isFittingDisabled, isDirectDisabled, fittingLabel, directLabel } = getItemButtonState(item);
+                  const fittingLabelSm = hasFittingBooking ? 'Booked' : hasDirectBooking ? 'N/A' : 'Book Fitting';
+                  const directLabelSm  = hasDirectBooking  ? (userDirectBooking?.bookingStatus === 'Approved' ? 'Approved' : 'Pending') : hasFittingBooking ? 'N/A' : 'Book Direct';
 
                   return (
-                    <tr key={item.id} className={`inv-tr${promo ? ' inv-tr-promo' : ''}`}>
+                    <tr key={item.id} className={`inv-tr${promo?' inv-tr-promo':''}`}>
                       <td>
                         <div className="inv-list-thumb" onClick={() => setGallery({ item, startIndex: 0 })}>
                           <MediaThumb item={item} />
@@ -962,12 +1289,10 @@ export default function BrowseOutfitsFragment() {
                         <div className="inv-item-name">{item.name}</div>
                         {promo && <div className="inv-list-promo-badge"><Sparkles size={9} /><span>{promo.code}</span></div>}
                         {hasAnyBooking && (
-                          <div className="inv-list-booked-badge" style={{ background: hasFittingBooking ? '#6b2d39' : '#c4717f', color: '#fff' }}>
-                            {hasFittingBooking ? (
-                              <><Calendar size={10} /> Fitting: {fmtDate(userFittingBooking.fittingDate)}</>
-                            ) : (
-                              <><ShoppingBag size={10} /> {userDirectBooking?.bookingStatus === 'Approved' ? 'Approved' : 'Pending'}</>
-                            )}
+                          <div className="inv-list-booked-badge" style={{ background: hasFittingBooking ? '#6b2d39' : '#c4717f', color:'#fff' }}>
+                            {hasFittingBooking
+                              ? <><Calendar size={10} /> Fitting: {fmtDate(userFittingBooking.fittingDate)}</>
+                              : <><ShoppingBag size={10} /> {userDirectBooking?.bookingStatus === 'Approved' ? 'Approved' : 'Pending'}</>}
                           </div>
                         )}
                       </td>
@@ -975,51 +1300,43 @@ export default function BrowseOutfitsFragment() {
                       <td><span className="inv-subtype-tag">{item.subtype}</span></td>
                       <td>{item.size}</td>
                       <td>
-                        {promo ? (
-                          <div><div className="inv-price-old">₱{item.price.toLocaleString()}</div><div className="inv-price-new">₱{Math.round(price).toLocaleString()}</div></div>
-                        ) : (
-                          <span className="inv-price">₱{item.price.toLocaleString()}</span>
-                        )}
+                        {promo
+                          ? <div><div className="inv-price-old">₱{item.price.toLocaleString()}</div><div className="inv-price-new">₱{Math.round(price).toLocaleString()}</div></div>
+                          : <span className="inv-price">₱{item.price.toLocaleString()}</span>}
                       </td>
                       <td><StatusBadge status={item.status} /></td>
                       <td>
                         <div className="inv-row-actions">
                           <button className="inv-icon-btn" onClick={() => { setSelectedItem(item); setModal('view'); }}><Eye size={13} /></button>
                           <button
-                            className={`inv-btn-book-sm ${hasFittingBooking ? 'inv-btn-booked' : ''}`}
+                            className={`inv-btn-book-sm${hasFittingBooking?' inv-btn-booked':''}`}
                             onClick={() => {
                               if (hasAnyBooking) {
-                                if (hasFittingBooking) {
-                                  showToast('error', `You already have a fitting booked on ${fmtDate(userFittingBooking.fittingDate)}.`);
-                                } else {
-                                  showToast('error', `You already have a booking for this item.`);
-                                }
+                                showToast('error', hasFittingBooking
+                                  ? `Already have fitting booked on ${fmtDate(userFittingBooking.fittingDate)}.`
+                                  : `You already have a booking for this item.`);
                               } else {
-                                setSelectedItem(item);
-                                setModal('booking');
+                                setSelectedItem(item); setModal('booking');
                               }
                             }}
                             disabled={isFittingDisabled}
                           >
-                            <Calendar size={12} /> {fittingButtonLabel}
+                            <Calendar size={12} /> {fittingLabelSm}
                           </button>
                           <button
-                            className={`inv-btn-direct-book-sm ${hasDirectBooking ? 'inv-btn-directbooked' : ''}`}
+                            className={`inv-btn-direct-book-sm${hasDirectBooking?' inv-btn-directbooked':''}`}
                             onClick={() => {
                               if (hasAnyBooking) {
-                                if (hasFittingBooking) {
-                                  showToast('error', `You already have a fitting booked on ${fmtDate(userFittingBooking.fittingDate)}.`);
-                                } else {
-                                  showToast('error', `You already have a booking for this item.`);
-                                }
+                                showToast('error', hasFittingBooking
+                                  ? `Already have fitting booked on ${fmtDate(userFittingBooking.fittingDate)}.`
+                                  : `You already have a booking for this item.`);
                               } else {
-                                setSelectedItem(item);
-                                setModal('directBooking');
+                                setSelectedItem(item); setModal('directBooking');
                               }
                             }}
                             disabled={isDirectDisabled}
                           >
-                            <ShoppingBag size={12} /> {directButtonLabel}
+                            <ShoppingBag size={12} /> {directLabelSm}
                           </button>
                         </div>
                       </td>
@@ -1032,28 +1349,11 @@ export default function BrowseOutfitsFragment() {
         )}
       </div>
 
+      {/* ── VIEW MODAL ──────────────────────────────────────────────────────── */}
       {modal === 'view' && selectedItem && (() => {
         const promo = activePromo(selectedItem);
         const price = discPrice(selectedItem);
-        const hasFittingBooking = hasUserBookedItem(selectedItem.id);
-        const hasDirectBooking = hasUserDirectBookedItem(selectedItem.id);
-        const hasAnyBooking = hasFittingBooking || hasDirectBooking;
-        const userFittingBooking = getUserBookingForItem(selectedItem.id);
-        const userDirectBooking = getUserDirectBookingForItem(selectedItem.id);
-        
-        const isFittingDisabled = selectedItem.status !== 'Available' || !isLoggedIn || hasAnyBooking;
-        const isDirectDisabled = selectedItem.status !== 'Available' || !isLoggedIn || hasAnyBooking;
-
-        let fittingButtonLabel = 'Book Fitting';
-        let directButtonLabel = 'Book Direct';
-        
-        if (hasFittingBooking) {
-          fittingButtonLabel = 'Fitting Booked';
-          directButtonLabel = 'Unavailable';
-        } else if (hasDirectBooking) {
-          fittingButtonLabel = 'Unavailable';
-          directButtonLabel = userDirectBooking?.bookingStatus === 'Approved' ? 'Booking Approved' : 'Booking Pending';
-        }
+        const { hasFittingBooking, hasDirectBooking, hasAnyBooking, userFittingBooking, userDirectBooking, isFittingDisabled, isDirectDisabled, fittingLabel, directLabel } = getItemButtonState(selectedItem);
 
         return (
           <div className="inv-overlay" onClick={closeModal}>
@@ -1068,7 +1368,7 @@ export default function BrowseOutfitsFragment() {
                   <div className="inv-view-media-overlay"><Eye size={17} /> View Full</div>
                 </div>
                 <div className="inv-view-details">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:'0.75rem', flexWrap:'wrap' }}>
                     <h4 className="inv-view-name">{selectedItem.name}</h4>
                     <StatusBadge status={selectedItem.status} />
                   </div>
@@ -1086,12 +1386,10 @@ export default function BrowseOutfitsFragment() {
                     </div>
                   )}
                   {hasAnyBooking && (
-                    <div className="inv-view-booked-warning" style={{ background: hasFittingBooking ? 'rgba(107,45,57,0.1)' : 'rgba(196,113,127,0.1)', border: `1px solid ${hasFittingBooking ? '#6b2d39' : '#c4717f'}`, borderRadius: '8px', padding: '0.75rem', marginBottom: '1rem' }}>
-                      {hasFittingBooking ? (
-                        <><Calendar size={14} style={{ color: '#6b2d39' }} /> <span>You have a fitting booked on <strong>{fmtDate(userFittingBooking.fittingDate)}</strong> at <strong>{userFittingBooking.fittingTime}</strong>.</span></>
-                      ) : (
-                        <><ShoppingBag size={14} style={{ color: '#c4717f' }} /> <span>You have a direct booking for this item - <strong>{userDirectBooking?.bookingStatus === 'Approved' ? 'Approved' : 'Pending Approval'}</strong>.</span></>
-                      )}
+                    <div className="inv-view-booked-warning" style={{ background: hasFittingBooking ? 'rgba(107,45,57,0.1)' : 'rgba(196,113,127,0.1)', border:`1px solid ${hasFittingBooking?'#6b2d39':'#c4717f'}`, borderRadius:'8px', padding:'0.75rem', marginBottom:'1rem' }}>
+                      {hasFittingBooking
+                        ? <><Calendar size={14} style={{ color:'#6b2d39' }} /> <span>You have a fitting booked on <strong>{fmtDate(userFittingBooking.fittingDate)}</strong> at <strong>{userFittingBooking.fittingTime}</strong>.</span></>
+                        : <><ShoppingBag size={14} style={{ color:'#c4717f' }} /> <span>You have a direct booking for this item — <strong>{userDirectBooking?.bookingStatus === 'Approved' ? 'Approved' : 'Pending Approval'}</strong>.</span></>}
                     </div>
                   )}
                   <div className="inv-view-grid">
@@ -1102,7 +1400,7 @@ export default function BrowseOutfitsFragment() {
                       ['Color', selectedItem.color],
                       ['Age Range', selectedItem.ageRange],
                       ['Daily Rate', promo
-                        ? <><span style={{ textDecoration: 'line-through', color: '#bbb', marginRight: '0.4rem' }}>₱{selectedItem.price.toLocaleString()}</span><strong style={{ color: '#15803d' }}>₱{Math.round(price).toLocaleString()}</strong></>
+                        ? <><span style={{ textDecoration:'line-through', color:'#bbb', marginRight:'0.4rem' }}>₱{selectedItem.price.toLocaleString()}</span><strong style={{ color:'#15803d' }}>₱{Math.round(price).toLocaleString()}</strong></>
                         : `₱${selectedItem.price.toLocaleString()}`],
                     ].map(([k, v]) => v && (
                       <div key={k} className="inv-view-row">
@@ -1117,38 +1415,30 @@ export default function BrowseOutfitsFragment() {
               <div className="inv-modal-footer">
                 <button className="inv-btn-ghost" onClick={closeModal}>Close</button>
                 <button
-                  className={`inv-btn-outline ${hasAnyBooking ? 'inv-btn-disabled' : ''}`}
+                  className={`inv-btn-outline${hasAnyBooking?' inv-btn-disabled':''}`}
                   onClick={() => {
                     if (hasAnyBooking) {
-                      if (hasFittingBooking) {
-                        showToast('error', `Already have fitting booked on ${fmtDate(userFittingBooking.fittingDate)}.`);
-                      } else {
-                        showToast('error', `You already have a booking for this item.`);
-                      }
-                    } else {
-                      setModal('booking');
-                    }
+                      showToast('error', hasFittingBooking
+                        ? `Already have fitting booked on ${fmtDate(userFittingBooking.fittingDate)}.`
+                        : `You already have a booking for this item.`);
+                    } else { setModal('booking'); }
                   }}
                   disabled={isFittingDisabled}
                 >
-                  <Calendar size={14} /> {fittingButtonLabel}
+                  <Calendar size={14} /> {fittingLabel}
                 </button>
                 <button
-                  className={`inv-btn-primary ${hasAnyBooking ? 'inv-btn-disabled' : ''}`}
+                  className={`inv-btn-primary${hasAnyBooking?' inv-btn-disabled':''}`}
                   onClick={() => {
                     if (hasAnyBooking) {
-                      if (hasDirectBooking) {
-                        showToast('error', `You already have a direct booking for this item (${userDirectBooking?.bookingStatus === 'Approved' ? 'Approved' : 'Pending approval'}).`);
-                      } else if (hasFittingBooking) {
-                        showToast('error', `You already have a fitting booked for this item on ${fmtDate(userFittingBooking.fittingDate)}.`);
-                      }
-                    } else {
-                      setModal('directBooking');
-                    }
+                      showToast('error', hasDirectBooking
+                        ? `You already have a direct booking (${userDirectBooking?.bookingStatus === 'Approved' ? 'Approved' : 'Pending approval'}).`
+                        : `You already have a fitting booked on ${fmtDate(userFittingBooking.fittingDate)}.`);
+                    } else { setModal('directBooking'); }
                   }}
                   disabled={isDirectDisabled}
                 >
-                  <ShoppingBag size={14} /> {directButtonLabel}
+                  <ShoppingBag size={14} /> {directLabel}
                 </button>
               </div>
             </div>
@@ -1156,27 +1446,29 @@ export default function BrowseOutfitsFragment() {
         );
       })()}
 
+      {/* ── FITTING BOOKING MODAL ───────────────────────────────────────────── */}
       {modal === 'booking' && selectedItem && !bookingConfirmed && (() => {
-        const hasFittingBooking = hasUserBookedItem(selectedItem.id);
-        const hasDirectBooking = hasUserDirectBookedItem(selectedItem.id);
-        const hasAnyBooking = hasFittingBooking || hasDirectBooking;
-        
+        const { hasFittingBooking, hasDirectBooking, hasAnyBooking, userFittingBooking } = getItemButtonState(selectedItem);
+
         if (hasAnyBooking) {
-          setTimeout(() => { 
-            closeModal(); 
-            if (hasFittingBooking) {
-              const ex = getUserBookingForItem(selectedItem.id);
-              showToast('error', `You already have a fitting booked for ${selectedItem.name} on ${fmtDate(ex.fittingDate)}.`);
-            } else {
-              showToast('error', `You already have a booking for ${selectedItem.name}.`);
-            }
+          setTimeout(() => {
+            closeModal();
+            showToast('error', hasFittingBooking
+              ? `You already have a fitting booked for ${selectedItem.name} on ${fmtDate(userFittingBooking.fittingDate)}.`
+              : `You already have a booking for ${selectedItem.name}.`);
           }, 100);
           return null;
         }
+
         const promo = activePromo(selectedItem);
+
+        // ── Working-days hint ────────────────────────────────────────────
+        const selectedDateNonWorking = booking.fittingDate && !isWorkingDay(booking.fittingDate, bookingSettings);
+        const dateIsFullyBooked = !!booking.fittingDate && !loadingFittingSlots && timeSlots.length > 0 && timeSlots.every(t => bookedFittingSlots.includes(t));
+
         return (
           <div className="inv-overlay" onClick={closeModal}>
-            <div className="inv-modal" style={{ maxWidth: '560px' }} onClick={e => e.stopPropagation()}>
+            <div className="inv-modal" style={{ maxWidth:'560px' }} onClick={e => e.stopPropagation()}>
               <div className="inv-modal-header">
                 <h3>Book a Fitting — {selectedItem.name}</h3>
                 <button className="inv-modal-close" onClick={closeModal} disabled={submitting}><X size={16} /></button>
@@ -1187,29 +1479,86 @@ export default function BrowseOutfitsFragment() {
                   <div>
                     <div className="inv-lease-preview-name">{selectedItem.name}</div>
                     <div className="inv-lease-preview-price">
-                      {promo ? (
-                        <><span style={{ textDecoration: 'line-through', color: '#bbb', marginRight: '0.3rem' }}>₱{selectedItem.price.toLocaleString()}</span>₱{Math.round(discPrice(selectedItem)).toLocaleString()}/day</>
-                      ) : `₱${selectedItem.price.toLocaleString()}/day`}
+                      {promo
+                        ? <><span style={{ textDecoration:'line-through', color:'#bbb', marginRight:'0.3rem' }}>₱{selectedItem.price.toLocaleString()}</span>₱{Math.round(discPrice(selectedItem)).toLocaleString()}/day</>
+                        : `₱${selectedItem.price.toLocaleString()}/day`}
                     </div>
-                    {promo && <div className="inv-promo-code-pill" style={{ marginTop: '0.25rem' }}><Sparkles size={8} /> {promo.code}</div>}
+                    {promo && <div className="inv-promo-code-pill" style={{ marginTop:'0.25rem' }}><Sparkles size={8} /> {promo.code}</div>}
                   </div>
                 </div>
+
                 <div className="inv-warning-box">
                   <AlertTriangle size={16} />
-                  <div><strong>Important:</strong> If you don't arrive at the scheduled time, your fitting may be cancelled. Please arrive 10 minutes early.</div>
-                </div>
-                <div className="inv-modal-grid">
-                  <div className="inv-field">
-                    <label className="inv-field-label">Fitting Date <span className="inv-required">*</span></label>
-                    <input className="inv-input" type="date" min={todayStr()} value={booking.fittingDate} onChange={e => setBooking(p => ({ ...p, fittingDate: e.target.value }))} disabled={submitting} />
-                  </div>
-                  <div className="inv-field">
-                    <label className="inv-field-label">Fitting Time <span className="inv-required">*</span></label>
-                    <select className="inv-select" value={booking.fittingTime} onChange={e => setBooking(p => ({ ...p, fittingTime: e.target.value }))} disabled={submitting}>
-                      {['10:00 AM', '11:00 AM', '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM'].map(t => <option key={t}>{t}</option>)}
-                    </select>
+                  <div>
+                    <strong>Important:</strong> If you don't arrive at the scheduled time, your fitting may be cancelled. Please arrive 10 minutes early.
+                    {bookingSettings.enabled && (
+                      <span> Shop hours: <strong>
+                        {min2label((bookingSettings.startHour ?? 9) * 60 + (bookingSettings.startMinute ?? 0))}
+                        {' – '}
+                        {min2label((bookingSettings.endHour ?? 17) * 60 + (bookingSettings.endMinute ?? 0))}
+                      </strong>.</span>
+                    )}
                   </div>
                 </div>
+
+                {/* ── Date picker ─────────────────────────────────────────── */}
+                <div className="inv-field">
+                  <label className="inv-field-label">Fitting Date <span className="inv-required">*</span></label>
+                  <FittingDatePicker
+                    value={booking.fittingDate}
+                    onChange={ds => setBooking(p => ({ ...p, fittingDate: ds, fittingTime: '' }))}
+                    minDate={todayStr()}
+                    bookingSettings={bookingSettings}
+                    itemId={selectedItem.id}
+                    timeSlots={timeSlots}
+                    slotCacheRef={slotCacheRef}
+                    disabled={submitting}
+                  />
+                </div>
+
+                {/* ── Time slot grid ──────────────────────────────────────── */}
+                <div className="inv-field">
+                  <label className="inv-field-label">
+                    Fitting Time <span className="inv-required">*</span>
+                    {loadingFittingSlots && booking.fittingDate && (
+                      <Loader2 size={11} className="inv-spinner-inline" style={{ marginLeft:'0.4rem' }} />
+                    )}
+                  </label>
+
+                  {!booking.fittingDate && (
+                    <div className="ts-placeholder">Select a date first</div>
+                  )}
+                  {booking.fittingDate && loadingFittingSlots && (
+                    <div className="ts-placeholder"><Loader2 size={13} className="inv-spinner-inline" /> Loading slots…</div>
+                  )}
+                  {booking.fittingDate && !loadingFittingSlots && dateIsFullyBooked && (
+                    <div className="ts-placeholder ts-placeholder-full">No available slots for this date</div>
+                  )}
+                  {booking.fittingDate && !loadingFittingSlots && !dateIsFullyBooked && (
+                    <div className="ts-grid">
+                      {timeSlots.map(t => {
+                        const isBooked = bookedFittingSlots.includes(t);
+                        const isSelected = booking.fittingTime === t;
+                        return (
+                          <button
+                            key={t}
+                            type="button"
+                            className={`ts-btn${isBooked ? ' ts-btn-booked' : ''}${isSelected ? ' ts-btn-selected' : ''}`}
+                            disabled={isBooked || submitting}
+                            onClick={() => !isBooked && setBooking(p => ({ ...p, fittingTime: t }))}
+                            title={isBooked ? 'This slot is already booked' : t}
+                          >
+                            <Clock size={11} />
+                            <span>{t}</span>
+                            {isBooked && <span className="ts-booked-tag">Booked</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* ── Contact info ─────────────────────────────────────────── */}
                 <div className="inv-field">
                   <label className="inv-field-label">Full Name <span className="inv-required">*</span></label>
                   <input className="inv-input" type="text" placeholder="Enter your full name" value={booking.name} onChange={e => setBooking(p => ({ ...p, name: e.target.value }))} disabled={submitting} />
@@ -1228,31 +1577,47 @@ export default function BrowseOutfitsFragment() {
                   <label className="inv-field-label">Preferred Size</label>
                   <select className="inv-select" value={booking.preferredSize} onChange={e => setBooking(p => ({ ...p, preferredSize: e.target.value }))} disabled={submitting}>
                     <option value="">Select size (optional)</option>
-                    {['XS', 'S', 'M', 'L', 'XL', 'XXL'].map(s => <option key={s}>{s}</option>)}
+                    {['XS','S','M','L','XL','XXL'].map(s => <option key={s}>{s}</option>)}
                   </select>
                 </div>
                 <div className="inv-field">
                   <label className="inv-field-label">Special Requests</label>
                   <textarea className="inv-textarea" rows={3} placeholder="Any special requests or questions?" value={booking.notes} onChange={e => setBooking(p => ({ ...p, notes: e.target.value }))} disabled={submitting} />
                 </div>
+
                 <div className="bk-payment-summary">
-                  <div className="bk-ps-row total" style={{ borderBottom: 'none', marginBottom: 0, paddingBottom: 0 }}>
+                  <div className="bk-ps-row total" style={{ borderBottom:'none', marginBottom:0, paddingBottom:0 }}>
                     <span><strong>Fitting Summary</strong></span>
                   </div>
                   <div className="bk-ps-row"><span>Item</span><span>{selectedItem.name}</span></div>
                   <div className="bk-ps-row"><span>Fitting Date</span><span>{booking.fittingDate ? fmtDate(booking.fittingDate) : '—'}</span></div>
                   <div className="bk-ps-row"><span>Fitting Time</span><span>{booking.fittingTime || '—'}</span></div>
-                  <div className="bk-ps-row" style={{ fontSize: '0.7rem', color: '#999', justifyContent: 'center', marginTop: '0.5rem' }}>* Fitting is FREE and no obligation to rent</div>
+                  <div className="bk-ps-row" style={{ fontSize:'0.7rem', color:'#999', justifyContent:'center', marginTop:'0.5rem' }}>
+                    * Fitting is FREE and no obligation to rent
+                  </div>
                 </div>
               </div>
+
               <div className="inv-modal-footer">
                 <button className="inv-btn-ghost" onClick={closeModal} disabled={submitting}>Cancel</button>
                 <button
                   className="inv-btn-primary"
                   onClick={handleBookingSubmit}
-                  disabled={submitting || !booking.fittingDate || !booking.fittingTime || !booking.name || !booking.email || !booking.phone}
+                  disabled={
+                    submitting ||
+                    !booking.fittingDate ||
+                    !booking.fittingTime ||
+                    !booking.name ||
+                    !booking.email ||
+                    !booking.phone ||
+                    selectedDateNonWorking ||
+                    bookedFittingSlots.includes(booking.fittingTime) ||
+                    (timeSlots.length > 0 && timeSlots.every(t => bookedFittingSlots.includes(t)))
+                  }
                 >
-                  {submitting ? <><Loader2 size={14} className="inv-spinner-inline" /> Submitting…</> : <>Confirm Fitting</>}
+                  {submitting
+                    ? <><Loader2 size={14} className="inv-spinner-inline" /> Submitting…</>
+                    : <>Confirm Fitting</>}
                 </button>
               </div>
             </div>
@@ -1260,11 +1625,12 @@ export default function BrowseOutfitsFragment() {
         );
       })()}
 
+      {/* ── FITTING CONFIRMATION MODAL ──────────────────────────────────────── */}
       {modal === 'booking' && bookingConfirmed && (
         <div className="inv-overlay" onClick={closeModal}>
-          <div className="inv-modal" style={{ maxWidth: '500px' }} onClick={e => e.stopPropagation()}>
-            <div className="inv-modal-header" style={{ background: '#6b2d3908', borderBottomColor: '#6b2d3920' }}>
-              <h3 style={{ color: '#6b2d39', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <div className="inv-modal" style={{ maxWidth:'500px' }} onClick={e => e.stopPropagation()}>
+            <div className="inv-modal-header" style={{ background:'#6b2d3908', borderBottomColor:'#6b2d3920' }}>
+              <h3 style={{ color:'#6b2d39', display:'flex', alignItems:'center', gap:'0.5rem' }}>
                 <CheckCircle size={20} /> Fitting Confirmed!
               </h3>
               <button className="inv-modal-close" onClick={closeModal}><X size={15} /></button>
@@ -1293,6 +1659,7 @@ export default function BrowseOutfitsFragment() {
         </div>
       )}
 
+      {/* ── DIRECT BOOKING MODAL ────────────────────────────────────────────── */}
       {modal === 'directBooking' && selectedItem && (
         <DirectBookingModal
           item={selectedItem}
@@ -1300,6 +1667,7 @@ export default function BrowseOutfitsFragment() {
           isLoggedIn={isLoggedIn}
           showToast={showToast}
           currentUser={currentUser}
+          bookingSettings={bookingSettings}
           onSuccess={confirmed => {
             getUserDirectBookings()
               .then(data => {
@@ -1308,19 +1676,18 @@ export default function BrowseOutfitsFragment() {
                 localStorage.setItem('userDirectBookings', JSON.stringify(bookings));
               })
               .catch(err => console.error('Error refreshing direct bookings:', err));
-            
             setDirectBookingConfirmed(confirmed);
             setModal('directBookingConfirm');
           }}
         />
       )}
 
+      {/* ── DIRECT BOOKING CONFIRM MODAL ────────────────────────────────────── */}
       {modal === 'directBookingConfirm' && directBookingConfirmed && (
         <DirectBookingConfirmModal booking={directBookingConfirmed} onClose={closeModal} />
       )}
 
       {gallery && <MediaGallery item={gallery.item} startIndex={gallery.startIndex} onClose={() => setGallery(null)} />}
-
       <Toast toast={toast} onClose={closeToast} />
     </div>
   );

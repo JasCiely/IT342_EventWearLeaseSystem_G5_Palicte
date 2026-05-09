@@ -9,32 +9,28 @@ import org.springframework.web.bind.annotation.*;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/admin/booking-settings")
 @RequiredArgsConstructor
 public class BookingTimeSettingsController {
 
     private final BookingTimeSettingsService service;
 
-    /**
-     * GET /api/admin/booking-settings
-     * Returns the current booking time settings.
-     * Accessible by ADMIN only.
-     */
-    @GetMapping
+    // ────────────────────────── Admin endpoints ──────────────────────────
+
+    @GetMapping("/api/admin/booking-settings")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<BookingTimeSettingsDto> getSettings() {
         return ResponseEntity.ok(service.getSettings());
     }
 
-    /**
-     * PUT /api/admin/booking-settings
-     * Replaces/updates booking time settings.
-     * Accessible by ADMIN only.
-     */
-    @PutMapping
+    @PutMapping("/api/admin/booking-settings")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<BookingTimeSettingsDto> updateSettings(
             @RequestBody BookingTimeSettingsDto dto) {
         return ResponseEntity.ok(service.updateSettings(dto));
+    }
+
+    @GetMapping("/api/public/booking-settings")
+    public ResponseEntity<BookingTimeSettingsDto> getPublicSettings() {
+        return ResponseEntity.ok(service.getSettings());
     }
 }

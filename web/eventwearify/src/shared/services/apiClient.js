@@ -79,4 +79,42 @@
     }
   };
 
+  export const publicFetch = async (endpoint, options = {}) => {
+  const headers = {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+    ...options.headers,
+  };
+ 
+  const url = `${API_BASE_URL}${endpoint}`;
+ 
+  try {
+    const response = await fetch(url, { ...options, headers });
+ 
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || data.error || `API Error: ${response.status}`);
+      }
+      return data;
+    } else {
+      const text = await response.text();
+      if (!response.ok) {
+        throw new Error(`Server error (${response.status}).`);
+      }
+      try {
+        return JSON.parse(text);
+      } catch {
+        throw new Error('Invalid response format from server');
+      }
+    }
+  } catch (error) {
+    if (error.message.includes('Failed to fetch')) {
+      throw new Error('Cannot connect to server. Please make sure the backend is running on port 8080');
+    }
+    throw error;
+  }
+};
+
   export const API_BASE_URL_ROOT = API_BASE_URL;

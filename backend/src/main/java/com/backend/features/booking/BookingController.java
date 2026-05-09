@@ -92,6 +92,13 @@ public class BookingController {
         return ResponseEntity.ok(bookingService.getAvailableTimeSlots(date));
     }
 
+    @GetMapping("/inventory/fitting/booked-slots")
+    public ResponseEntity<List<String>> getBookedFittingSlots(
+            @RequestParam String itemId,
+            @RequestParam String date) {
+        return ResponseEntity.ok(bookingService.getBookedFittingSlots(itemId, date));
+    }
+
     // ── Admin: Fitting Bookings ────────────────────────────────
 
     @GetMapping("/admin/bookings/fitting")

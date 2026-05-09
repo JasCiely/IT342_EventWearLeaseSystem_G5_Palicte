@@ -1,41 +1,22 @@
-import { authFetch } from './apiClient.js';
+import { publicFetch, authFetch } from './apiClient.js';
 
-const ENDPOINT = '/admin/booking-settings';
+const ENDPOINT = '/public/booking-settings';
 
-/**
- * Fetch booking time settings from the backend.
- * Returns a settings object shaped for the frontend:
- * {
- *   enabled: boolean,
- *   startHour: number,
- *   startMinute: number,
- *   endHour: number,
- *   endMinute: number,
- *   workingDays: number[],
- *   timezone: string,
- *   autoApproveThreshold: number,
- *   fittingDurationMinutes: number,
- * }
- */
 export const fetchBookingSettings = async () => {
   try {
-    const data = await authFetch(ENDPOINT);
+    const data = await publicFetch(ENDPOINT);
     return mapFromApi(data);
   } catch (error) {
     console.error('Error fetching booking settings:', error);
-    // Return sensible defaults so the UI is never broken
     return getDefaultSettings();
   }
 };
 
-/**
- * Persist booking time settings to the backend.
- * Accepts the same shape returned by fetchBookingSettings.
- */
 export const saveBookingSettings = async (settings) => {
   try {
     const payload = mapToApi(settings);
-    const data = await authFetch(ENDPOINT, {
+    // Admin PUT endpoint – still requires auth
+    const data = await authFetch('/admin/booking-settings', {
       method: 'PUT',
       body: JSON.stringify(payload),
     });

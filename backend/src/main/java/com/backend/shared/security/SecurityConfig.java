@@ -58,7 +58,7 @@ public class SecurityConfig {
 
                         // Public inventory reads
                         .requestMatchers(HttpMethod.GET, "/api/inventory/items", "/api/inventory/items/**",
-                                "/api/inventory/promotions")
+                                "/api/inventory/promotions", "/api/inventory/fitting/booked-slots")
                         .permitAll()
 
                         // Direct bookings — customers can create/view their own; admins manage all
@@ -67,6 +67,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/direct-bookings/availability").hasRole("CUSTOMER")
                         .requestMatchers(HttpMethod.GET, "/api/direct-bookings/**").hasAnyRole("ADMIN", "CUSTOMER")
                         .requestMatchers(HttpMethod.PUT, "/api/direct-bookings/**").hasRole("ADMIN")
+                        .requestMatchers("/api/public/**").permitAll()
 
                         // Preflight
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()

@@ -28,4 +28,6 @@ public interface BookingService {
     boolean checkAvailability(String fittingDate, String fittingTime, String excludeId);
 
     List<String> getAvailableTimeSlots(String fittingDate);
+
+    List<String> getBookedFittingSlots(String itemId, String date);
 }

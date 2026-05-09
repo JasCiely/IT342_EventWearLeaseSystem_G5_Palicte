@@ -45,6 +45,11 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
         @Query("SELECT DISTINCT b.fittingTime FROM Booking b WHERE b.fittingDate = :fittingDate AND b.status = 'CONFIRMED' GROUP BY b.fittingTime HAVING COUNT(b) < :maxSlots")
         List<String> findAvailableTimeSlots(@Param("fittingDate") String fittingDate, @Param("maxSlots") int maxSlots);
 
+        @Query("SELECT b.fittingTime FROM Booking b WHERE b.itemId = :itemId AND b.fittingDate = :fittingDate AND b.status = 'CONFIRMED'")
+        List<String> findBookedTimesByItemAndDate(@Param("itemId") String itemId, @Param("fittingDate") String fittingDate);
+
+        boolean existsByItemIdAndFittingDateAndFittingTimeAndStatus(String itemId, String fittingDate, String fittingTime, String status);
+
         @Modifying
         @Query("UPDATE Booking b SET b.leaseStarted = true, b.leaseBookingId = :leaseBookingId WHERE b.id = :bookingId")
         void markLeaseStarted(@Param("bookingId") String bookingId, @Param("leaseBookingId") String leaseBookingId);
