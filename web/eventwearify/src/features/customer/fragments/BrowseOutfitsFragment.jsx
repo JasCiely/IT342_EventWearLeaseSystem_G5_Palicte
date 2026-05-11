@@ -1,4 +1,5 @@
-// BrowseOutfitsFragment.jsx
+// ==================== BrowseOutfitsFragment.jsx (FULL UPDATED FILE) ====================
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   Search, LayoutGrid, List, Eye, Calendar,
@@ -10,8 +11,8 @@ import '../styles/BrowseOutfitsFragment.css';
 import {
   fetchItems, fetchPromotions, bookFitting, getUserBookings,
   createDirectBooking, checkDirectBookingAvailability, getUserDirectBookings,
-  getBookedFittingSlots,   // ← NEW: add to your bookingApi re-export
-  getOccupiedDirectDates,  // ← NEW: add to your bookingApi re-export
+  getBookedFittingSlots,
+  getOccupiedDirectDates,
 } from '../services/inventoryApi';
 import { getProfile } from '../services/userService';
 import { useBookingSettings } from "../../../shared/hooks/useBookingSettings";
@@ -25,7 +26,63 @@ const validatePhilippinePhone = (phone) => {
 };
 
 // ────────────────────────────────────────────────────────────────────────────
-// Leasing helpers
+// Philippine Phone Input Component with auto-formatting and flag
+// ────────────────────────────────────────────────────────────────────────────
+const PhilippinePhoneInput = ({ value, onChange, disabled, placeholder = "9XX XXX XXXX" }) => {
+  const getRawDigits = (fullNumber) => {
+    if (!fullNumber || typeof fullNumber !== 'string') return '';
+    const match = fullNumber.match(/^\+63(\d+)$/);
+    return match ? match[1] : '';
+  };
+
+  const [rawDigits, setRawDigits] = useState(() => getRawDigits(value));
+
+  useEffect(() => {
+    setRawDigits(getRawDigits(value));
+  }, [value]);
+
+  const formatDisplay = (digits) => {
+    if (!digits) return '';
+    const cleaned = digits.replace(/\D/g, '');
+    if (cleaned.length === 0) return '';
+    if (cleaned.length <= 3) return cleaned;
+    if (cleaned.length <= 6) return `${cleaned.slice(0, 3)} ${cleaned.slice(3)}`;
+    return `${cleaned.slice(0, 3)} ${cleaned.slice(3, 6)} ${cleaned.slice(6, 10)}`;
+  };
+
+  const handleChange = (e) => {
+    let input = e.target.value;
+    let digits = input.replace(/\D/g, '');
+    if (digits.length > 10) digits = digits.slice(0, 10);
+    setRawDigits(digits);
+    const fullNumber = digits ? `+63${digits}` : '';
+    onChange(fullNumber);
+  };
+
+  const isValid = rawDigits.length === 10 && rawDigits.startsWith('9');
+  const displayValue = formatDisplay(rawDigits);
+
+  return (
+    <div className={`ph-phone-input-wrapper ${!isValid && rawDigits.length > 0 ? 'ph-phone-invalid' : ''}`}>
+      <div className="ph-phone-prefix">
+        <span className="ph-flag">🇵🇭</span>
+        <span className="ph-country-code">+63</span>
+      </div>
+      <input
+        type="tel"
+        className="ph-phone-input"
+        value={displayValue}
+        onChange={handleChange}
+        disabled={disabled}
+        placeholder={placeholder}
+        autoComplete="off"
+      />
+    </div>
+  );
+};
+
+// ────────────────────────────────────────────────────────────────────────────
+// Leasing helpers (unchanged)
 // ────────────────────────────────────────────────────────────────────────────
 const DEFAULT_LEASING = { minLeaseDays: 2, weeklyDiscount: 100, monthlyDiscountCap: 300 };
 
@@ -66,12 +123,9 @@ function calculateLeasePricing(dailyRate, startDateStr, endDateStr) {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Time-slot generation helpers
+// Time-slot generation helpers (unchanged)
 // ────────────────────────────────────────────────────────────────────────────
 
-/**
- * Format total-minutes-from-midnight → "h:mm AM/PM" label.
- */
 function min2label(totalMin) {
   const h24 = Math.floor(totalMin / 60);
   const m   = totalMin % 60;
@@ -80,14 +134,6 @@ function min2label(totalMin) {
   return `${h12}:${String(m).padStart(2, '0')} ${period}`;
 }
 
-/**
- * Build the array of time-slot strings that the shop offers based on
- * BookingTimeSettings (open time, close time, fittingDurationMinutes).
- * The last slot must START before (closeTime - duration) so the fitting
- * still finishes within shop hours.
- *
- * Returns string[] e.g. ["9:00 AM", "9:30 AM", …, "4:30 PM"]
- */
 function buildTimeSlots(settings) {
   const openMin  = (settings.startHour  ?? 9)  * 60 + (settings.startMinute  ?? 0);
   const closeMin = (settings.endHour    ?? 17) * 60 + (settings.endMinute    ?? 0);
@@ -99,36 +145,21 @@ function buildTimeSlots(settings) {
   return slots;
 }
 
-/**
- * Return true if a given date string (YYYY-MM-DD) is a working day
- * according to the backend settings.
- * workingDays uses JS convention: 0 = Sunday … 6 = Saturday.
- */
 function isWorkingDay(dateStr, settings) {
   if (!settings?.enabled) return true;
   if (!dateStr) return true;
-  const dow = new Date(dateStr + 'T00:00:00').getDay(); // 0=Sun…6=Sat
+  const dow = new Date(dateStr + 'T00:00:00').getDay();
   return (settings.workingDays || [1, 2, 3, 4, 5]).includes(dow);
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Direct booking date-range overlap helpers
+// Direct booking date-range overlap helpers (unchanged)
 // ────────────────────────────────────────────────────────────────────────────
 
-/**
- * Check whether [s1,e1] overlaps [s2,e2] (inclusive, YYYY-MM-DD strings).
- */
 function datesOverlap(s1, e1, s2, e2) {
   return s1 <= e2 && e1 >= s2;
 }
 
-/**
- * Classify how a proposed [startDate, endDate] sits among occupiedRanges.
- * Returns:
- *   'blocked'  — overlaps at least one Approved/Confirmed range
- *   'pending'  — overlaps at least one Pending range (but no blocked)
- *   'free'     — no overlap at all
- */
 function classifyDateRange(startDate, endDate, occupiedRanges) {
   if (!startDate || !endDate || !occupiedRanges?.length) return 'free';
   let hasPending = false;
@@ -141,7 +172,7 @@ function classifyDateRange(startDate, endDate, occupiedRanges) {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Shared Data
+// Shared Data (unchanged)
 // ────────────────────────────────────────────────────────────────────────────
 const ITEM_STATUS_META = {
   'Available':   { color: '#15803d', bg: 'rgba(21,128,61,0.1)',   dot: '#22c55e' },
@@ -157,7 +188,7 @@ const fmtDate     = d => d ? new Date(d).toLocaleDateString('en-PH', { year:'num
 const fmtDateTime = (d, t) => d ? `${fmtDate(d)} at ${t}` : '';
 
 // ────────────────────────────────────────────────────────────────────────────
-// UI Components
+// UI Components (unchanged except removed original validatePhilippinePhone usage)
 // ────────────────────────────────────────────────────────────────────────────
 function StatusBadge({ status }) {
   const m = ITEM_STATUS_META[status] || { color:'#888', bg:'rgba(0,0,0,0.06)', dot:'#888' };
@@ -292,7 +323,7 @@ function FastSkeletonRow() {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Fitting Date Picker — compact popup calendar
+// Fitting Date Picker (unchanged)
 // ────────────────────────────────────────────────────────────────────────────
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DOW_LABELS  = ['Su','Mo','Tu','We','Th','Fr','Sa'];
@@ -309,7 +340,6 @@ function FittingDatePicker({ value, onChange, minDate, bookingSettings, itemId, 
   const [localCache, setLocalCache] = useState({});
   const [loadingSet, setLoadingSet] = useState(new Set());
 
-  // Close popup on outside click
   useEffect(() => {
     if (!open) return;
     const h = e => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false); };
@@ -317,7 +347,6 @@ function FittingDatePicker({ value, onChange, minDate, bookingSettings, itemId, 
     return () => document.removeEventListener('mousedown', h);
   }, [open]);
 
-  // Keep view in sync with selected value
   useEffect(() => {
     if (value) {
       const d = new Date(value + 'T00:00:00');
@@ -329,7 +358,6 @@ function FittingDatePicker({ value, onChange, minDate, bookingSettings, itemId, 
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const firstDow    = new Date(year, month, 1).getDay();
 
-  // Batch-fetch booked slots for all visible working days
   useEffect(() => {
     if (!itemId || !timeSlots.length) return;
     const toFetch = [];
@@ -363,7 +391,6 @@ function FittingDatePicker({ value, onChange, minDate, bookingSettings, itemId, 
         return next;
       });
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [year, month, itemId, timeSlots.length]);
 
   const getSlots = ds => {
@@ -383,7 +410,6 @@ function FittingDatePicker({ value, onChange, minDate, bookingSettings, itemId, 
 
   return (
     <div className="fitting-cal-wrap" ref={wrapRef}>
-      {/* Trigger — same height as other inputs */}
       <button
         type="button"
         className={`fitting-cal-trigger${!value ? ' fct-empty' : ''}`}
@@ -395,7 +421,6 @@ function FittingDatePicker({ value, onChange, minDate, bookingSettings, itemId, 
         <ChevronDown size={13} style={{ color: '#bbb', flexShrink: 0, transition: 'transform 0.15s', transform: open ? 'rotate(180deg)' : 'none' }} />
       </button>
 
-      {/* Popup calendar */}
       {open && (
         <div className="fitting-cal-popup">
           <div className="fitting-cal-header">
@@ -455,17 +480,131 @@ function FittingDatePicker({ value, onChange, minDate, bookingSettings, itemId, 
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Direct Booking Modal  (with date-overlap warnings)
+// Direct Date Picker (unchanged)
+// ────────────────────────────────────────────────────────────────────────────
+function DirectDatePicker({ value, onChange, minDate, bookingSettings, occupiedRanges, disabled, label }) {
+  const today = minDate || todayStr();
+
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef(null);
+  const [view, setView] = useState(() => {
+    const d = value ? new Date(value + 'T00:00:00') : new Date();
+    return { year: d.getFullYear(), month: d.getMonth() };
+  });
+
+  useEffect(() => {
+    if (!open) return;
+    const h = e => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [open]);
+
+  useEffect(() => {
+    if (value) {
+      const d = new Date(value + 'T00:00:00');
+      setView({ year: d.getFullYear(), month: d.getMonth() });
+    }
+  }, [value]);
+
+  const { year, month } = view;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDow = new Date(year, month, 1).getDay();
+
+  const prevMonth = () => setView(v => { const d = new Date(v.year, v.month - 1, 1); return { year: d.getFullYear(), month: d.getMonth() }; });
+  const nextMonth = () => setView(v => { const d = new Date(v.year, v.month + 1, 1); return { year: d.getFullYear(), month: d.getMonth() }; });
+  const canPrev = new Date(year, month, 0).toISOString().split('T')[0] >= today;
+
+  const isDateBlocked = (dateStr) => {
+    if (!occupiedRanges || !occupiedRanges.length) return false;
+    return occupiedRanges.some(range => dateStr >= range.startDate && dateStr <= range.endDate);
+  };
+
+  const cells = [];
+  for (let i = 0; i < firstDow; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+  const handleSelect = ds => { onChange(ds); setOpen(false); };
+
+  return (
+    <div className="fitting-cal-wrap" ref={wrapRef}>
+      <button
+        type="button"
+        className={`fitting-cal-trigger${!value ? ' fct-empty' : ''}`}
+        onClick={() => !disabled && setOpen(o => !o)}
+        disabled={disabled}
+      >
+        <Calendar size={13} style={{ color: value ? '#6b2d39' : '#bbb', flexShrink: 0 }} />
+        <span style={{ flex: 1, textAlign: 'left' }}>{value ? fmtDate(value) : `Select ${label || 'date'}`}</span>
+        <ChevronDown size={13} style={{ color: '#bbb', flexShrink: 0, transition: 'transform 0.15s', transform: open ? 'rotate(180deg)' : 'none' }} />
+      </button>
+
+      {open && (
+        <div className="fitting-cal-popup">
+          <div className="fitting-cal-header">
+            <button type="button" className="fitting-cal-nav" onClick={prevMonth} disabled={!canPrev}><ChevronLeft size={13} /></button>
+            <span className="fitting-cal-title">{MONTH_NAMES[month]} {year}</span>
+            <button type="button" className="fitting-cal-nav" onClick={nextMonth}><ChevronRight size={13} /></button>
+          </div>
+
+          <div className="fitting-cal-grid">
+            {DOW_LABELS.map(d => <div key={d} className="fitting-cal-dow">{d}</div>)}
+            {cells.map((day, i) => {
+              if (!day) return <div key={`e${i}`} />;
+              const ds = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+              const isPast = ds < today;
+              const isNonWork = !isWorkingDay(ds, bookingSettings);
+              const isBlocked = isDateBlocked(ds);
+              const isSelected = ds === value;
+              const isToday = ds === today;
+              const clickable = !isPast && !isNonWork && !isBlocked;
+
+              let cls = 'fitting-cal-day';
+              if (isPast) cls += ' fcd-past';
+              else if (isNonWork) cls += ' fcd-closed';
+              else if (isBlocked) cls += ' fcd-full';
+              else cls += ' fcd-avail';
+              if (isSelected) cls += ' fcd-selected';
+              if (isToday && !isSelected) cls += ' fcd-today';
+
+              return (
+                <button
+                  key={ds}
+                  type="button"
+                  className={cls}
+                  onClick={() => clickable && handleSelect(ds)}
+                  disabled={!clickable}
+                  title={isPast ? 'Past date' : isNonWork ? 'Closed day' : isBlocked ? 'Already booked' : undefined}
+                >
+                  {day}
+                  {isBlocked && !isPast && !isNonWork && <span className="fcd-dot fcd-dot-full" />}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="fitting-cal-legend">
+            <span><span className="fcl-dot fcl-avail" />Available</span>
+            <span><span className="fcl-dot fcl-full" />Booked</span>
+            <span><span className="fcl-dot fcl-closed" />Closed</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Direct Booking Modal (unchanged except phone input)
 // ────────────────────────────────────────────────────────────────────────────
 function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, currentUser, bookingSettings, userProfile }) {
   const [form, setForm] = useState({
     startDate: '', endDate: '', notes: '',
     name: currentUser?.name || '',
     email: currentUser?.email || '',
-    phone: '', preferredSize: '',
+    phone: '',
+    preferredSize: '',
   });
 
-  // Prefill name, email, and phone (phone only if present) from user profile
   useEffect(() => {
     if (!userProfile) return;
     const fullName = [userProfile.firstName, userProfile.lastName].filter(Boolean).join(' ');
@@ -481,9 +620,7 @@ function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, c
   const [checkingAvail, setCheckingAvail] = useState(false);
   const [occupiedRanges, setOccupiedRanges]   = useState([]);
   const [loadingOccupied, setLoadingOccupied] = useState(true);
-  // 'free' | 'pending' | 'blocked' | null
   const [overlapStatus, setOverlapStatus] = useState(null);
-  // true = user confirmed they want to proceed despite pending overlap
   const [pendingAcknowledged, setPendingAcknowledged] = useState(false);
 
   const debounceRef = useRef(null);
@@ -493,7 +630,6 @@ function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, c
     [item.price, form.startDate, form.endDate]
   );
 
-  // Load occupied date ranges for this item once on mount
   useEffect(() => {
     setLoadingOccupied(true);
     getOccupiedDirectDates(item.id)
@@ -502,7 +638,6 @@ function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, c
       .finally(() => setLoadingOccupied(false));
   }, [item.id]);
 
-  // Recompute overlap whenever dates change
   useEffect(() => {
     if (!form.startDate || !form.endDate || !pricing?.isValid) {
       setOverlapStatus(null);
@@ -511,11 +646,9 @@ function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, c
     }
     const status = classifyDateRange(form.startDate, form.endDate, occupiedRanges);
     setOverlapStatus(status);
-    // Reset acknowledgement whenever dates change
     setPendingAcknowledged(false);
   }, [form.startDate, form.endDate, pricing?.isValid, occupiedRanges]);
 
-  // Availability check (debounced) — only runs when NOT blocked
   useEffect(() => {
     if (!form.startDate || !form.endDate || !pricing?.isValid || overlapStatus === 'blocked') {
       setAvailability(null);
@@ -579,7 +712,6 @@ function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, c
     }
   };
 
-  // Determine whether the submit button should be active
   const pendingBlocking = overlapStatus === 'pending' && !pendingAcknowledged;
   const canSubmit = (
     pricing?.isValid &&
@@ -591,11 +723,13 @@ function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, c
     form.name && form.email && form.phone
   );
 
-  // Build the min date for the date pickers based on working days
-  // We don't grey calendar days (HTML <input type="date"> has no per-day disabling),
-  // but we DO validate on submit and show an inline notice when the date is a non-working day.
-  const startIsNonWorking = form.startDate && !isWorkingDay(form.startDate, bookingSettings);
-  const endIsNonWorking   = form.endDate   && !isWorkingDay(form.endDate,   bookingSettings);
+  const handleStartChange = (newStart) => {
+    setForm(p => ({
+      ...p,
+      startDate: newStart,
+      endDate: p.endDate && p.endDate < newStart ? '' : p.endDate
+    }));
+  };
 
   return (
     <div className="inv-overlay" onClick={onClose}>
@@ -619,19 +753,19 @@ function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, c
             <div><strong>Note:</strong> Direct booking requires full payment upon confirmation. You will be contacted for payment and pickup arrangements.</div>
           </div>
 
-          {/* ── Date Pickers ─────────────────────────── */}
           <div className="inv-modal-grid">
             <div className="inv-field">
               <label className="inv-field-label">Rental Start Date <span className="inv-required">*</span></label>
-              <input
-                className={`inv-input${startIsNonWorking ? ' inv-input-warn' : ''}`}
-                type="date"
-                min={todayStr()}
+              <DirectDatePicker
                 value={form.startDate}
-                onChange={e => setForm(p => ({ ...p, startDate: e.target.value, endDate: p.endDate && p.endDate < e.target.value ? '' : p.endDate }))}
+                onChange={handleStartChange}
+                minDate={todayStr()}
+                bookingSettings={bookingSettings}
+                occupiedRanges={occupiedRanges}
                 disabled={submitting}
+                label="start date"
               />
-              {startIsNonWorking && (
+              {form.startDate && !isWorkingDay(form.startDate, bookingSettings) && (
                 <span className="inv-field-hint inv-field-hint-warn">
                   <AlertTriangle size={11} /> Not a working day
                 </span>
@@ -639,15 +773,16 @@ function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, c
             </div>
             <div className="inv-field">
               <label className="inv-field-label">Rental End Date <span className="inv-required">*</span></label>
-              <input
-                className={`inv-input${endIsNonWorking ? ' inv-input-warn' : ''}`}
-                type="date"
-                min={form.startDate || todayStr()}
+              <DirectDatePicker
                 value={form.endDate}
-                onChange={e => setForm(p => ({ ...p, endDate: e.target.value }))}
+                onChange={(newEnd) => setForm(p => ({ ...p, endDate: newEnd }))}
+                minDate={form.startDate || todayStr()}
+                bookingSettings={bookingSettings}
+                occupiedRanges={occupiedRanges}
                 disabled={submitting || !form.startDate}
+                label="end date"
               />
-              {endIsNonWorking && (
+              {form.endDate && !isWorkingDay(form.endDate, bookingSettings) && (
                 <span className="inv-field-hint inv-field-hint-warn">
                   <AlertTriangle size={11} /> Not a working day
                 </span>
@@ -655,7 +790,6 @@ function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, c
             </div>
           </div>
 
-          {/* ── Pricing validation ──────────────────── */}
           {pricing && !pricing.isValid && (
             <div className="inv-warning-box">
               <AlertTriangle size={16} />
@@ -663,11 +797,8 @@ function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, c
             </div>
           )}
 
-          {/* ── Overlap / availability indicators ───── */}
           {pricing?.isValid && (
             <div style={{ display:'flex', flexDirection:'column', gap:'0.5rem' }}>
-
-              {/* BLOCKED — confirmed/approved booking exists for these dates */}
               {overlapStatus === 'blocked' && (
                 <div className="inv-warning-box inv-warning-box-blocked">
                   <AlertTriangle size={16} />
@@ -677,8 +808,6 @@ function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, c
                   </div>
                 </div>
               )}
-
-              {/* PENDING — another user has a pending (unconfirmed) booking */}
               {overlapStatus === 'pending' && !pendingAcknowledged && (
                 <div className="inv-warning-box inv-warning-box-pending">
                   <Info size={16} style={{ flexShrink: 0, marginTop: 2 }} />
@@ -706,16 +835,12 @@ function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, c
                   </div>
                 </div>
               )}
-
-              {/* PENDING — acknowledged */}
               {overlapStatus === 'pending' && pendingAcknowledged && (
                 <div className="inv-warning-box" style={{ background:'rgba(245,158,11,0.07)', borderColor:'#f59e0b', color:'#b45309' }}>
                   <Info size={14} />
                   <span>Proceeding with dates that have a pending booking. If the other booking is approved first, yours may not be confirmed.</span>
                 </div>
               )}
-
-              {/* Backend availability check */}
               {overlapStatus !== 'blocked' && checkingAvail && (
                 <div className="inv-warning-box" style={{ borderColor:'#6b2d39' }}>
                   <Loader2 size={14} className="inv-spinner-inline" />
@@ -737,7 +862,6 @@ function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, c
             </div>
           )}
 
-          {/* ── Pricing summary ─────────────────────── */}
           {pricing?.isValid && (
             <div className="inv-pricing-summary">
               <div className="inv-pricing-row">
@@ -763,7 +887,6 @@ function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, c
             </div>
           )}
 
-          {/* ── Customer info ────────────────────────── */}
           <div style={{ borderTop:'1px solid #eeecea', marginTop:'0.5rem', paddingTop:'1rem' }}>
             <label style={{ fontSize:'0.75rem', fontWeight:700, color:'#888', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:'1rem', display:'block' }}>
               Customer Information
@@ -779,7 +902,12 @@ function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, c
               </div>
               <div className="inv-field">
                 <label className="inv-field-label">Phone <span className="inv-required">*</span></label>
-                <input className="inv-input" type="tel" placeholder="+63 912 345 6789" value={form.phone} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))} disabled={submitting} />
+                <PhilippinePhoneInput
+                  value={form.phone}
+                  onChange={(val) => setForm(p => ({ ...p, phone: val }))}
+                  disabled={submitting}
+                  placeholder="9XX XXX XXXX"
+                />
               </div>
             </div>
             <div className="inv-field">
@@ -796,7 +924,6 @@ function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, c
             <textarea className="inv-textarea" rows={3} placeholder="Any specific notes or requirements…" value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} disabled={submitting} />
           </div>
 
-          {/* ── Summary box ──────────────────────────── */}
           <div className="bk-payment-summary">
             <div className="bk-ps-row total" style={{ borderBottom:'none', marginBottom:0, paddingBottom:0 }}>
               <span><strong>Booking Summary</strong></span>
@@ -864,7 +991,7 @@ function DirectBookingConfirmModal({ booking, onClose }) {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Main Component
+// Main Component 
 // ────────────────────────────────────────────────────────────────────────────
 export default function BrowseOutfitsFragment() {
   const [items, setItems]             = useState([]);
@@ -875,7 +1002,6 @@ export default function BrowseOutfitsFragment() {
   const [isPromosLoaded, setIsPromosLoaded] = useState(false);
   const [loadError, setLoadError]     = useState('');
 
-  // ── Booking settings from backend ───────────────────────────────────────
   const { settings: bookingSettings } = useBookingSettings();
 
   const [viewMode, setViewMode]       = useState('grid');
@@ -893,9 +1019,7 @@ export default function BrowseOutfitsFragment() {
   const authToken   = useMemo(() => localStorage.getItem('accessToken') || localStorage.getItem('token'), []);
   const isLoggedIn  = !!authToken;
   const [userProfile, setUserProfile] = useState(null);
-  
 
-  // ── NEW: derived time slots from booking settings ────────────────────────
   const timeSlots = useMemo(() => buildTimeSlots(bookingSettings), [bookingSettings]);
 
   const [booking, setBooking] = useState({
@@ -907,12 +1031,10 @@ export default function BrowseOutfitsFragment() {
   const [submitting, setSubmitting]                       = useState(false);
   const [directBookingConfirmed, setDirectBookingConfirmed] = useState(null);
 
-  // ── NEW: booked fitting slots for the selected item+date ────────────────
   const [bookedFittingSlots, setBookedFittingSlots]       = useState([]);
   const [loadingFittingSlots, setLoadingFittingSlots]     = useState(false);
   const slotCacheRef = useRef({});
 
-  // ── Fetch everything on mount ────────────────────────────────────────────
   useEffect(() => {
     fetchItems()
       .then(data => { setItems(data); setIsItemsLoaded(true); })
@@ -941,7 +1063,6 @@ export default function BrowseOutfitsFragment() {
     }
   }, [isLoggedIn]);
 
-  // ── NEW: fetch booked slots whenever the item OR fitting date changes ────
   useEffect(() => {
     if (modal !== 'booking' || !selectedItem || !booking.fittingDate) {
       setBookedFittingSlots([]);
@@ -962,10 +1083,9 @@ export default function BrowseOutfitsFragment() {
       .finally(()  => setLoadingFittingSlots(false));
   }, [modal, selectedItem?.id, booking.fittingDate]);
 
-  // Auto-select first available time when slots are loaded or date changes
+  // Auto-select first available time slot when booked slots change
   useEffect(() => {
     if (!timeSlots.length) return;
-    // If current time is booked or doesn't exist, pick the first available
     const firstAvail = timeSlots.find(t => !bookedFittingSlots.includes(t));
     setBooking(p => ({
       ...p,
@@ -975,7 +1095,6 @@ export default function BrowseOutfitsFragment() {
     }));
   }, [bookedFittingSlots, timeSlots]);
 
-  // Prefill fitting booking contact fields from user profile when form opens
   useEffect(() => {
     if (modal !== 'booking' || !userProfile) return;
     const fullName = [userProfile.firstName, userProfile.lastName].filter(Boolean).join(' ');
@@ -1003,7 +1122,7 @@ export default function BrowseOutfitsFragment() {
     });
   };
 
-const hasUserDirectBookedItem = useCallback(itemId => {
+  const hasUserDirectBookedItem = useCallback(itemId => {
     if (!directBookings.length) return false;
     return directBookings.some(b =>
       String(b.inventoryItemId) === String(itemId) &&
@@ -1074,14 +1193,12 @@ const hasUserDirectBookedItem = useCallback(itemId => {
       && (filterSize === 'All'   || i.size     === filterSize);
   }), [availableItems, search, filterCat, filterSubcat, filterSize]);
 
-  // ── Fitting booking submit ───────────────────────────────────────────────
   const handleBookingSubmit = async () => {
     if (!isLoggedIn) { showToast('error', 'Please login first to book a fitting.'); return; }
     if (!booking.fittingDate || !booking.fittingTime) { showToast('error', 'Please select a fitting date and time.'); return; }
     if (!booking.name || !booking.email || !booking.phone) { showToast('error', 'Please fill in your contact information.'); return; }
     if (!validatePhilippinePhone(booking.phone)) { showToast('error', 'Invalid Philippine mobile number. Use +63 followed by 10 digits.'); return; }
 
-    // Working-day check
     if (bookingSettings.enableTimeRestrictions && !isWorkingDay(booking.fittingDate, bookingSettings)) {
       showToast('error', 'The selected date is not a working day. Please choose a different date.'); return;
     }
@@ -1094,7 +1211,6 @@ const hasUserDirectBookedItem = useCallback(itemId => {
       showToast('error', `You already have a booking for ${selectedItem.name}. You cannot book another.`); return;
     }
 
-    // Slot already booked?
     if (bookedFittingSlots.includes(booking.fittingTime)) {
       showToast('error', `The time slot ${booking.fittingTime} is already booked. Please select another time.`); return;
     }
@@ -1130,7 +1246,6 @@ const hasUserDirectBookedItem = useCallback(itemId => {
     }
   };
 
-  // ── Error state ──────────────────────────────────────────────────────────
   if (loadError && isItemsLoaded) {
     return (
       <div className="inv-root">
@@ -1145,7 +1260,6 @@ const hasUserDirectBookedItem = useCallback(itemId => {
 
   const showSkeletons = !isItemsLoaded;
 
-  // ── Helpers for button labels (shared between grid + list) ───────────────
   const getItemButtonState = (item) => {
     const hasFittingBooking = hasUserBookedItem(item.id);
     const hasDirectBooking  = hasUserDirectBookedItem(item.id);
@@ -1167,7 +1281,6 @@ const hasUserDirectBookedItem = useCallback(itemId => {
     return { hasFittingBooking, hasDirectBooking, hasAnyBooking, userFittingBooking, userDirectBooking, isFittingDisabled, isDirectDisabled, fittingLabel, directLabel };
   };
 
-  // ── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="inv-root">
       <div className="inv-top">
@@ -1211,7 +1324,7 @@ const hasUserDirectBookedItem = useCallback(itemId => {
           </div>
         </div>
 
-        {/* ── GRID VIEW ────────────────────────────────────────────────────── */}
+        {/* GRID VIEW */}
         {viewMode === 'grid' && (
           <div className="inv-grid">
             {showSkeletons && [...Array(12)].map((_, i) => <FastSkeletonCard key={i} />)}
@@ -1295,7 +1408,7 @@ const hasUserDirectBookedItem = useCallback(itemId => {
           </div>
         )}
 
-        {/* ── LIST VIEW ───────────────────────────────────────────────────── */}
+        {/* LIST VIEW */}
         {viewMode === 'list' && (
           <div className="inv-table-wrap">
             <table className="inv-table">
@@ -1324,7 +1437,7 @@ const hasUserDirectBookedItem = useCallback(itemId => {
                         <div className="inv-list-thumb" onClick={() => setGallery({ item, startIndex: 0 })}>
                           <MediaThumb item={item} />
                         </div>
-                      </td>
+                       </td>
                       <td>
                         <div className="inv-item-name">{item.name}</div>
                         {promo && <div className="inv-list-promo-badge"><Sparkles size={9} /><span>{promo.code}</span></div>}
@@ -1335,7 +1448,7 @@ const hasUserDirectBookedItem = useCallback(itemId => {
                               : <><ShoppingBag size={10} /> {userDirectBooking?.bookingStatus === 'Approved' ? 'Approved' : 'Pending'}</>}
                           </div>
                         )}
-                      </td>
+                        </td>
                       <td><span className="inv-cat-tag">{item.category}</span></td>
                       <td><span className="inv-subtype-tag">{item.subtype}</span></td>
                       <td>{item.size}</td>
@@ -1343,7 +1456,7 @@ const hasUserDirectBookedItem = useCallback(itemId => {
                         {promo
                           ? <div><div className="inv-price-old">₱{item.price.toLocaleString()}</div><div className="inv-price-new">₱{Math.round(price).toLocaleString()}</div></div>
                           : <span className="inv-price">₱{item.price.toLocaleString()}</span>}
-                      </td>
+                        </td>
                       <td><StatusBadge status={item.status} /></td>
                       <td>
                         <div className="inv-row-actions">
@@ -1379,7 +1492,7 @@ const hasUserDirectBookedItem = useCallback(itemId => {
                             <ShoppingBag size={12} /> {directLabelSm}
                           </button>
                         </div>
-                      </td>
+                        </td>
                     </tr>
                   );
                 })}
@@ -1389,7 +1502,7 @@ const hasUserDirectBookedItem = useCallback(itemId => {
         )}
       </div>
 
-      {/* ── VIEW MODAL ──────────────────────────────────────────────────────── */}
+      {/* VIEW MODAL */}
       {modal === 'view' && selectedItem && (() => {
         const promo = activePromo(selectedItem);
         const price = discPrice(selectedItem);
@@ -1486,7 +1599,7 @@ const hasUserDirectBookedItem = useCallback(itemId => {
         );
       })()}
 
-      {/* ── FITTING BOOKING MODAL ───────────────────────────────────────────── */}
+      {/* FITTING BOOKING MODAL - with SIDE BY SIDE date and time dropdown */}
       {modal === 'booking' && selectedItem && !bookingConfirmed && (() => {
         const { hasFittingBooking, hasDirectBooking, hasAnyBooking, userFittingBooking } = getItemButtonState(selectedItem);
 
@@ -1501,10 +1614,19 @@ const hasUserDirectBookedItem = useCallback(itemId => {
         }
 
         const promo = activePromo(selectedItem);
-
-        // ── Working-days hint ────────────────────────────────────────────
         const selectedDateNonWorking = booking.fittingDate && !isWorkingDay(booking.fittingDate, bookingSettings);
         const dateIsFullyBooked = !!booking.fittingDate && !loadingFittingSlots && timeSlots.length > 0 && timeSlots.every(t => bookedFittingSlots.includes(t));
+
+        // Build options for time select
+        const timeOptions = timeSlots.map(slot => ({
+          value: slot,
+          label: slot,
+          disabled: bookedFittingSlots.includes(slot)
+        }));
+
+        const handleTimeChange = (e) => {
+          setBooking(p => ({ ...p, fittingTime: e.target.value }));
+        };
 
         return (
           <div className="inv-overlay" onClick={closeModal}>
@@ -1541,64 +1663,61 @@ const hasUserDirectBookedItem = useCallback(itemId => {
                   </div>
                 </div>
 
-                {/* ── Date picker ─────────────────────────────────────────── */}
-                <div className="inv-field">
-                  <label className="inv-field-label">Fitting Date <span className="inv-required">*</span></label>
-                  <FittingDatePicker
-                    value={booking.fittingDate}
-                    onChange={ds => setBooking(p => ({ ...p, fittingDate: ds, fittingTime: '' }))}
-                    minDate={todayStr()}
-                    bookingSettings={bookingSettings}
-                    itemId={selectedItem.id}
-                    timeSlots={timeSlots}
-                    slotCacheRef={slotCacheRef}
-                    disabled={submitting}
-                  />
-                </div>
-
-                {/* ── Time slot grid ──────────────────────────────────────── */}
-                <div className="inv-field">
-                  <label className="inv-field-label">
-                    Fitting Time <span className="inv-required">*</span>
-                    {loadingFittingSlots && booking.fittingDate && (
-                      <Loader2 size={11} className="inv-spinner-inline" style={{ marginLeft:'0.4rem' }} />
+                {/* Date and Time side by side */}
+                <div className="inv-modal-grid">
+                  <div className="inv-field">
+                    <label className="inv-field-label">Fitting Date <span className="inv-required">*</span></label>
+                    <FittingDatePicker
+                      value={booking.fittingDate}
+                      onChange={ds => setBooking(p => ({ ...p, fittingDate: ds, fittingTime: '' }))}
+                      minDate={todayStr()}
+                      bookingSettings={bookingSettings}
+                      itemId={selectedItem.id}
+                      timeSlots={timeSlots}
+                      slotCacheRef={slotCacheRef}
+                      disabled={submitting}
+                    />
+                    {selectedDateNonWorking && (
+                      <span className="inv-field-hint inv-field-hint-warn">
+                        <AlertTriangle size={11} /> Not a working day
+                      </span>
                     )}
-                  </label>
-
-                  {!booking.fittingDate && (
-                    <div className="ts-placeholder">Select a date first</div>
-                  )}
-                  {booking.fittingDate && loadingFittingSlots && (
-                    <div className="ts-placeholder"><Loader2 size={13} className="inv-spinner-inline" /> Loading slots…</div>
-                  )}
-                  {booking.fittingDate && !loadingFittingSlots && dateIsFullyBooked && (
-                    <div className="ts-placeholder ts-placeholder-full">No available slots for this date</div>
-                  )}
-                  {booking.fittingDate && !loadingFittingSlots && !dateIsFullyBooked && (
-                    <div className="ts-grid">
-                      {timeSlots.map(t => {
-                        const isBooked = bookedFittingSlots.includes(t);
-                        const isSelected = booking.fittingTime === t;
-                        return (
-                          <button
-                            key={t}
-                            type="button"
-                            className={`ts-btn${isBooked ? ' ts-btn-booked' : ''}${isSelected ? ' ts-btn-selected' : ''}`}
-                            disabled={isBooked || submitting}
-                            onClick={() => !isBooked && setBooking(p => ({ ...p, fittingTime: t }))}
-                            title={isBooked ? 'This slot is already booked' : t}
-                          >
-                            <Clock size={11} />
-                            <span>{t}</span>
-                            {isBooked && <span className="ts-booked-tag">Booked</span>}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
+                  </div>
+                  <div className="inv-field">
+                    <label className="inv-field-label">
+                      Fitting Time <span className="inv-required">*</span>
+                      {loadingFittingSlots && booking.fittingDate && (
+                        <Loader2 size={11} className="inv-spinner-inline" style={{ marginLeft:'0.4rem' }} />
+                      )}
+                    </label>
+                    {!booking.fittingDate && (
+                      <div className="ts-placeholder">Select a date first</div>
+                    )}
+                    {booking.fittingDate && loadingFittingSlots && (
+                      <div className="ts-placeholder"><Loader2 size={13} className="inv-spinner-inline" /> Loading slots…</div>
+                    )}
+                    {booking.fittingDate && !loadingFittingSlots && dateIsFullyBooked && (
+                      <div className="ts-placeholder ts-placeholder-full">No available slots for this date</div>
+                    )}
+                    {booking.fittingDate && !loadingFittingSlots && !dateIsFullyBooked && (
+                      <select
+                        className="inv-select time-select-dropdown"
+                        value={booking.fittingTime}
+                        onChange={handleTimeChange}
+                        disabled={submitting}
+                        style={{ width: '100%' }}
+                      >
+                        <option value="" disabled>Select a time</option>
+                        {timeOptions.map(opt => (
+                          <option key={opt.value} value={opt.value} disabled={opt.disabled}>
+                            {opt.label} {opt.disabled ? '(Booked)' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
                 </div>
 
-                {/* ── Contact info ─────────────────────────────────────────── */}
                 <div className="inv-field">
                   <label className="inv-field-label">Full Name <span className="inv-required">*</span></label>
                   <input className="inv-input" type="text" placeholder="Enter your full name" value={booking.name} onChange={e => setBooking(p => ({ ...p, name: e.target.value }))} disabled={submitting} />
@@ -1610,7 +1729,12 @@ const hasUserDirectBookedItem = useCallback(itemId => {
                   </div>
                   <div className="inv-field">
                     <label className="inv-field-label">Phone <span className="inv-required">*</span></label>
-                    <input className="inv-input" type="tel" placeholder="+63 912 345 6789" value={booking.phone} onChange={e => setBooking(p => ({ ...p, phone: e.target.value }))} disabled={submitting} />
+                    <PhilippinePhoneInput
+                      value={booking.phone}
+                      onChange={(val) => setBooking(p => ({ ...p, phone: val }))}
+                      disabled={submitting}
+                      placeholder="9XX XXX XXXX"
+                    />
                   </div>
                 </div>
                 <div className="inv-field">
@@ -1665,7 +1789,7 @@ const hasUserDirectBookedItem = useCallback(itemId => {
         );
       })()}
 
-      {/* ── FITTING CONFIRMATION MODAL ──────────────────────────────────────── */}
+      {/* FITTING CONFIRMATION MODAL */}
       {modal === 'booking' && bookingConfirmed && (
         <div className="inv-overlay" onClick={closeModal}>
           <div className="inv-modal" style={{ maxWidth:'500px' }} onClick={e => e.stopPropagation()}>
@@ -1699,7 +1823,7 @@ const hasUserDirectBookedItem = useCallback(itemId => {
         </div>
       )}
 
-      {/* ── DIRECT BOOKING MODAL ────────────────────────────────────────────── */}
+      {/* DIRECT BOOKING MODAL */}
       {modal === 'directBooking' && selectedItem && (
         <DirectBookingModal
           item={selectedItem}
@@ -1723,7 +1847,7 @@ const hasUserDirectBookedItem = useCallback(itemId => {
         />
       )}
 
-      {/* ── DIRECT BOOKING CONFIRM MODAL ────────────────────────────────────── */}
+      {/* DIRECT BOOKING CONFIRM MODAL */}
       {modal === 'directBookingConfirm' && directBookingConfirmed && (
         <DirectBookingConfirmModal booking={directBookingConfirmed} onClose={closeModal} />
       )}
