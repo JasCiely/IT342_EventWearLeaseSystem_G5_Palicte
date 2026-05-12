@@ -41,4 +41,6 @@ public interface DirectBookingService {
     void resendDirectBookingConfirmationEmail(String bookingId);
 
     List<DirectBookingResponse> getAllUserBookingsList(String userId);
+
+    void cancelDirectBooking(String bookingId, String userId);
 }
