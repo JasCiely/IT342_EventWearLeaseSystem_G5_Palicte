@@ -3,8 +3,6 @@ package com.backend.features.booking;
 import com.backend.features.booking.dto.request.DirectBookingRequest;
 import com.backend.features.booking.dto.response.DirectBookingResponse;
 import com.backend.shared.entity.DirectBooking;
-import com.backend.features.booking.DirectBookingRepository;
-import com.backend.features.booking.DirectBookingService;
 import com.backend.shared.email.EmailService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -291,5 +289,35 @@ public class DirectBookingServiceImpl implements DirectBookingService {
         return page.getContent().stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public void cancelDirectBooking(String bookingId, String userId) {
+        DirectBooking booking = directBookingRepository.findById(bookingId)
+                .orElseThrow(() -> new IllegalArgumentException("Booking not found"));
+
+        if (!booking.getUserId().equals(userId)) {
+            throw new SecurityException("You are not allowed to cancel this booking");
+        }
+
+        String status = booking.getBookingStatus();
+        if (!"Pending".equals(status) && !"Approved".equals(status)) {
+            throw new IllegalStateException("Only pending or approved bookings can be cancelled");
+        }
+
+        booking.setBookingStatus("Cancelled");
+        directBookingRepository.save(booking);
+        log.info("Direct booking {} cancelled by customer {}", bookingId, userId);
+
+        try {
+            emailService.sendDirectBookingCancellation(
+                    booking.getCustomerEmail(),
+                    booking.getCustomerName(),
+                    booking.getItemName(),
+                    booking.getId());
+        } catch (Exception e) {
+            log.warn("Failed to send cancellation email for direct booking {}: {}", bookingId, e.getMessage());
+        }
     }
 }

@@ -2213,3 +2213,55 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Cancel button styles */
+.inv-btn-cancel,
+.inv-btn-cancel-direct {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    padding: 0.5rem 0.5rem;
+    border-radius: 10px;
+    background: #dc2626;
+    color: #fff;
+    border: none;
+    font-size: 0.7rem;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.inv-btn-cancel:hover:not(:disabled),
+.inv-btn-cancel-direct:hover:not(:disabled) {
+    background: #b91c1c;
+    transform: translateY(-1px);
+}
+
+.inv-btn-cancel:disabled,
+.inv-btn-cancel-direct:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Small version for list view */
+.inv-btn-cancel-sm {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.4rem 0.7rem;
+    border-radius: 8px;
+    background: #dc2626;
+    color: #fff;
+    border: none;
+    font-size: 0.7rem;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+}
+
+.inv-btn-cancel-sm:hover:not(:disabled) {
+    background: #b91c1c;
+}

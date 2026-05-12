@@ -1,10 +1,8 @@
 // features/customer/services/inventoryApi.js
-// Re-exports from shared — do not add feature-specific logic here.
-// Inventory-only functions:
-export { 
-  fetchItems, 
-  fetchItemById, 
-  fetchPromotions, 
+export {
+  fetchItems,
+  fetchItemById,
+  fetchPromotions,
   testBackendConnection,
   createItem,
   updateItem,
@@ -33,6 +31,8 @@ export {
   returnLease,
   extendLease,
   getUnavailableDates,
-  getBookedFittingSlots,      
-  getOccupiedDirectDates,    
+  getBookedFittingSlots,
+  getOccupiedDirectDates,
+  cancelFittingBooking,    
+  cancelDirectBooking,     
 } from '../../../shared/services/bookingApi.js';

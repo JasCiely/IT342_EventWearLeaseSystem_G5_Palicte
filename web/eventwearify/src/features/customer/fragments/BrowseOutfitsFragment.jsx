@@ -1,4 +1,4 @@
-// ==================== BrowseOutfitsFragment.jsx (FULL UPDATED FILE) ====================
+// ==================== BrowseOutfitsFragment.jsx (FULL UPDATED – Hide booked items) ====================
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
@@ -13,6 +13,8 @@ import {
   createDirectBooking, checkDirectBookingAvailability, getUserDirectBookings,
   getBookedFittingSlots,
   getOccupiedDirectDates,
+  cancelFittingBooking,
+  cancelDirectBooking,
 } from '../services/inventoryApi';
 import { getProfile } from '../services/userService';
 import { useBookingSettings } from "../../../shared/hooks/useBookingSettings";
@@ -82,7 +84,7 @@ const PhilippinePhoneInput = ({ value, onChange, disabled, placeholder = "9XX XX
 };
 
 // ────────────────────────────────────────────────────────────────────────────
-// Leasing helpers (unchanged)
+// Leasing helpers
 // ────────────────────────────────────────────────────────────────────────────
 const DEFAULT_LEASING = { minLeaseDays: 2, weeklyDiscount: 100, monthlyDiscountCap: 300 };
 
@@ -123,7 +125,7 @@ function calculateLeasePricing(dailyRate, startDateStr, endDateStr) {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Time-slot generation helpers (unchanged)
+// Time-slot generation helpers
 // ────────────────────────────────────────────────────────────────────────────
 
 function min2label(totalMin) {
@@ -153,7 +155,7 @@ function isWorkingDay(dateStr, settings) {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Direct booking date-range overlap helpers (unchanged)
+// Direct booking date-range overlap helpers
 // ────────────────────────────────────────────────────────────────────────────
 
 function datesOverlap(s1, e1, s2, e2) {
@@ -172,7 +174,7 @@ function classifyDateRange(startDate, endDate, occupiedRanges) {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Shared Data (unchanged)
+// Shared Data
 // ────────────────────────────────────────────────────────────────────────────
 const ITEM_STATUS_META = {
   'Available':   { color: '#15803d', bg: 'rgba(21,128,61,0.1)',   dot: '#22c55e' },
@@ -188,7 +190,7 @@ const fmtDate     = d => d ? new Date(d).toLocaleDateString('en-PH', { year:'num
 const fmtDateTime = (d, t) => d ? `${fmtDate(d)} at ${t}` : '';
 
 // ────────────────────────────────────────────────────────────────────────────
-// UI Components (unchanged except removed original validatePhilippinePhone usage)
+// UI Components
 // ────────────────────────────────────────────────────────────────────────────
 function StatusBadge({ status }) {
   const m = ITEM_STATUS_META[status] || { color:'#888', bg:'rgba(0,0,0,0.06)', dot:'#888' };
@@ -323,7 +325,7 @@ function FastSkeletonRow() {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Fitting Date Picker (unchanged)
+// Fitting Date Picker
 // ────────────────────────────────────────────────────────────────────────────
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DOW_LABELS  = ['Su','Mo','Tu','We','Th','Fr','Sa'];
@@ -480,7 +482,7 @@ function FittingDatePicker({ value, onChange, minDate, bookingSettings, itemId, 
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Direct Date Picker (unchanged)
+// Direct Date Picker
 // ────────────────────────────────────────────────────────────────────────────
 function DirectDatePicker({ value, onChange, minDate, bookingSettings, occupiedRanges, disabled, label }) {
   const today = minDate || todayStr();
@@ -594,7 +596,7 @@ function DirectDatePicker({ value, onChange, minDate, bookingSettings, occupiedR
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Direct Booking Modal (unchanged except phone input)
+// Direct Booking Modal
 // ────────────────────────────────────────────────────────────────────────────
 function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, currentUser, bookingSettings, userProfile }) {
   const [form, setForm] = useState({
@@ -1035,6 +1037,8 @@ export default function BrowseOutfitsFragment() {
   const [loadingFittingSlots, setLoadingFittingSlots]     = useState(false);
   const slotCacheRef = useRef({});
 
+  const [cancelling, setCancelling] = useState(null); // { type: 'fitting'|'direct', id }
+
   useEffect(() => {
     fetchItems()
       .then(data => { setItems(data); setIsItemsLoaded(true); })
@@ -1062,6 +1066,21 @@ export default function BrowseOutfitsFragment() {
         .catch(err => console.error('Error loading direct bookings:', err));
     }
   }, [isLoggedIn]);
+
+  // --------------------------------------------------------------------------
+  // KEY CHANGE: Build set of item IDs that the user has already booked
+  // (active bookings only – exclude cancelled)
+  // --------------------------------------------------------------------------
+  const bookedItemIds = useMemo(() => {
+    if (!isLoggedIn) return new Set();
+    const fittingIds = userBookings
+      .filter(b => b.status !== 'CANCELLED')
+      .map(b => String(b.itemId));
+    const directIds = directBookings
+      .filter(b => b.bookingStatus !== 'Cancelled')
+      .map(b => String(b.inventoryItemId));
+    return new Set([...fittingIds, ...directIds]);
+  }, [userBookings, directBookings, isLoggedIn]);
 
   useEffect(() => {
     if (modal !== 'booking' || !selectedItem || !booking.fittingDate) {
@@ -1122,11 +1141,43 @@ export default function BrowseOutfitsFragment() {
     });
   };
 
+  const handleCancelFitting = async (bookingId) => {
+    if (!window.confirm('Are you sure you want to cancel this fitting booking? This action cannot be undone.')) return;
+    setCancelling({ type: 'fitting', id: bookingId });
+    try {
+      await cancelFittingBooking(bookingId);
+      const updated = await getUserBookings();
+      setUserBookings(updated);
+      showToast('success', 'Fitting booking cancelled successfully.');
+    } catch (err) {
+      showToast('error', err.message || 'Failed to cancel booking.');
+    } finally {
+      setCancelling(null);
+    }
+  };
+
+  const handleCancelDirect = async (bookingId) => {
+    if (!window.confirm('Are you sure you want to cancel this direct booking? This action cannot be undone.')) return;
+    setCancelling({ type: 'direct', id: bookingId });
+    try {
+      await cancelDirectBooking(bookingId);
+      const updated = await getUserDirectBookings();
+      setDirectBookings(updated);
+      localStorage.setItem('userDirectBookings', JSON.stringify(updated));
+      showToast('success', 'Direct booking cancelled successfully.');
+    } catch (err) {
+      showToast('error', err.message || 'Failed to cancel booking.');
+    } finally {
+      setCancelling(null);
+    }
+  };
+
   const hasUserDirectBookedItem = useCallback(itemId => {
     if (!directBookings.length) return false;
     return directBookings.some(b =>
       String(b.inventoryItemId) === String(itemId) &&
-      (b.bookingStatus === 'Pending' || b.bookingStatus === 'Approved' || b.bookingStatus === 'Confirmed')
+      (b.bookingStatus === 'Pending' || b.bookingStatus === 'Approved' || b.bookingStatus === 'Confirmed') &&
+      b.bookingStatus !== 'Cancelled'
     );
   }, [directBookings]);
 
@@ -1134,7 +1185,8 @@ export default function BrowseOutfitsFragment() {
     if (!directBookings.length) return null;
     return directBookings.find(b =>
       String(b.inventoryItemId) === String(itemId) &&
-      (b.bookingStatus === 'Pending' || b.bookingStatus === 'Approved' || b.bookingStatus === 'Confirmed')
+      (b.bookingStatus === 'Pending' || b.bookingStatus === 'Approved' || b.bookingStatus === 'Confirmed') &&
+      b.bookingStatus !== 'Cancelled'
     );
   }, [directBookings]);
 
@@ -1144,7 +1196,8 @@ export default function BrowseOutfitsFragment() {
     return userBookings.some(b =>
       String(b.itemId) === String(itemId) &&
       b.status === 'CONFIRMED' &&
-      new Date(b.fittingDate) >= today
+      new Date(b.fittingDate) >= today &&
+      b.status !== 'CANCELLED'
     );
   }, [userBookings]);
 
@@ -1154,7 +1207,8 @@ export default function BrowseOutfitsFragment() {
     return userBookings.find(b =>
       String(b.itemId) === String(itemId) &&
       b.status === 'CONFIRMED' &&
-      new Date(b.fittingDate) >= today
+      new Date(b.fittingDate) >= today &&
+      b.status !== 'CANCELLED'
     );
   }, [userBookings]);
 
@@ -1177,6 +1231,7 @@ export default function BrowseOutfitsFragment() {
   }, [activePromo]);
 
   const availableItems = useMemo(() => items.filter(i => i.status === 'Available' || i.status === 'Reserved'), [items]);
+  
   const categories     = useMemo(() => [...new Set(availableItems.map(i => i.category))], [availableItems]);
   const subcategories  = useMemo(() => {
     if (filterCat === 'All') return [];
@@ -1185,13 +1240,19 @@ export default function BrowseOutfitsFragment() {
   useEffect(() => { setFilterSubcat('All'); }, [filterCat]);
   const sizes = useMemo(() => [...new Set(availableItems.map(i => i.size))].sort(), [availableItems]);
 
+  // --------------------------------------------------------------------------
+  // KEY CHANGE: Filter out items that the user has already booked
+  // --------------------------------------------------------------------------
   const visibleItems = useMemo(() => availableItems.filter(i => {
+    // Skip items that the user has already booked
+    if (bookedItemIds.has(String(i.id))) return false;
+
     const q = search.toLowerCase();
     return (!q || i.name.toLowerCase().includes(q) || i.category.toLowerCase().includes(q) || (i.subtype||'').toLowerCase().includes(q))
       && (filterCat === 'All'    || i.category === filterCat)
       && (filterSubcat === 'All' || i.subtype  === filterSubcat)
       && (filterSize === 'All'   || i.size     === filterSize);
-  }), [availableItems, search, filterCat, filterSubcat, filterSize]);
+  }), [availableItems, search, filterCat, filterSubcat, filterSize, bookedItemIds]);
 
   const handleBookingSubmit = async () => {
     if (!isLoggedIn) { showToast('error', 'Please login first to book a fitting.'); return; }
@@ -1246,6 +1307,38 @@ export default function BrowseOutfitsFragment() {
     }
   };
 
+  const getItemButtonState = (item) => {
+    const fittingBooking = getUserBookingForItem(item.id);
+    const directBooking = getUserDirectBookingForItem(item.id);
+    const hasFittingBooking = !!fittingBooking;
+    const hasDirectBooking = !!directBooking;
+    const hasAnyBooking = hasFittingBooking || hasDirectBooking;
+
+    let fittingLabel = 'Book Fitting';
+    let directLabel = 'Book Direct';
+    if (hasFittingBooking) {
+      fittingLabel = 'Fitting Booked';
+      directLabel = 'Unavailable';
+    } else if (hasDirectBooking) {
+      fittingLabel = 'Unavailable';
+      directLabel = directBooking.bookingStatus === 'Approved' ? 'Booking Approved' : 'Booking Pending';
+    }
+
+    return {
+      fittingBookingId: fittingBooking?.id,
+      directBookingId: directBooking?.id,
+      hasFittingBooking,
+      hasDirectBooking,
+      hasAnyBooking,
+      userFittingBooking: fittingBooking,
+      userDirectBooking: directBooking,
+      isFittingDisabled: item.status !== 'Available' || !isLoggedIn || hasAnyBooking,
+      isDirectDisabled: item.status !== 'Available' || !isLoggedIn || hasAnyBooking,
+      fittingLabel,
+      directLabel,
+    };
+  };
+
   if (loadError && isItemsLoaded) {
     return (
       <div className="inv-root">
@@ -1259,27 +1352,6 @@ export default function BrowseOutfitsFragment() {
   }
 
   const showSkeletons = !isItemsLoaded;
-
-  const getItemButtonState = (item) => {
-    const hasFittingBooking = hasUserBookedItem(item.id);
-    const hasDirectBooking  = hasUserDirectBookedItem(item.id);
-    const hasAnyBooking     = hasFittingBooking || hasDirectBooking;
-    const userFittingBooking = getUserBookingForItem(item.id);
-    const userDirectBooking  = getUserDirectBookingForItem(item.id);
-    const isFittingDisabled  = item.status !== 'Available' || !isLoggedIn || hasAnyBooking;
-    const isDirectDisabled   = item.status !== 'Available' || !isLoggedIn || hasAnyBooking;
-
-    let fittingLabel = 'Book Fitting';
-    let directLabel  = 'Book Direct';
-    if (hasFittingBooking) {
-      fittingLabel = 'Fitting Booked';
-      directLabel  = 'Unavailable';
-    } else if (hasDirectBooking) {
-      fittingLabel = 'Unavailable';
-      directLabel  = userDirectBooking?.bookingStatus === 'Approved' ? 'Booking Approved' : 'Booking Pending';
-    }
-    return { hasFittingBooking, hasDirectBooking, hasAnyBooking, userFittingBooking, userDirectBooking, isFittingDisabled, isDirectDisabled, fittingLabel, directLabel };
-  };
 
   return (
     <div className="inv-root">
@@ -1328,12 +1400,18 @@ export default function BrowseOutfitsFragment() {
         {viewMode === 'grid' && (
           <div className="inv-grid">
             {showSkeletons && [...Array(12)].map((_, i) => <FastSkeletonCard key={i} />)}
-            {!showSkeletons && visibleItems.length === 0 && <div className="inv-empty-grid">No items found.</div>}
+            {!showSkeletons && visibleItems.length === 0 && (
+              <div className="inv-empty-grid">
+                {bookedItemIds.size > 0 
+                  ? "You've already booked all available items. Check back later for new arrivals!"
+                  : "No items found."}
+              </div>
+            )}
             {!showSkeletons && visibleItems.map(item => {
               const promo = activePromo(item);
               const price = discPrice(item);
               const files = item.mediaFiles?.length || 0;
-              const { hasFittingBooking, hasDirectBooking, hasAnyBooking, userFittingBooking, userDirectBooking, isFittingDisabled, isDirectDisabled, fittingLabel, directLabel } = getItemButtonState(item);
+              const { hasFittingBooking, hasDirectBooking, hasAnyBooking, userFittingBooking, userDirectBooking, isFittingDisabled, isDirectDisabled, fittingLabel, directLabel, fittingBookingId, directBookingId } = getItemButtonState(item);
 
               return (
                 <div key={item.id} className="inv-grid-card">
@@ -1371,36 +1449,64 @@ export default function BrowseOutfitsFragment() {
                   </div>
                   <div className="inv-grid-actions">
                     <button className="inv-icon-btn" onClick={() => { setSelectedItem(item); setModal('view'); }}><Eye size={13} /></button>
-                    <button
-                      className={`inv-btn-book${hasFittingBooking?' inv-btn-booked':''}`}
-                      onClick={() => {
-                        if (hasAnyBooking) {
-                          showToast('error', hasFittingBooking
-                            ? `You already have a fitting booked for this item on ${fmtDate(userFittingBooking.fittingDate)}.`
-                            : `You already have a direct booking for this item.`);
-                        } else {
-                          setSelectedItem(item); setModal('booking');
-                        }
-                      }}
-                      disabled={isFittingDisabled}
-                    >
-                      <Calendar size={13} /> {fittingLabel}
-                    </button>
-                    <button
-                      className={`inv-btn-direct-book${hasDirectBooking?' inv-btn-directbooked':''}`}
-                      onClick={() => {
-                        if (hasAnyBooking) {
-                          showToast('error', hasDirectBooking
-                            ? `You already have a direct booking for this item.`
-                            : `You already have a fitting booked for this item on ${fmtDate(userFittingBooking.fittingDate)}.`);
-                        } else {
-                          setSelectedItem(item); setModal('directBooking');
-                        }
-                      }}
-                      disabled={isDirectDisabled}
-                    >
-                      <ShoppingBag size={13} /> {directLabel}
-                    </button>
+                    {hasFittingBooking ? (
+                      <button
+                        className="inv-btn-cancel"
+                        onClick={() => handleCancelFitting(fittingBookingId)}
+                        disabled={cancelling?.type === 'fitting' && cancelling?.id === fittingBookingId}
+                      >
+                        {cancelling?.type === 'fitting' && cancelling?.id === fittingBookingId ? (
+                          <Loader2 size={12} className="inv-spinner-inline" />
+                        ) : (
+                          'Cancel Fitting'
+                        )}
+                      </button>
+                    ) : (
+                      <button
+                        className={`inv-btn-book${hasFittingBooking ? ' inv-btn-booked' : ''}`}
+                        onClick={() => {
+                          if (hasAnyBooking) {
+                            showToast('error', hasFittingBooking
+                              ? `You already have a fitting booked for this item on ${fmtDate(userFittingBooking.fittingDate)}.`
+                              : `You already have a direct booking for this item.`);
+                          } else {
+                            setSelectedItem(item); setModal('booking');
+                          }
+                        }}
+                        disabled={isFittingDisabled}
+                      >
+                        <Calendar size={13} /> {fittingLabel}
+                      </button>
+                    )}
+                    {hasDirectBooking ? (
+                      <button
+                        className="inv-btn-cancel-direct"
+                        onClick={() => handleCancelDirect(directBookingId)}
+                        disabled={cancelling?.type === 'direct' && cancelling?.id === directBookingId}
+                      >
+                        {cancelling?.type === 'direct' && cancelling?.id === directBookingId ? (
+                          <Loader2 size={12} className="inv-spinner-inline" />
+                        ) : (
+                          'Cancel Direct'
+                        )}
+                      </button>
+                    ) : (
+                      <button
+                        className={`inv-btn-direct-book${hasDirectBooking ? ' inv-btn-directbooked' : ''}`}
+                        onClick={() => {
+                          if (hasAnyBooking) {
+                            showToast('error', hasDirectBooking
+                              ? `You already have a direct booking for this item.`
+                              : `You already have a fitting booked for this item on ${fmtDate(userFittingBooking.fittingDate)}.`);
+                          } else {
+                            setSelectedItem(item); setModal('directBooking');
+                          }
+                        }}
+                        disabled={isDirectDisabled}
+                      >
+                        <ShoppingBag size={13} /> {directLabel}
+                      </button>
+                    )}
                   </div>
                 </div>
               );
@@ -1422,12 +1528,16 @@ export default function BrowseOutfitsFragment() {
               <tbody>
                 {showSkeletons && [...Array(8)].map((_, i) => <FastSkeletonRow key={i} />)}
                 {!showSkeletons && visibleItems.length === 0 && (
-                  <tr><td colSpan={8} className="inv-empty">No items found.</td></tr>
+                  <tr><td colSpan={8} className="inv-empty">
+                    {bookedItemIds.size > 0 
+                      ? "You've already booked all available items. Check back later for new arrivals!"
+                      : "No items found."}
+                  </td></tr>
                 )}
                 {!showSkeletons && visibleItems.map(item => {
                   const promo = activePromo(item);
                   const price = discPrice(item);
-                  const { hasFittingBooking, hasDirectBooking, hasAnyBooking, userFittingBooking, userDirectBooking, isFittingDisabled, isDirectDisabled, fittingLabel, directLabel } = getItemButtonState(item);
+                  const { hasFittingBooking, hasDirectBooking, hasAnyBooking, userFittingBooking, userDirectBooking, isFittingDisabled, isDirectDisabled, fittingLabel, directLabel, fittingBookingId, directBookingId } = getItemButtonState(item);
                   const fittingLabelSm = hasFittingBooking ? 'Booked' : hasDirectBooking ? 'N/A' : 'Book Fitting';
                   const directLabelSm  = hasDirectBooking  ? (userDirectBooking?.bookingStatus === 'Approved' ? 'Approved' : 'Pending') : hasFittingBooking ? 'N/A' : 'Book Direct';
 
@@ -1437,7 +1547,7 @@ export default function BrowseOutfitsFragment() {
                         <div className="inv-list-thumb" onClick={() => setGallery({ item, startIndex: 0 })}>
                           <MediaThumb item={item} />
                         </div>
-                       </td>
+                      </td>
                       <td>
                         <div className="inv-item-name">{item.name}</div>
                         {promo && <div className="inv-list-promo-badge"><Sparkles size={9} /><span>{promo.code}</span></div>}
@@ -1448,7 +1558,7 @@ export default function BrowseOutfitsFragment() {
                               : <><ShoppingBag size={10} /> {userDirectBooking?.bookingStatus === 'Approved' ? 'Approved' : 'Pending'}</>}
                           </div>
                         )}
-                        </td>
+                       </td>
                       <td><span className="inv-cat-tag">{item.category}</span></td>
                       <td><span className="inv-subtype-tag">{item.subtype}</span></td>
                       <td>{item.size}</td>
@@ -1456,43 +1566,71 @@ export default function BrowseOutfitsFragment() {
                         {promo
                           ? <div><div className="inv-price-old">₱{item.price.toLocaleString()}</div><div className="inv-price-new">₱{Math.round(price).toLocaleString()}</div></div>
                           : <span className="inv-price">₱{item.price.toLocaleString()}</span>}
-                        </td>
+                       </td>
                       <td><StatusBadge status={item.status} /></td>
                       <td>
                         <div className="inv-row-actions">
                           <button className="inv-icon-btn" onClick={() => { setSelectedItem(item); setModal('view'); }}><Eye size={13} /></button>
-                          <button
-                            className={`inv-btn-book-sm${hasFittingBooking?' inv-btn-booked':''}`}
-                            onClick={() => {
-                              if (hasAnyBooking) {
-                                showToast('error', hasFittingBooking
-                                  ? `Already have fitting booked on ${fmtDate(userFittingBooking.fittingDate)}.`
-                                  : `You already have a booking for this item.`);
-                              } else {
-                                setSelectedItem(item); setModal('booking');
-                              }
-                            }}
-                            disabled={isFittingDisabled}
-                          >
-                            <Calendar size={12} /> {fittingLabelSm}
-                          </button>
-                          <button
-                            className={`inv-btn-direct-book-sm${hasDirectBooking?' inv-btn-directbooked':''}`}
-                            onClick={() => {
-                              if (hasAnyBooking) {
-                                showToast('error', hasFittingBooking
-                                  ? `Already have fitting booked on ${fmtDate(userFittingBooking.fittingDate)}.`
-                                  : `You already have a booking for this item.`);
-                              } else {
-                                setSelectedItem(item); setModal('directBooking');
-                              }
-                            }}
-                            disabled={isDirectDisabled}
-                          >
-                            <ShoppingBag size={12} /> {directLabelSm}
-                          </button>
+                          {hasFittingBooking ? (
+                            <button
+                              className="inv-btn-cancel-sm"
+                              onClick={() => handleCancelFitting(fittingBookingId)}
+                              disabled={cancelling?.type === 'fitting' && cancelling?.id === fittingBookingId}
+                            >
+                              {cancelling?.type === 'fitting' && cancelling?.id === fittingBookingId ? (
+                                <Loader2 size={11} className="inv-spinner-inline" />
+                              ) : (
+                                'Cancel'
+                              )}
+                            </button>
+                          ) : (
+                            <button
+                              className={`inv-btn-book-sm${hasFittingBooking ? ' inv-btn-booked' : ''}`}
+                              onClick={() => {
+                                if (hasAnyBooking) {
+                                  showToast('error', hasFittingBooking
+                                    ? `Already have fitting booked on ${fmtDate(userFittingBooking.fittingDate)}.`
+                                    : `You already have a booking for this item.`);
+                                } else {
+                                  setSelectedItem(item); setModal('booking');
+                                }
+                              }}
+                              disabled={isFittingDisabled}
+                            >
+                              <Calendar size={12} /> {fittingLabelSm}
+                            </button>
+                          )}
+                          {hasDirectBooking ? (
+                            <button
+                              className="inv-btn-cancel-sm-direct"
+                              onClick={() => handleCancelDirect(directBookingId)}
+                              disabled={cancelling?.type === 'direct' && cancelling?.id === directBookingId}
+                            >
+                              {cancelling?.type === 'direct' && cancelling?.id === directBookingId ? (
+                                <Loader2 size={11} className="inv-spinner-inline" />
+                              ) : (
+                                'Cancel'
+                              )}
+                            </button>
+                          ) : (
+                            <button
+                              className={`inv-btn-direct-book-sm${hasDirectBooking ? ' inv-btn-directbooked' : ''}`}
+                              onClick={() => {
+                                if (hasAnyBooking) {
+                                  showToast('error', hasFittingBooking
+                                    ? `Already have fitting booked on ${fmtDate(userFittingBooking.fittingDate)}.`
+                                    : `You already have a booking for this item.`);
+                                } else {
+                                  setSelectedItem(item); setModal('directBooking');
+                                }
+                              }}
+                              disabled={isDirectDisabled}
+                            >
+                              <ShoppingBag size={12} /> {directLabelSm}
+                            </button>
+                          )}
                         </div>
-                        </td>
+                       </td>
                     </tr>
                   );
                 })}
@@ -1506,7 +1644,7 @@ export default function BrowseOutfitsFragment() {
       {modal === 'view' && selectedItem && (() => {
         const promo = activePromo(selectedItem);
         const price = discPrice(selectedItem);
-        const { hasFittingBooking, hasDirectBooking, hasAnyBooking, userFittingBooking, userDirectBooking, isFittingDisabled, isDirectDisabled, fittingLabel, directLabel } = getItemButtonState(selectedItem);
+        const { hasFittingBooking, hasDirectBooking, hasAnyBooking, userFittingBooking, userDirectBooking, isFittingDisabled, isDirectDisabled, fittingLabel, directLabel, fittingBookingId, directBookingId } = getItemButtonState(selectedItem);
 
         return (
           <div className="inv-overlay" onClick={closeModal}>
@@ -1567,39 +1705,67 @@ export default function BrowseOutfitsFragment() {
               </div>
               <div className="inv-modal-footer">
                 <button className="inv-btn-ghost" onClick={closeModal}>Close</button>
-                <button
-                  className={`inv-btn-outline${hasAnyBooking?' inv-btn-disabled':''}`}
-                  onClick={() => {
-                    if (hasAnyBooking) {
-                      showToast('error', hasFittingBooking
-                        ? `Already have fitting booked on ${fmtDate(userFittingBooking.fittingDate)}.`
-                        : `You already have a booking for this item.`);
-                    } else { setModal('booking'); }
-                  }}
-                  disabled={isFittingDisabled}
-                >
-                  <Calendar size={14} /> {fittingLabel}
-                </button>
-                <button
-                  className={`inv-btn-primary${hasAnyBooking?' inv-btn-disabled':''}`}
-                  onClick={() => {
-                    if (hasAnyBooking) {
-                      showToast('error', hasDirectBooking
-                        ? `You already have a direct booking (${userDirectBooking?.bookingStatus === 'Approved' ? 'Approved' : 'Pending approval'}).`
-                        : `You already have a fitting booked on ${fmtDate(userFittingBooking.fittingDate)}.`);
-                    } else { setModal('directBooking'); }
-                  }}
-                  disabled={isDirectDisabled}
-                >
-                  <ShoppingBag size={14} /> {directLabel}
-                </button>
+                {hasFittingBooking ? (
+                  <button
+                    className="inv-btn-cancel"
+                    onClick={() => handleCancelFitting(fittingBookingId)}
+                    disabled={cancelling?.type === 'fitting' && cancelling?.id === fittingBookingId}
+                  >
+                    {cancelling?.type === 'fitting' && cancelling?.id === fittingBookingId ? (
+                      <Loader2 size={14} className="inv-spinner-inline" />
+                    ) : (
+                      'Cancel Fitting'
+                    )}
+                  </button>
+                ) : (
+                  <button
+                    className={`inv-btn-outline${hasAnyBooking ? ' inv-btn-disabled' : ''}`}
+                    onClick={() => {
+                      if (hasAnyBooking) {
+                        showToast('error', hasFittingBooking
+                          ? `Already have fitting booked on ${fmtDate(userFittingBooking.fittingDate)}.`
+                          : `You already have a booking for this item.`);
+                      } else { setModal('booking'); }
+                    }}
+                    disabled={isFittingDisabled}
+                  >
+                    <Calendar size={14} /> {fittingLabel}
+                  </button>
+                )}
+                {hasDirectBooking ? (
+                  <button
+                    className="inv-btn-cancel-direct"
+                    onClick={() => handleCancelDirect(directBookingId)}
+                    disabled={cancelling?.type === 'direct' && cancelling?.id === directBookingId}
+                  >
+                    {cancelling?.type === 'direct' && cancelling?.id === directBookingId ? (
+                      <Loader2 size={14} className="inv-spinner-inline" />
+                    ) : (
+                      'Cancel Direct'
+                    )}
+                  </button>
+                ) : (
+                  <button
+                    className={`inv-btn-primary${hasAnyBooking ? ' inv-btn-disabled' : ''}`}
+                    onClick={() => {
+                      if (hasAnyBooking) {
+                        showToast('error', hasDirectBooking
+                          ? `You already have a direct booking (${userDirectBooking?.bookingStatus === 'Approved' ? 'Approved' : 'Pending approval'}).`
+                          : `You already have a fitting booked on ${fmtDate(userFittingBooking.fittingDate)}.`);
+                      } else { setModal('directBooking'); }
+                    }}
+                    disabled={isDirectDisabled}
+                  >
+                    <ShoppingBag size={14} /> {directLabel}
+                  </button>
+                )}
               </div>
             </div>
           </div>
         );
       })()}
 
-      {/* FITTING BOOKING MODAL - with SIDE BY SIDE date and time dropdown */}
+      {/* FITTING BOOKING MODAL */}
       {modal === 'booking' && selectedItem && !bookingConfirmed && (() => {
         const { hasFittingBooking, hasDirectBooking, hasAnyBooking, userFittingBooking } = getItemButtonState(selectedItem);
 
@@ -1617,7 +1783,6 @@ export default function BrowseOutfitsFragment() {
         const selectedDateNonWorking = booking.fittingDate && !isWorkingDay(booking.fittingDate, bookingSettings);
         const dateIsFullyBooked = !!booking.fittingDate && !loadingFittingSlots && timeSlots.length > 0 && timeSlots.every(t => bookedFittingSlots.includes(t));
 
-        // Build options for time select
         const timeOptions = timeSlots.map(slot => ({
           value: slot,
           label: slot,
@@ -1663,7 +1828,6 @@ export default function BrowseOutfitsFragment() {
                   </div>
                 </div>
 
-                {/* Date and Time side by side */}
                 <div className="inv-modal-grid">
                   <div className="inv-field">
                     <label className="inv-field-label">Fitting Date <span className="inv-required">*</span></label>

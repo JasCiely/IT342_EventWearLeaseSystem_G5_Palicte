@@ -36,4 +36,6 @@ public interface BookingService {
     List<String> getBookedFittingSlots(String itemId, String date);
 
     void resendFittingConfirmationEmail(String bookingId);
+
+    void cancelFittingBooking(String bookingId, String customerEmail);
 }

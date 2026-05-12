@@ -2,7 +2,6 @@ package com.backend.features.booking;
 
 import com.backend.features.booking.dto.request.DirectBookingRequest;
 import com.backend.features.booking.dto.response.DirectBookingResponse;
-import com.backend.features.booking.DirectBookingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -191,5 +190,22 @@ public class DirectBookingController {
         String userId = authentication.getName();
         List<DirectBookingResponse> bookings = directBookingService.getAllUserBookingsList(userId);
         return ResponseEntity.ok(bookings);
+    }
+
+    @PatchMapping("/{bookingId}/cancel")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public ResponseEntity<?> cancelDirectBooking(
+            @PathVariable String bookingId,
+            Authentication authentication) {
+
+        try {
+            String userId = authentication.getName();
+            directBookingService.cancelDirectBooking(bookingId, userId);
+            return ResponseEntity.ok(Map.of("message", "Booking cancelled successfully"));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
+        } catch (SecurityException | IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
     }
 }

@@ -258,4 +258,20 @@ public class BookingController {
             return ResponseEntity.notFound().build();
         }
     }
+
+    @PatchMapping("/inventory/bookings/{bookingId}/cancel")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> cancelFittingBooking(
+            @PathVariable String bookingId,
+            @AuthenticationPrincipal UserDetails userDetails) {
+
+        try {
+            bookingService.cancelFittingBooking(bookingId, userDetails.getUsername());
+            return ResponseEntity.ok(Map.of("message", "Booking cancelled successfully"));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
+        } catch (SecurityException | IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
 }

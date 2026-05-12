@@ -23,6 +23,7 @@ public class EmailService {
     @Value("${app.name:EventWear}")
     private String appName;
 
+    // ─────────────────────────────── OTP ───────────────────────────────────
     public void sendOtpEmail(String toEmail, String otp) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
@@ -64,6 +65,7 @@ public class EmailService {
         }
     }
 
+    // ──────────────────────────── Fitting Booking ──────────────────────────
     public void sendFittingConfirmation(String toEmail, String customerName,
             String bookingId, String itemName,
             String fittingDate, String fittingTime) {
@@ -143,13 +145,78 @@ public class EmailService {
         }
     }
 
-    /**
-     * Called from BookingServiceImpl.completeFittingWithoutLease() with 3 params:
-     * emailService.sendFittingCompletedNoLease(email, customerName, itemName)
-     *
-     * The old 4-param version (with bookingId) is kept as an overload so any
-     * other callers in the codebase continue to compile without changes.
-     */
+    public void sendFittingCancellation(String toEmail, String customerName,
+            String bookingId, String itemName,
+            String fittingDate, String fittingTime) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setFrom(fromEmail, appName);
+            helper.setTo(toEmail);
+            helper.setSubject(appName + " – Fitting Booking Cancelled #" + bookingId);
+
+            String htmlContent = String.format(
+                    """
+                            <!DOCTYPE html>
+                            <html>
+                            <head><meta charset="UTF-8"></head>
+                            <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                                <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
+                                    <div style="text-align: center; border-bottom: 2px solid #dc2626; padding-bottom: 10px; margin-bottom: 20px;">
+                                        <h2 style="color: #dc2626; margin: 0;">%s</h2>
+                                        <p style="margin: 5px 0 0; color: #666;">Fitting Booking Cancelled</p>
+                                    </div>
+
+                                    <p>Dear <strong>%s</strong>,</p>
+                                    <p>Your fitting booking for <strong>%s</strong> on <strong>%s at %s</strong> has been <strong style="color: #dc2626;">cancelled</strong>.</p>
+
+                                    <div style="background-color: #f9f9f9; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                                        <h3 style="margin: 0 0 10px 0; color: #dc2626;">Cancelled Booking Details</h3>
+                                        <table style="width: 100%%; border-collapse: collapse;">
+                                            <tr>
+                                                <td style="padding: 8px 0; width: 120px;"><strong>Booking ID:</strong></td>
+                                                <td style="padding: 8px 0;">%s</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 8px 0;"><strong>Item:</strong></td>
+                                                <td style="padding: 8px 0;">%s</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 8px 0;"><strong>Date & Time:</strong></td>
+                                                <td style="padding: 8px 0;">%s at %s</td>
+                                            </tr>
+                                        </table>
+                                    </div>
+
+                                    <div style="background-color: #e8f5e9; padding: 15px; border-radius: 8px; border-left: 4px solid #15803d; margin: 20px 0;">
+                                        <strong>✨ You can book again!</strong>
+                                        <p style="margin: 10px 0 0 0;">If you still wish to try on this item, you may book another fitting slot anytime through our website.</p>
+                                    </div>
+
+                                    <p>We hope to serve you again soon!</p>
+
+                                    <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;">
+                                    <p style="font-size: 12px; color: #999; text-align: center;">
+                                        Need help? Contact us at support@eventwear.com<br>
+                                        – The %s Team
+                                    </p>
+                                </div>
+                            </body>
+                            </html>
+                            """,
+                    appName, customerName, itemName, fittingDate, fittingTime,
+                    bookingId, itemName, fittingDate, fittingTime, appName);
+
+            helper.setText(htmlContent, true);
+            mailSender.send(message);
+            log.info("Fitting cancellation email sent to {}", toEmail);
+        } catch (Exception e) {
+            log.error("Failed to send fitting cancellation email to {}: {}", toEmail, e.getMessage());
+        }
+    }
+
+    // ──────────────────────────── Fitting Completed (No Lease) ─────────────────
     public void sendFittingCompletedNoLease(String toEmail, String customerName,
             String itemName) {
         sendFittingCompletedNoLease(toEmail, customerName, null, itemName);
@@ -193,7 +260,7 @@ public class EmailService {
                                     </div>
 
                                     <div style="background-color: #e8f5e9; padding: 15px; border-radius: 8px; border-left: 4px solid #15803d; margin: 20px 0;">
-                                        <strong>&#x2705; What's Next?</strong>
+                                        <strong>✅ What's Next?</strong>
                                         <p style="margin: 10px 0 0 0;">You can book this item for rental at any time. Visit our website to proceed with your rental.</p>
                                     </div>
 
@@ -227,6 +294,7 @@ public class EmailService {
         }
     }
 
+    // ──────────────────────────── Fitting to Lease ─────────────────────────
     public void sendFittingToLeaseConfirmation(String toEmail, String customerName,
             String fittingBookingId, String directBookingId, String itemName,
             String startDate, String endDate, BigDecimal finalPrice) {
@@ -274,13 +342,13 @@ public class EmailService {
                                             </tr>
                                             <tr>
                                                 <td style="padding: 8px 0;"><strong>Total Amount:</strong></td>
-                                                <td style="padding: 8px 0;"><strong style="color: #15803d; font-size: 16px;">&#x20B1;%s</strong></td>
+                                                <td style="padding: 8px 0;"><strong style="color: #15803d; font-size: 16px;">₱%s</strong></td>
                                             </tr>
                                         </table>
                                     </div>
 
                                     <div style="background-color: #e8f5e9; padding: 15px; border-radius: 8px; border-left: 4px solid #15803d; margin: 20px 0;">
-                                        <strong>&#x1F4B0; Payment Information:</strong>
+                                        <strong>💰 Payment Information:</strong>
                                         <ul style="margin: 10px 0 0 20px;">
                                             <li>Full payment is required to confirm your rental</li>
                                             <li>Payment methods: GCash, Bank Transfer, or Cash on Pickup</li>
@@ -310,6 +378,7 @@ public class EmailService {
         }
     }
 
+    // ──────────────────────────── Direct Booking ───────────────────────────
     public void sendDirectBookingConfirmation(String toEmail, String customerName,
             String bookingId, String itemName,
             String startDate, String endDate,
@@ -358,13 +427,13 @@ public class EmailService {
                                             </tr>
                                             <tr>
                                                 <td style="padding: 8px 0;"><strong>Total Amount:</strong></td>
-                                                <td style="padding: 8px 0;"><strong style="color: #15803d; font-size: 16px;">&#x20B1;%s</strong></td>
+                                                <td style="padding: 8px 0;"><strong style="color: #15803d; font-size: 16px;">₱%s</strong></td>
                                             </tr>
                                         </table>
                                     </div>
 
                                     <div style="background-color: #fff3e0; padding: 15px; border-radius: 8px; border-left: 4px solid #f59e0b; margin: 20px 0;">
-                                        <strong>&#x1F4CC; Next Steps:</strong>
+                                        <strong>📌 Next Steps:</strong>
                                         <ul style="margin: 10px 0 0 20px;">
                                             <li>Our team will review your booking within <strong>24 hours</strong></li>
                                             <li>You will receive another email once your booking is approved</li>
@@ -373,7 +442,7 @@ public class EmailService {
                                     </div>
 
                                     <div style="background-color: #e8f5e9; padding: 15px; border-radius: 8px; border-left: 4px solid #15803d; margin: 20px 0;">
-                                        <strong>&#x1F4B0; Payment Information:</strong>
+                                        <strong>💰 Payment Information:</strong>
                                         <ul style="margin: 10px 0 0 20px;">
                                             <li>Full payment is required upon approval</li>
                                             <li>Payment methods: GCash, Bank Transfer, or Cash on Pickup</li>
@@ -403,6 +472,72 @@ public class EmailService {
         }
     }
 
+    public void sendDirectBookingCancellation(String toEmail, String customerName,
+            String itemName, String bookingId) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setFrom(fromEmail, appName);
+            helper.setTo(toEmail);
+            helper.setSubject(appName + " – Direct Booking Cancelled #" + bookingId);
+
+            String htmlContent = String.format(
+                    """
+                            <!DOCTYPE html>
+                            <html>
+                            <head><meta charset="UTF-8"></head>
+                            <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                                <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
+                                    <div style="text-align: center; border-bottom: 2px solid #dc2626; padding-bottom: 10px; margin-bottom: 20px;">
+                                        <h2 style="color: #dc2626; margin: 0;">%s</h2>
+                                        <p style="margin: 5px 0 0; color: #666;">Direct Booking Cancelled</p>
+                                    </div>
+
+                                    <p>Dear <strong>%s</strong>,</p>
+                                    <p>Your direct booking for <strong>%s</strong> has been <strong style="color: #dc2626;">cancelled</strong>.</p>
+
+                                    <div style="background-color: #f9f9f9; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                                        <h3 style="margin: 0 0 10px 0; color: #dc2626;">Cancelled Booking Details</h3>
+                                        <table style="width: 100%%; border-collapse: collapse;">
+                                            <tr>
+                                                <td style="padding: 8px 0; width: 120px;"><strong>Booking ID:</strong></td>
+                                                <td style="padding: 8px 0;">%s</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 8px 0;"><strong>Item:</strong></td>
+                                                <td style="padding: 8px 0;">%s</td>
+                                            </tr>
+                                        </table>
+                                    </div>
+
+                                    <div style="background-color: #e8f5e9; padding: 15px; border-radius: 8px; border-left: 4px solid #15803d; margin: 20px 0;">
+                                        <strong>✨ You can book again!</strong>
+                                        <p style="margin: 10px 0 0 0;">If you still wish to rent this item, you may create a new direct booking anytime through our website.</p>
+                                    </div>
+
+                                    <p>We hope to serve you again soon!</p>
+
+                                    <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;">
+                                    <p style="font-size: 12px; color: #999; text-align: center;">
+                                        Need help? Contact us at support@eventwear.com<br>
+                                        – The %s Team
+                                    </p>
+                                </div>
+                            </body>
+                            </html>
+                            """,
+                    appName, customerName, itemName, bookingId, itemName, appName);
+
+            helper.setText(htmlContent, true);
+            mailSender.send(message);
+            log.info("Direct booking cancellation email sent to {}", toEmail);
+        } catch (Exception e) {
+            log.error("Failed to send direct booking cancellation email to {}: {}", toEmail, e.getMessage());
+        }
+    }
+
+    // ──────────────────────────── Lease Completed ──────────────────────────
     public void sendLeaseCompletedEmail(String toEmail, String customerName,
             String itemName, String bookingId) {
         try {
@@ -458,6 +593,7 @@ public class EmailService {
         }
     }
 
+    // ──────────────────────────── Direct Booking Status Update ─────────────────
     public void sendDirectBookingStatusUpdate(String toEmail, String customerName,
             String itemName, String status, String bookingId) {
         try {
@@ -504,7 +640,7 @@ public class EmailService {
             if (status.equals("Approved")) {
                 htmlContent += """
                         <div style="background-color: #e8f5e9; padding: 15px; border-radius: 8px; border-left: 4px solid #15803d; margin: 20px 0;">
-                            <strong>&#x2705; What's Next?</strong>
+                            <strong>✅ What's Next?</strong>
                             <ul style="margin: 10px 0 0 20px;">
                                 <li>Our team will contact you within 24 hours for payment arrangements</li>
                                 <li>Once payment is confirmed, your booking will be finalized</li>
@@ -515,7 +651,7 @@ public class EmailService {
             } else if (status.equals("Rejected")) {
                 htmlContent += """
                         <div style="background-color: #fee2e2; padding: 15px; border-radius: 8px; border-left: 4px solid #dc2626; margin: 20px 0;">
-                            <strong>&#x274C; Booking Rejected</strong>
+                            <strong>❌ Booking Rejected</strong>
                             <ul style="margin: 10px 0 0 20px;">
                                 <li>The item may no longer be available for your selected dates</li>
                                 <li>Please try booking different dates or browse other items</li>
