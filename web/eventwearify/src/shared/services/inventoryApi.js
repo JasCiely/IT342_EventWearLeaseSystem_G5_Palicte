@@ -142,3 +142,34 @@ export const updatePromotion = async (id, promoData) => {
 export const deletePromotion = async (id) => {
   return authFetch(`/inventory/promotions/${id}`, { method: 'DELETE' });
 };
+
+// Add to shared/services/inventoryApi.js
+
+// ── Inventory Settings ──────────────────────────────────────────────────────
+export const fetchInventorySettings = async () => {
+  try {
+    // Use public endpoint (no admin role required)
+    return await authFetch('/inventory-settings');
+  } catch (error) {
+    console.error('Error fetching inventory settings:', error);
+    // Return defaults as fallback
+    return {
+      minLeaseDays: 2,
+      weeklyDiscount: 100,
+      monthlyDiscountCap: 300
+    };
+  }
+};
+
+export const saveInventorySettings = async (settings) => {
+  try {
+    // Admin-only endpoint (requires ADMIN role)
+    return await authFetch('/admin/inventory-settings', {
+      method: 'PUT',
+      body: JSON.stringify(settings),
+    });
+  } catch (error) {
+    console.error('Error saving inventory settings:', error);
+    throw error;
+  }
+};

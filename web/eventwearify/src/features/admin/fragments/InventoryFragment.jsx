@@ -18,6 +18,8 @@ import {
   createPromotion as apiCreatePromotion,
   updatePromotion as apiUpdatePromotion,
   deletePromotion as apiDeletePromotion,
+  fetchInventorySettings,
+  saveInventorySettings,
 } from '../../../shared/services/inventoryApi.js';
 
 // ────────────────────────────────────────────────────────────
@@ -621,15 +623,30 @@ export default function InventoryFragment() {
   // ── Confirm delete state ──────────────────────────────────
   const [confirmDelete, setConfirmDelete] = useState(null);
 
-  // ── Leasing settings state ────────────────────────────────
-  const [leasingSettings, setLeasingSettings] = useState(() => {
-    const saved = localStorage.getItem('leasingSettings');
-    return saved ? JSON.parse(saved) : {
-      minLeaseDays: 2,
-      weeklyDiscount: 100,
-      monthlyDiscountCap: 300
-    };
+  // ── Leasing settings state (now backed by backend) ────────
+  const [leasingSettings, setLeasingSettings] = useState({
+    minLeaseDays: 2,
+    weeklyDiscount: 100,
+    monthlyDiscountCap: 300
   });
+  const [settingsLoading, setSettingsLoading] = useState(false);
+
+  // Load inventory settings from backend on mount
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const settings = await fetchInventorySettings();
+        setLeasingSettings({
+          minLeaseDays: settings.minLeaseDays ?? 2,
+          weeklyDiscount: settings.weeklyDiscount ?? 100,
+          monthlyDiscountCap: settings.monthlyDiscountCap ?? 300,
+        });
+      } catch (err) {
+        console.error('Failed to load inventory settings:', err);
+      }
+    };
+    loadSettings();
+  }, []);
 
   const blank      = { name:'', category:'', subtype:'', size:'', color:'Ivory', price:'', status:'Available', mediaFiles:[], ageRange:'', description:'' };
   const blankPromo = { code:'', type:'percentage', value:'', items:[], start:'', end:'', active:true };
@@ -789,6 +806,20 @@ export default function InventoryFragment() {
       showToast('error', err.message || 'Failed to save promo.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  // ── Save Inventory Settings ───────────────────────────────
+  const handleSaveSettings = async () => {
+    setSettingsLoading(true);
+    try {
+      await saveInventorySettings(leasingSettings);
+      showToast('success', 'Inventory settings saved successfully');
+      closeModal();
+    } catch (err) {
+      showToast('error', err.message || 'Failed to save settings');
+    } finally {
+      setSettingsLoading(false);
     }
   };
 
@@ -1392,7 +1423,7 @@ export default function InventoryFragment() {
         </div>
       )}
 
-      {/* ══ MODAL: Leasing Settings ══ */}
+      {/* ══ MODAL: Leasing Settings (connected to backend) ══ */}
       {modal === 'settings' && (
         <div className="inv-overlay" onClick={closeModal}>
           <div className="inv-modal" onClick={e => e.stopPropagation()}>
@@ -1445,12 +1476,8 @@ export default function InventoryFragment() {
             </div>
             <div className="inv-modal-footer">
               <button className="inv-btn-ghost" onClick={closeModal}>Cancel</button>
-              <button className="inv-btn-primary" onClick={() => {
-                localStorage.setItem('leasingSettings', JSON.stringify(leasingSettings));
-                showToast('success', 'Leasing settings saved successfully');
-                closeModal();
-              }}>
-                <CheckCircle size={13}/> Save Settings
+              <button className="inv-btn-primary" onClick={handleSaveSettings} disabled={settingsLoading}>
+                {settingsLoading ? <><Loader2 size={13} className="inv-spinner-inline"/> Saving…</> : <><CheckCircle size={13}/> Save Settings</>}
               </button>
             </div>
           </div>

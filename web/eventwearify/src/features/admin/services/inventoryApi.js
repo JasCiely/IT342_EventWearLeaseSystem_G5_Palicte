@@ -10,7 +10,9 @@ export {
   deleteItem,
   createPromotion,
   updatePromotion,
-  deletePromotion
+  deletePromotion,
+  fetchInventorySettings,
+  saveInventorySettings,
 } from '../../../shared/services/inventoryApi.js';
 
 // Booking functions:
