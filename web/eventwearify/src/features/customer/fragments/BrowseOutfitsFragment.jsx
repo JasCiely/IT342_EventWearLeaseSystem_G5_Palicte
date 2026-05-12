@@ -1,4 +1,4 @@
-// ==================== BrowseOutfitsFragment.jsx (FULL UPDATED – Hide booked items) ====================
+// ==================== BrowseOutfitsFragment.jsx (with live inventory settings) ====================
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
@@ -15,6 +15,7 @@ import {
   getOccupiedDirectDates,
   cancelFittingBooking,
   cancelDirectBooking,
+  fetchInventorySettings,           // <-- new import
 } from '../services/inventoryApi';
 import { getProfile } from '../services/userService';
 import { useBookingSettings } from "../../../shared/hooks/useBookingSettings";
@@ -84,9 +85,28 @@ const PhilippinePhoneInput = ({ value, onChange, disabled, placeholder = "9XX XX
 };
 
 // ────────────────────────────────────────────────────────────────────────────
-// Leasing helpers
+// Leasing helpers (now uses injected settings instead of localStorage)
 // ────────────────────────────────────────────────────────────────────────────
 const DEFAULT_LEASING = { minLeaseDays: 2, weeklyDiscount: 100, monthlyDiscountCap: 300 };
+
+function calculateLeasePricing(dailyRate, startDateStr, endDateStr, settings) {
+  if (!startDateStr || !endDateStr) return null;
+  const start = new Date(startDateStr);
+  const end   = new Date(endDateStr);
+  if (isNaN(start) || isNaN(end) || end < start) return null;
+  const effectiveSettings = settings || DEFAULT_LEASING;
+  const totalDays = Math.round((end - start) / 86_400_000) + 1;
+  if (totalDays < effectiveSettings.minLeaseDays) {
+    return { isValid: false, totalDays, minLeaseDays: effectiveSettings.minLeaseDays };
+  }
+  const basePrice  = dailyRate * totalDays;
+  const weeks      = Math.floor(totalDays / 7);
+  const rawDisc    = weeks * effectiveSettings.weeklyDiscount;
+  const discount   = Math.min(rawDisc, effectiveSettings.monthlyDiscountCap);
+  const finalPrice = Math.max(0, basePrice - discount);
+  const savings    = discount > 0 ? `You saved ₱${discount.toLocaleString()} from weekly discounts` : '';
+  return { isValid: true, totalDays, weeks, basePrice, discount, finalPrice, savingsText: savings, minLeaseDays: effectiveSettings.minLeaseDays };
+}
 
 const to24Hour = (time12) => {
   const [time, period] = time12.split(' ');
@@ -95,34 +115,6 @@ const to24Hour = (time12) => {
   if (period === 'PM' && hours !== 12) hours += 12;
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 };
- 
-function getLeasingSettings() {
-  try {
-    const saved = localStorage.getItem('leasingSettings');
-    return saved ? { ...DEFAULT_LEASING, ...JSON.parse(saved) } : DEFAULT_LEASING;
-  } catch {
-    return DEFAULT_LEASING;
-  }
-}
-
-function calculateLeasePricing(dailyRate, startDateStr, endDateStr) {
-  if (!startDateStr || !endDateStr) return null;
-  const start = new Date(startDateStr);
-  const end   = new Date(endDateStr);
-  if (isNaN(start) || isNaN(end) || end < start) return null;
-  const settings  = getLeasingSettings();
-  const totalDays = Math.round((end - start) / 86_400_000) + 1;
-  if (totalDays < settings.minLeaseDays) {
-    return { isValid: false, totalDays, minLeaseDays: settings.minLeaseDays };
-  }
-  const basePrice  = dailyRate * totalDays;
-  const weeks      = Math.floor(totalDays / 7);
-  const rawDisc    = weeks * settings.weeklyDiscount;
-  const discount   = Math.min(rawDisc, settings.monthlyDiscountCap);
-  const finalPrice = Math.max(0, basePrice - discount);
-  const savings    = discount > 0 ? `You saved ₱${discount.toLocaleString()} from weekly discounts` : '';
-  return { isValid: true, totalDays, weeks, basePrice, discount, finalPrice, savingsText: savings, minLeaseDays: settings.minLeaseDays };
-}
 
 // ────────────────────────────────────────────────────────────────────────────
 // Time-slot generation helpers
@@ -190,7 +182,7 @@ const fmtDate     = d => d ? new Date(d).toLocaleDateString('en-PH', { year:'num
 const fmtDateTime = (d, t) => d ? `${fmtDate(d)} at ${t}` : '';
 
 // ────────────────────────────────────────────────────────────────────────────
-// UI Components
+// UI Components (StatusBadge, MediaThumb, MediaGallery, Toast, Skeletons)
 // ────────────────────────────────────────────────────────────────────────────
 function StatusBadge({ status }) {
   const m = ITEM_STATUS_META[status] || { color:'#888', bg:'rgba(0,0,0,0.06)', dot:'#888' };
@@ -325,7 +317,7 @@ function FastSkeletonRow() {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Fitting Date Picker
+// Fitting Date Picker (unchanged)
 // ────────────────────────────────────────────────────────────────────────────
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DOW_LABELS  = ['Su','Mo','Tu','We','Th','Fr','Sa'];
@@ -482,7 +474,7 @@ function FittingDatePicker({ value, onChange, minDate, bookingSettings, itemId, 
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Direct Date Picker
+// Direct Date Picker (unchanged)
 // ────────────────────────────────────────────────────────────────────────────
 function DirectDatePicker({ value, onChange, minDate, bookingSettings, occupiedRanges, disabled, label }) {
   const today = minDate || todayStr();
@@ -596,9 +588,9 @@ function DirectDatePicker({ value, onChange, minDate, bookingSettings, occupiedR
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Direct Booking Modal
+// Direct Booking Modal (receives inventorySettings as a prop)
 // ────────────────────────────────────────────────────────────────────────────
-function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, currentUser, bookingSettings, userProfile }) {
+function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, currentUser, bookingSettings, userProfile, inventorySettings }) {
   const [form, setForm] = useState({
     startDate: '', endDate: '', notes: '',
     name: currentUser?.name || '',
@@ -628,8 +620,8 @@ function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, c
   const debounceRef = useRef(null);
 
   const pricing = useMemo(
-    () => calculateLeasePricing(item.price, form.startDate, form.endDate),
-    [item.price, form.startDate, form.endDate]
+    () => calculateLeasePricing(item.price, form.startDate, form.endDate, inventorySettings),
+    [item.price, form.startDate, form.endDate, inventorySettings]
   );
 
   useEffect(() => {
@@ -1004,6 +996,8 @@ export default function BrowseOutfitsFragment() {
   const [isPromosLoaded, setIsPromosLoaded] = useState(false);
   const [loadError, setLoadError]     = useState('');
 
+  const [inventorySettings, setInventorySettings] = useState(null); // new state
+
   const { settings: bookingSettings } = useBookingSettings();
 
   const [viewMode, setViewMode]       = useState('grid');
@@ -1039,6 +1033,13 @@ export default function BrowseOutfitsFragment() {
 
   const [cancelling, setCancelling] = useState(null); // { type: 'fitting'|'direct', id }
 
+  // Fetch inventory settings from backend
+  useEffect(() => {
+    fetchInventorySettings()
+      .then(settings => setInventorySettings(settings))
+      .catch(err => console.error('Failed to load inventory settings:', err));
+  }, []);
+
   useEffect(() => {
     fetchItems()
       .then(data => { setItems(data); setIsItemsLoaded(true); })
@@ -1068,8 +1069,7 @@ export default function BrowseOutfitsFragment() {
   }, [isLoggedIn]);
 
   // --------------------------------------------------------------------------
-  // KEY CHANGE: Build set of item IDs that the user has already booked
-  // (active bookings only – exclude cancelled)
+  // Build set of item IDs that the user has already booked (active bookings only)
   // --------------------------------------------------------------------------
   const bookedItemIds = useMemo(() => {
     if (!isLoggedIn) return new Set();
@@ -1240,11 +1240,8 @@ export default function BrowseOutfitsFragment() {
   useEffect(() => { setFilterSubcat('All'); }, [filterCat]);
   const sizes = useMemo(() => [...new Set(availableItems.map(i => i.size))].sort(), [availableItems]);
 
-  // --------------------------------------------------------------------------
-  // KEY CHANGE: Filter out items that the user has already booked
-  // --------------------------------------------------------------------------
+  // Filter out items that the user has already booked
   const visibleItems = useMemo(() => availableItems.filter(i => {
-    // Skip items that the user has already booked
     if (bookedItemIds.has(String(i.id))) return false;
 
     const q = search.toLowerCase();
@@ -1558,7 +1555,7 @@ export default function BrowseOutfitsFragment() {
                               : <><ShoppingBag size={10} /> {userDirectBooking?.bookingStatus === 'Approved' ? 'Approved' : 'Pending'}</>}
                           </div>
                         )}
-                       </td>
+                      </td>
                       <td><span className="inv-cat-tag">{item.category}</span></td>
                       <td><span className="inv-subtype-tag">{item.subtype}</span></td>
                       <td>{item.size}</td>
@@ -1566,7 +1563,7 @@ export default function BrowseOutfitsFragment() {
                         {promo
                           ? <div><div className="inv-price-old">₱{item.price.toLocaleString()}</div><div className="inv-price-new">₱{Math.round(price).toLocaleString()}</div></div>
                           : <span className="inv-price">₱{item.price.toLocaleString()}</span>}
-                       </td>
+                      </td>
                       <td><StatusBadge status={item.status} /></td>
                       <td>
                         <div className="inv-row-actions">
@@ -1630,7 +1627,7 @@ export default function BrowseOutfitsFragment() {
                             </button>
                           )}
                         </div>
-                       </td>
+                      </td>
                     </tr>
                   );
                 })}
@@ -1997,6 +1994,7 @@ export default function BrowseOutfitsFragment() {
           currentUser={currentUser}
           bookingSettings={bookingSettings}
           userProfile={userProfile}
+          inventorySettings={inventorySettings}  // <-- pass live settings
           onSuccess={confirmed => {
             getUserDirectBookings()
               .then(data => {
