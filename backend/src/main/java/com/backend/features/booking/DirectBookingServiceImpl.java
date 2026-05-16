@@ -260,9 +260,64 @@ public class DirectBookingServiceImpl implements DirectBookingService {
             Map<String, String> range = new HashMap<>();
             range.put("startDate", b.getStartDate().toString());
             range.put("endDate", b.getEndDate().toString());
+            range.put("status", b.getBookingStatus());
             ranges.add(range);
         }
         return ranges;
+    }
+
+    @Override
+    @Transactional
+    public DirectBookingResponse editCustomerBookingDates(String bookingId, String userId, LocalDate startDate, LocalDate endDate) {
+        DirectBooking booking = directBookingRepository.findById(bookingId)
+                .orElseThrow(() -> new IllegalArgumentException("Booking not found"));
+
+        if (!booking.getUserId().equals(userId)) {
+            throw new SecurityException("You are not allowed to edit this booking");
+        }
+
+        String status = booking.getBookingStatus();
+        if (!"Pending".equals(status) && !"Approved".equals(status) && !"Active Lease".equals(status)) {
+            throw new IllegalStateException("Only Pending, Approved, or Active Lease bookings can be edited");
+        }
+
+        if ("Active Lease".equals(status)) {
+            startDate = booking.getStartDate();
+        }
+
+        if (startDate.isAfter(endDate)) {
+            throw new IllegalArgumentException("Start date cannot be after end date");
+        }
+
+        if (endDate.isBefore(LocalDate.now())) {
+            throw new IllegalArgumentException("End date cannot be in the past");
+        }
+
+        if (directBookingRepository.hasOverlappingBookingsExcluding(
+                booking.getInventoryItemId(), startDate, endDate, bookingId)) {
+            throw new IllegalArgumentException("Item is not available for the selected dates");
+        }
+
+        int newTotalDays = (int) ChronoUnit.DAYS.between(startDate, endDate) + 1;
+
+        if (booking.getBasePrice() != null && booking.getTotalDays() != null && booking.getTotalDays() > 0) {
+            BigDecimal dailyRate = booking.getBasePrice()
+                    .divide(BigDecimal.valueOf(booking.getTotalDays()), 4, RoundingMode.HALF_UP);
+            BigDecimal newBasePrice = dailyRate.multiply(BigDecimal.valueOf(newTotalDays))
+                    .setScale(2, RoundingMode.HALF_UP);
+            BigDecimal discount = booking.getDiscountAmount() != null ? booking.getDiscountAmount() : BigDecimal.ZERO;
+            booking.setBasePrice(newBasePrice);
+            booking.setFinalPrice(newBasePrice.subtract(discount).setScale(2, RoundingMode.HALF_UP));
+        }
+
+        booking.setStartDate(startDate);
+        booking.setEndDate(endDate);
+        booking.setTotalDays(newTotalDays);
+
+        DirectBooking updated = directBookingRepository.save(booking);
+        log.info("Customer {} edited booking {} dates to {} - {}", userId, bookingId, startDate, endDate);
+
+        return mapToResponse(updated);
     }
 
     @Override

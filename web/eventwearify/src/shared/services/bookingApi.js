@@ -305,6 +305,32 @@ export const cancelDirectBooking = async (bookingId) => {
   }
 };
 
+export const editCustomerBookingDates = async (bookingId, startDate, endDate) => {
+  try {
+    const response = await authFetch(`/direct-bookings/${bookingId}/edit-dates`, {
+      method: 'PUT',
+      body: JSON.stringify({ startDate, endDate }),
+    });
+    return response;
+  } catch (error) {
+    console.error('Error editing booking dates:', error);
+    throw error;
+  }
+};
+
+export const rescheduleCustomerFitting = async (bookingId, fittingDate, fittingTime) => {
+  try {
+    const response = await authFetch(`/inventory/bookings/${bookingId}/reschedule`, {
+      method: 'PATCH',
+      body: JSON.stringify({ fittingDate, fittingTime }),
+    });
+    return response;
+  } catch (error) {
+    console.error('Error rescheduling fitting:', error);
+    throw error;
+  }
+};
+
 // Transitions an Approved direct booking to Active Lease (item physically picked up).
 export const markDirectBookingPickedUp = async (bookingId) => {
   try {

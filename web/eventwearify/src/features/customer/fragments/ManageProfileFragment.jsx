@@ -235,9 +235,6 @@ const ManageProfileFragment = () => {
   const handleEditChange = (e) =>
     setEditFields(prev => ({ ...prev, [e.target.name]: e.target.value }));
 
-  const handlePhoneChange = (val) =>
-    setEditFields(prev => ({ ...prev, phone: val }));
-
   const handlePwChange = (e) =>
     setPwForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
 
@@ -488,7 +485,7 @@ const ManageProfileFragment = () => {
                 {editMode ? (
                   <PhilippinePhoneInput
                     value={editFields.phone}
-                    onChange={handlePhoneChange}
+                    onChange={(val) => setEditFields(prev => ({ ...prev, phone: val }))}
                   />
                 ) : (
                   <div className="pf-field-value">

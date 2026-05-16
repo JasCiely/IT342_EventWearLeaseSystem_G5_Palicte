@@ -329,4 +329,30 @@ public class BookingController {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
+
+    @PatchMapping("/inventory/bookings/{bookingId}/reschedule")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public ResponseEntity<?> rescheduleCustomerFitting(
+            @PathVariable String bookingId,
+            @RequestBody FittingRescheduleRequest request,
+            @AuthenticationPrincipal UserDetails userDetails) {
+
+        try {
+            boolean slotAvailable = bookingService.checkAvailability(
+                    request.getFittingDate(), request.getFittingTime(), bookingId);
+            if (!slotAvailable) {
+                return ResponseEntity.badRequest().body(Map.of("error", "This time slot is fully booked"));
+            }
+            bookingService.rescheduleFittingByCustomer(
+                    bookingId, userDetails.getUsername(),
+                    request.getFittingDate(), request.getFittingTime());
+            return ResponseEntity.ok(Map.of("message", "Fitting rescheduled successfully"));
+        } catch (IllegalArgumentException e) {
+            String msg = e.getMessage();
+            if ("Booking not found".equals(msg)) return ResponseEntity.notFound().build();
+            return ResponseEntity.badRequest().body(Map.of("error", msg));
+        } catch (SecurityException | IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
 }

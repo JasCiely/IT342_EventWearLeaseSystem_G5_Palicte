@@ -213,4 +213,31 @@ public class DirectBookingController {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
+
+    @PutMapping("/{bookingId}/edit-dates")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public ResponseEntity<?> editCustomerBookingDates(
+            @PathVariable String bookingId,
+            @RequestBody Map<String, String> body,
+            Authentication authentication) {
+
+        try {
+            String userId = authentication.getName();
+            LocalDate startDate = LocalDate.parse(body.get("startDate"));
+            LocalDate endDate = LocalDate.parse(body.get("endDate"));
+            DirectBookingResponse response = directBookingService.editCustomerBookingDates(bookingId, userId, startDate, endDate);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            String msg = e.getMessage();
+            if ("Booking not found".equals(msg)) return ResponseEntity.notFound().build();
+            return ResponseEntity.badRequest().body(Map.of("error", msg));
+        } catch (SecurityException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", e.getMessage()));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            log.error("Unexpected error editing booking dates for {}", bookingId, e);
+            return ResponseEntity.internalServerError().body(Map.of("error", "Failed to update booking dates"));
+        }
+    }
 }

@@ -43,4 +43,7 @@ public interface BookingService {
     void cancelFittingBooking(String bookingId, String customerEmail);
 
     void autoCancelPastFittings();
+
+    // Customer-facing reschedule: validates ownership and CONFIRMED status before delegating.
+    Booking rescheduleFittingByCustomer(String bookingId, String customerEmail, String fittingDate, String fittingTime);
 }

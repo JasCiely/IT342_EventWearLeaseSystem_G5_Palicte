@@ -459,4 +459,21 @@ public class BookingServiceImpl implements BookingService {
             log.error("Failed to send cancellation email for booking {}: {}", bookingId, e.getMessage());
         }
     }
+
+    @Override
+    @Transactional
+    public Booking rescheduleFittingByCustomer(String bookingId, String customerEmail, String fittingDate, String fittingTime) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new IllegalArgumentException("Booking not found"));
+
+        if (!booking.getCustomerEmail().equals(customerEmail)) {
+            throw new SecurityException("You are not allowed to reschedule this booking");
+        }
+
+        if (!"CONFIRMED".equals(booking.getStatus())) {
+            throw new IllegalStateException("Only confirmed bookings can be rescheduled");
+        }
+
+        return rescheduleFitting(bookingId, fittingDate, fittingTime);
+    }
 }

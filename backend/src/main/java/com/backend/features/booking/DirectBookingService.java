@@ -59,4 +59,8 @@ public interface DirectBookingService {
     // Same as isItemAvailable but excludes a specific booking from the conflict check
     // (used when editing an existing booking so it doesn't block itself).
     boolean isItemAvailableExcluding(String itemId, LocalDate startDate, LocalDate endDate, String excludeBookingId);
+
+    // Customer-facing edit: validates ownership, allows Pending/Approved/Active Lease.
+    // Active Lease locks start date; only end date may change.
+    DirectBookingResponse editCustomerBookingDates(String bookingId, String userId, LocalDate startDate, LocalDate endDate);
 }
