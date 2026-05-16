@@ -1,5 +1,6 @@
 import React from 'react';
 import '../styles/AdminDashboardHeader.css';
+import logo from '../../../assets/logo.png';
 
 const DashboardHeader = ({ userName = "Admin", onLogout }) => {
   return (
@@ -8,9 +9,7 @@ const DashboardHeader = ({ userName = "Admin", onLogout }) => {
 
         {/* Left — logo / brand */}
         <div className="header-brand">
-          <div className="header-brand-mark">
-            <span className="header-brand-mark-inner" />
-          </div>
+          <img src={logo} alt="EventWear Logo" className="header-brand-logo" />
           <div className="header-brand-text">
             <span className="header-brand-name">EventWear</span>
             <span className="header-brand-sub">Admin Dashboard</span>

@@ -66,7 +66,7 @@ const CustomerDashboard = () => {
           </div>
           <div className="cust-brand-text">
             <span className="cust-brand-name">EventWear</span>
-            <span className="cust-brand-sub">Customer Portal</span>
+            <span className="cust-brand-sub">CUSTOMER DASHBOARD</span>
           </div>
         </div>
 
@@ -93,7 +93,7 @@ const CustomerDashboard = () => {
           {!collapsed && (
             <div className="cust-sidebar-label">
               <span className="cust-sidebar-dot" />
-              <span className="cust-sidebar-label-text">Menu</span>
+              <span className="cust-sidebar-label-text">CUSTOMER PANEL</span>
             </div>
           )}
 
