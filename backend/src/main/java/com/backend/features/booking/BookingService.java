@@ -1,5 +1,6 @@
 package com.backend.features.booking;
 
+import com.backend.features.booking.dto.request.AdminFittingBookingRequest;
 import com.backend.features.booking.dto.request.FittingBookingRequest;
 import com.backend.features.booking.dto.response.FittingBookingResponse;
 import com.backend.shared.entity.Booking;
@@ -10,6 +11,8 @@ import java.util.List;
 
 public interface BookingService {
     FittingBookingResponse createBooking(FittingBookingRequest request);
+
+    FittingBookingResponse createFittingBookingForCustomer(AdminFittingBookingRequest request);
 
     List<Booking> getBookingsByEmail(String email);
 
@@ -38,4 +41,6 @@ public interface BookingService {
     void resendFittingConfirmationEmail(String bookingId);
 
     void cancelFittingBooking(String bookingId, String customerEmail);
+
+    void autoCancelPastFittings();
 }

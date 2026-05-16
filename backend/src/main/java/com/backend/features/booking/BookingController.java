@@ -19,6 +19,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -167,13 +168,15 @@ public class BookingController {
             @PathVariable String bookingId,
             @RequestBody FittingRescheduleRequest request) {
         try {
-            // Check availability for new time slot
+            // Slot capacity check (max 5 per time slot, excluding this booking)
             boolean available = bookingService.checkAvailability(request.getFittingDate(), request.getFittingTime(),
                     bookingId);
             if (!available) {
                 return ResponseEntity.badRequest().body(Map.of("error", "This time slot is fully booked"));
             }
 
+            // Working-day, working-hours, slot-alignment, and per-item uniqueness
+            // are validated inside rescheduleFitting and throw IllegalArgumentException
             bookingService.rescheduleFitting(bookingId, request.getFittingDate(), request.getFittingTime());
 
             Map<String, Object> response = new HashMap<>();
@@ -183,7 +186,12 @@ public class BookingController {
             response.put("message", "Fitting rescheduled successfully");
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.notFound().build();
+            // Distinguishes "not found" from validation errors by message content
+            String msg = e.getMessage();
+            if (msg != null && msg.equals("Booking not found")) {
+                return ResponseEntity.notFound().build();
+            }
+            return ResponseEntity.badRequest().body(Map.of("error", msg));
         }
     }
 
@@ -243,6 +251,25 @@ public class BookingController {
         }
     }
 
+    @PutMapping("/admin/bookings/direct/{bookingId}/dates")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> updateDirectBookingDates(
+            @PathVariable String bookingId,
+            @RequestBody Map<String, String> body) {
+        try {
+            LocalDate startDate = LocalDate.parse(body.get("startDate"));
+            LocalDate endDate   = LocalDate.parse(body.get("endDate"));
+            DirectBookingResponse response = directBookingService.updateDirectBookingDates(bookingId, startDate, endDate);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            String msg = e.getMessage();
+            if ("Booking not found".equals(msg)) return ResponseEntity.notFound().build();
+            return ResponseEntity.badRequest().body(Map.of("error", msg));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
     @PutMapping("/admin/bookings/direct/{bookingId}/status")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> updateDirectBookingStatus(
@@ -256,6 +283,34 @@ public class BookingController {
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
+        } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PutMapping("/admin/bookings/direct/{bookingId}/pickup")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> markDirectBookingPickedUp(@PathVariable String bookingId) {
+        try {
+            DirectBookingResponse response = directBookingService.markPickedUp(bookingId);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PutMapping("/admin/bookings/direct/{bookingId}/undo-pickup")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> undoDirectBookingPickup(@PathVariable String bookingId) {
+        try {
+            DirectBookingResponse response = directBookingService.undoPickup(bookingId);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
 

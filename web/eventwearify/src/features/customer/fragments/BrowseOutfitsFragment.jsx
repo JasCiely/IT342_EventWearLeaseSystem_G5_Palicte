@@ -146,6 +146,12 @@ function isWorkingDay(dateStr, settings) {
   return (settings.workingDays || [1, 2, 3, 4, 5]).includes(dow);
 }
 
+function isWorkdayOver(settings) {
+  const now = new Date();
+  const closeMin = ((settings?.endHour ?? 17) * 60) + (settings?.endMinute ?? 0);
+  return (now.getHours() * 60 + now.getMinutes()) >= closeMin;
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // Direct booking date-range overlap helpers
 // ────────────────────────────────────────────────────────────────────────────
@@ -428,11 +434,11 @@ function FittingDatePicker({ value, onChange, minDate, bookingSettings, itemId, 
             {cells.map((day, i) => {
               if (!day) return <div key={`e${i}`} />;
               const ds         = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-              const isPast     = ds < today;
+              const isPast     = ds < today || (ds === todayStr() && isWorkdayOver(bookingSettings));
               const isNonWork  = !isWorkingDay(ds, bookingSettings);
               const slots      = getSlots(ds);
               const isChecking = loadingSet.has(ds);
-              const isFullBook = !isPast && !isNonWork && timeSlots.length > 0 && slots !== undefined && timeSlots.every(t => slots.includes(t));
+              const isFullBook = !isPast && !isNonWork && timeSlots.length > 0 && slots !== undefined && timeSlots.every(t => slots.includes(to24Hour(t)));
               const isSelected = ds === value;
               const isToday    = ds === today;
               const clickable  = !isPast && !isNonWork && !isFullBook;
@@ -545,11 +551,11 @@ function DirectDatePicker({ value, onChange, minDate, bookingSettings, occupiedR
             {cells.map((day, i) => {
               if (!day) return <div key={`e${i}`} />;
               const ds = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-              const isPast = ds < today;
+              const isPast = ds < today || (ds === todayStr() && isWorkdayOver(bookingSettings));
               const isNonWork = !isWorkingDay(ds, bookingSettings);
               const isBlocked = isDateBlocked(ds);
               const isSelected = ds === value;
-              const isToday = ds === today;
+              const isToday = ds === todayStr();
               const clickable = !isPast && !isNonWork && !isBlocked;
 
               let cls = 'fitting-cal-day';
@@ -1105,10 +1111,10 @@ export default function BrowseOutfitsFragment() {
   // Auto-select first available time slot when booked slots change
   useEffect(() => {
     if (!timeSlots.length) return;
-    const firstAvail = timeSlots.find(t => !bookedFittingSlots.includes(t));
+    const firstAvail = timeSlots.find(t => !bookedFittingSlots.includes(to24Hour(t)));
     setBooking(p => ({
       ...p,
-      fittingTime: bookedFittingSlots.includes(p.fittingTime)
+      fittingTime: bookedFittingSlots.includes(to24Hour(p.fittingTime))
         ? (firstAvail || '')
         : (p.fittingTime || firstAvail || ''),
     }));
@@ -1269,7 +1275,7 @@ export default function BrowseOutfitsFragment() {
       showToast('error', `You already have a booking for ${selectedItem.name}. You cannot book another.`); return;
     }
 
-    if (bookedFittingSlots.includes(booking.fittingTime)) {
+    if (bookedFittingSlots.includes(to24Hour(booking.fittingTime))) {
       showToast('error', `The time slot ${booking.fittingTime} is already booked. Please select another time.`); return;
     }
 
@@ -1778,12 +1784,12 @@ export default function BrowseOutfitsFragment() {
 
         const promo = activePromo(selectedItem);
         const selectedDateNonWorking = booking.fittingDate && !isWorkingDay(booking.fittingDate, bookingSettings);
-        const dateIsFullyBooked = !!booking.fittingDate && !loadingFittingSlots && timeSlots.length > 0 && timeSlots.every(t => bookedFittingSlots.includes(t));
+        const dateIsFullyBooked = !!booking.fittingDate && !loadingFittingSlots && timeSlots.length > 0 && timeSlots.every(t => bookedFittingSlots.includes(to24Hour(t)));
 
         const timeOptions = timeSlots.map(slot => ({
           value: slot,
           label: slot,
-          disabled: bookedFittingSlots.includes(slot)
+          disabled: bookedFittingSlots.includes(to24Hour(slot))
         }));
 
         const handleTimeChange = (e) => {
@@ -1936,8 +1942,8 @@ export default function BrowseOutfitsFragment() {
                     !booking.email ||
                     !booking.phone ||
                     selectedDateNonWorking ||
-                    bookedFittingSlots.includes(booking.fittingTime) ||
-                    (timeSlots.length > 0 && timeSlots.every(t => bookedFittingSlots.includes(t)))
+                    bookedFittingSlots.includes(to24Hour(booking.fittingTime)) ||
+                    (timeSlots.length > 0 && timeSlots.every(t => bookedFittingSlots.includes(to24Hour(t))))
                   }
                 >
                   {submitting

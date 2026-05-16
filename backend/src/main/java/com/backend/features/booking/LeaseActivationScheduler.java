@@ -12,10 +12,12 @@ public class LeaseActivationScheduler {
 
     private final DirectBookingService directBookingService;
 
-    // Runs daily at midnight — promotes Approved bookings whose startDate has arrived to Active Lease.
-    @Scheduled(cron = "0 0 0 * * *")
-    public void activateDueLeases() {
-        log.info("Scheduled lease auto-activation started");
-        directBookingService.activateDueLeases();
+    // Runs every minute — auto-cancels Approved bookings whose pickup deadline has passed.
+    // Pickup deadline = working-hours close time on the booking's startDate.
+    // If time restrictions are disabled, expires at midnight of the day after startDate.
+    @Scheduled(fixedRate = 60000)
+    public void autoExpireApprovedBookings() {
+        log.debug("Direct booking pickup-expiry check started");
+        directBookingService.autoExpireApprovedBookings();
     }
 }

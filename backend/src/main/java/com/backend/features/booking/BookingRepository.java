@@ -52,4 +52,16 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
         @Modifying
         @Query("UPDATE Booking b SET b.leaseStarted = true, b.leaseBookingId = :leaseBookingId WHERE b.id = :bookingId")
         void markLeaseStarted(@Param("bookingId") String bookingId, @Param("leaseBookingId") String leaseBookingId);
+
+        // For auto-cancel scheduler: find active fittings on or before a given date
+        @Query("SELECT b FROM Booking b WHERE b.status IN ('CONFIRMED', 'Approved') AND b.fittingDate <= :today")
+        List<Booking> findConfirmedOnOrBeforeDate(@Param("today") String today);
+
+        // For reschedule: per-item uniqueness check excluding the booking being rescheduled
+        @Query("SELECT COUNT(b) > 0 FROM Booking b WHERE b.itemId = :itemId AND b.fittingDate = :fittingDate AND b.fittingTime = :fittingTime AND b.status = 'CONFIRMED' AND b.id != :excludeId")
+        boolean existsByItemIdAndFittingDateAndFittingTimeAndStatusExcludingId(
+                @Param("itemId") String itemId,
+                @Param("fittingDate") String fittingDate,
+                @Param("fittingTime") String fittingTime,
+                @Param("excludeId") String excludeId);
 }

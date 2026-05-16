@@ -102,6 +102,8 @@ public class DirectBookingController {
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
+        } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
             log.error("Error updating booking status", e);
             Map<String, String> error = new HashMap<>();
@@ -163,16 +165,19 @@ public class DirectBookingController {
     }
 
     @GetMapping("/availability")
-    @PreAuthorize("hasRole('CUSTOMER')")
+    @PreAuthorize("hasRole('CUSTOMER') or hasRole('ADMIN')")
     public ResponseEntity<Map<String, Boolean>> checkAvailability(
             @RequestParam String itemId,
             @RequestParam String startDate,
-            @RequestParam String endDate) {
+            @RequestParam String endDate,
+            @RequestParam(required = false) String excludeBookingId) {
 
         try {
             LocalDate start = LocalDate.parse(startDate);
             LocalDate end = LocalDate.parse(endDate);
-            boolean available = directBookingService.isItemAvailable(itemId, start, end);
+            boolean available = (excludeBookingId != null && !excludeBookingId.isBlank())
+                    ? directBookingService.isItemAvailableExcluding(itemId, start, end, excludeBookingId)
+                    : directBookingService.isItemAvailable(itemId, start, end);
             Map<String, Boolean> response = new HashMap<>();
             response.put("available", available);
             return ResponseEntity.ok(response);

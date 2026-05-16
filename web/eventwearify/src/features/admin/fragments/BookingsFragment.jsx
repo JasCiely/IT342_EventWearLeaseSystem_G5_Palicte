@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import '../styles/BookingsManagement.css';
+import '../../customer/styles/BrowseOutfitsFragment.css';
 import {
   Search, Eye, X, CheckCircle, AlertCircle, Clock, User, Phone,
-  Calendar, RotateCcw, ChevronRight, PackageCheck,
+  Calendar, RotateCcw, ChevronRight, ChevronLeft, PackageCheck,
   XCircle, Star, AlertTriangle,
-  Loader2, ShoppingBag, Settings, Save, Sun,
+  Loader2, ShoppingBag, Settings, Save, Sun, Plus,
   Calendar as CalendarIcon, AlarmClock, Edit3, Scissors,
   Image as ImageIcon, Video, RefreshCw, Download, FileText,
   History, CheckSquare, Square, Mail, MailX,
@@ -20,13 +21,18 @@ import {
   rescheduleFitting,
   checkFittingAvailability,
   getAvailableTimeSlots,
+  getBookedFittingSlots,
   returnLease,
   extendLease,
   getUnavailableDates,
+  updateDirectBookingDates,
+  markDirectBookingPickedUp,
+  checkDirectBookingAvailability,
 } from '../services/inventoryApi';
 import { fetchBookingSettings, saveBookingSettings, getDefaultSettings } from '../services/bookingSettingsApi';
 import { authFetch } from '../../../shared/services/apiClient.js';
 import FittingToLeaseModal from './FittingToLeaseModal';
+import CreateBookingModal from './CreateBookingModal';
 
 // ─── Status meta ────────────────────────────────────────────────────────────
 
@@ -39,24 +45,23 @@ const BOOKING_STATUS_META = {
   'Completed':    { color: '#1d4ed8', bg: 'rgba(29,78,216,0.1)',   dot: '#3b82f6', label: 'Completed' },
   'Active Lease': { color: '#7c3aed', bg: 'rgba(124,58,237,0.1)', dot: '#8b5cf6', label: 'Active Lease' },
   'Returned':     { color: '#0e7490', bg: 'rgba(14,116,144,0.1)', dot: '#06b6d4', label: 'Returned' },
+  'COMPLETED':       { color: '#1d4ed8', bg: 'rgba(29,78,216,0.1)',   dot: '#3b82f6', label: 'Completed' },
   'LEASE_CONVERTED': { color: '#7c3aed', bg: 'rgba(124,58,237,0.1)', dot: '#8b5cf6', label: 'Lease Converted' },
 };
 
-const FITTING_FLOW_STEPS = ['Pending', 'Approved', 'Completed'];
-const FITTING_NEXT_ACTIONS = {
-  'Pending':  { label: 'Approve Fitting', icon: CheckCircle, next: 'Approved',  color: '#15803d' },
-  'Approved': { label: 'Mark as Done',    icon: Star,        next: 'Completed', color: '#1d4ed8' },
-};
+const FITTING_FLOW_STEPS = ['CONFIRMED', 'COMPLETED'];
+const FITTING_FLOW_LABELS = { 'CONFIRMED': 'Confirmed', 'COMPLETED': 'Done' };
+const FITTING_NEXT_ACTIONS = {};
 
 const DIRECT_FLOW_STEPS = ['Pending', 'Approved', 'Active Lease', 'Returned', 'Completed'];
+// Approved → Active Lease requires explicit admin confirmation via the "Picked Up" button.
 // Active Lease uses two dedicated buttons (Returned + Extend) rendered separately.
-// Approved → Active Lease is handled automatically by the backend scheduler.
 const DIRECT_NEXT_ACTIONS = {
   'Pending': { label: 'Approve Booking', icon: CheckCircle, next: 'Approved', color: '#15803d' },
 };
 
-const CANCELLABLE = ['Pending', 'Approved'];
-const TERMINAL    = ['Completed', 'Cancelled', 'Rejected', 'LEASE_CONVERTED'];
+const CANCELLABLE = ['Pending', 'Approved', 'CONFIRMED'];
+const TERMINAL    = ['Completed', 'COMPLETED', 'Cancelled', 'Rejected', 'LEASE_CONVERTED'];
 
 // Default settings are now provided by getDefaultSettings() from bookingSettingsApi
 
@@ -67,12 +72,97 @@ const DAYS = [
   { value: 6, label: 'Saturday' },
 ];
 
+/**
+ * Builds the working-hours end datetime for the day of a fitting.
+ * This is the canonical expiry boundary used by both frontend and backend.
+ * workingHours shape: { endHour: number, endMinute?: number }
+ */
+const getFittingWorkingEndTime = (booking, workingHours) => {
+  if (!booking?.fittingDate) return null;
+  const endHour   = workingHours?.endHour   ?? 17;
+  const endMinute = workingHours?.endMinute ?? 0;
+  return new Date(`${booking.fittingDate}T${String(endHour).padStart(2,'0')}:${String(endMinute).padStart(2,'0')}:00`);
+};
+
+/**
+ * Returns true when the fitting START time has passed AND the working-hours
+ * end time has NOT been reached yet → "Needs Attention".
+ * Once the working end time is reached the booking is expired (auto-cancelled
+ * by the backend) and must NOT show a warning.
+ */
+const isFittingInAttentionWindow = (booking, durationMinutes = 30, workingHours = null) => {
+  if (!booking?.fittingDate || !booking?.fittingTime) return false;
+  const now   = new Date();
+  const start = new Date(`${booking.fittingDate}T${booking.fittingTime}:00`);
+  // Use the working-hours end time as the expiry wall if available,
+  // otherwise fall back to fittingTime + duration (legacy behaviour).
+  const expiry = workingHours
+    ? getFittingWorkingEndTime(booking, workingHours)
+    : new Date(start.getTime() + durationMinutes * 60000);
+  if (!expiry) return false;
+  return now >= start && now < expiry;
+};
+
+/**
+ * Returns true when the working-hours end time for the fitting day has
+ * already passed → booking is expired and the backend will/has auto-cancelled it.
+ * No warning or pending state should be shown after this point.
+ */
+const isFittingExpiredByWorkingHours = (booking, workingHours) => {
+  if (!booking?.fittingDate) return false;
+  const expiry = getFittingWorkingEndTime(booking, workingHours);
+  if (!expiry) return false;
+  return new Date() >= expiry;
+};
+
+/**
+ * Legacy alias kept for sort-order and backward-compat call sites that
+ * only need "is the fitting day/time in the past at all".
+ */
+const isFittingBeyondDutyWindow = (booking, durationMinutes = 30, workingHours = null) => {
+  // If we have working hours, use the end-time wall (stricter / canonical rule).
+  if (workingHours) return isFittingExpiredByWorkingHours(booking, workingHours);
+  if (!booking?.fittingDate || !booking?.fittingTime) return false;
+  const now   = new Date();
+  const start = new Date(`${booking.fittingDate}T${booking.fittingTime}:00`);
+  return now >= new Date(start.getTime() + durationMinutes * 60000);
+};
+
+/**
+ * Returns true when an Approved direct booking has passed its pickup deadline.
+ * Deadline = working-hours close time on startDate (or midnight of next day when
+ * time restrictions are disabled).  Mirrors the backend autoExpireApprovedBookings logic.
+ */
+const isApprovedDirectBookingExpired = (booking, workingHours) => {
+  if (!booking?.startDate) return false;
+  const today = new Date().toISOString().split('T')[0];
+  const startDate = booking.startDate;
+  if (startDate > today) return false;
+  if (startDate < today) return true;
+  // startDate === today: check working-hours close time
+  if (workingHours?.enabled && workingHours?.endHour !== undefined) {
+    const endHour   = workingHours.endHour   ?? 17;
+    const endMinute = workingHours.endMinute ?? 0;
+    const deadline  = new Date(`${startDate}T${String(endHour).padStart(2,'0')}:${String(endMinute).padStart(2,'0')}:00`);
+    return new Date() >= deadline;
+  }
+  return false;
+};
+
+/** Legacy helper kept for sort-order and card-highlight purposes.
+ *  True when start time has passed (regardless of duty window). */
 const isFittingPast = (booking) => {
   if (!booking?.fittingDate) return false;
   const dateStr = booking.fittingDate;
   const timeStr = booking.fittingTime || '23:59';
   const dt = new Date(`${dateStr}T${timeStr}`);
   return dt < new Date();
+};
+
+const isToday = (booking) => {
+  const today = new Date().toISOString().split('T')[0];
+  const date = booking.fittingDate || booking.startDate;
+  return date === today;
 };
 
 // ─── StatusBadge ─────────────────────────────────────────────────────────────
@@ -99,6 +189,9 @@ function FlowStepper({ current, isFitting }) {
   }
   const steps = isFitting ? FITTING_FLOW_STEPS : DIRECT_FLOW_STEPS;
   const activeIdx = steps.indexOf(current);
+  const getLabel = (step) => isFitting
+    ? (FITTING_FLOW_LABELS[step] || step)
+    : (BOOKING_STATUS_META[step]?.label || step);
   return (
     <div className="bk-stepper">
       {steps.map((step, i) => (
@@ -106,7 +199,7 @@ function FlowStepper({ current, isFitting }) {
           <div className="bk-step-dot">
             {i < activeIdx ? <CheckCircle size={13} /> : <span>{i + 1}</span>}
           </div>
-          <div className="bk-step-label">{step}</div>
+          <div className="bk-step-label">{getLabel(step)}</div>
           {i < steps.length - 1 && <div className="bk-step-connector" />}
         </div>
       ))}
@@ -218,24 +311,29 @@ function NoLeaseConfirmModal({ booking, onConfirm, onClose }) {
     <div className="inv-overlay" onClick={onClose}>
       <div className="inv-modal inv-modal-sm" onClick={e => e.stopPropagation()}>
         <div className="inv-modal-header">
-          <h3>Complete Fitting Without Rental</h3>
+          <h3><CheckCircle size={15} style={{ marginRight: 6, color: '#15803d' }} />Mark Fitting Done</h3>
           <button className="inv-modal-close" onClick={onClose}><X size={15} /></button>
         </div>
         <div className="inv-modal-body">
           <div className="bk-action-context">
             <div className="bk-action-customer">{booking.customerName}</div>
             <div className="bk-action-item">{booking.itemName}</div>
+            {booking.fittingDate && (
+              <div className="bk-action-dates">
+                <Calendar size={11} /> {booking.fittingDate} at {booking.fittingTime}
+              </div>
+            )}
           </div>
-          <div className="bk-warning-message" style={{ padding: '0.75rem', background: 'rgba(180,83,9,0.1)', borderRadius: '8px', color: '#b45309' }}>
-            <AlertTriangle size={14} style={{ display: 'inline', marginRight: '8px' }} />
-            This will mark the fitting as completed without creating a rental booking.
+          <div style={{ padding: '0.75rem', background: 'rgba(21,128,61,0.08)', borderRadius: '8px', color: '#15803d', fontSize: '0.82rem' }}>
+            <CheckCircle size={14} style={{ display: 'inline', marginRight: '8px' }} />
+            Mark this fitting session as completed. You can still create a rental booking afterward.
           </div>
         </div>
         <div className="inv-modal-footer">
           <button className="inv-btn-ghost" onClick={onClose} disabled={submitting}>Cancel</button>
           <button
             className="inv-btn-primary"
-            style={{ background: '#1d4ed8' }}
+            style={{ background: '#15803d' }}
             onClick={async () => {
               setSubmitting(true);
               await onConfirm();
@@ -244,7 +342,7 @@ function NoLeaseConfirmModal({ booking, onConfirm, onClose }) {
             disabled={submitting}
           >
             {submitting ? <Loader2 size={13} className="inv-spinner-inline" /> : <CheckCircle size={13} />}
-            Confirm Completion
+            Mark as Done
           </button>
         </div>
       </div>
@@ -270,7 +368,7 @@ function ReturnLeaseModal({ booking, onConfirm, onClose }) {
             <div className="bk-action-item">{booking.itemName}</div>
             <div className="bk-action-dates">{booking.startDate} → {booking.endDate}</div>
           </div>
-          <div style={{ padding: '0.75rem', background: 'rgba(14,116,144,0.08)', borderRadius: 8, color: '#0e7490', fontSize: '0.82rem' }}>
+          <div style={{ padding: '0.75rem', background: 'rgba(13,148,136,0.08)', borderRadius: 8, color: '#0d9488', fontSize: '0.82rem' }}>
             <PackageCheck size={13} style={{ display: 'inline', marginRight: 6 }} />
             This will mark the item as <strong>Returned</strong> then immediately <strong>Completed</strong>.
             Inventory availability will be restored.
@@ -280,7 +378,7 @@ function ReturnLeaseModal({ booking, onConfirm, onClose }) {
           <button className="inv-btn-ghost" onClick={onClose} disabled={submitting}>Cancel</button>
           <button
             className="inv-btn-primary"
-            style={{ background: '#0e7490' }}
+            style={{ background: '#0d9488' }}
             onClick={async () => { setSubmitting(true); await onConfirm(); setSubmitting(false); }}
             disabled={submitting}
           >
@@ -293,14 +391,121 @@ function ReturnLeaseModal({ booking, onConfirm, onClose }) {
   );
 }
 
+// ─── PickedUpModal ────────────────────────────────────────────────────────────
+
+function PickedUpModal({ booking, onConfirm, onClose }) {
+  const [submitting, setSubmitting] = useState(false);
+
+  return (
+    <div className="inv-overlay" onClick={onClose}>
+      <div className="inv-modal inv-modal-sm" onClick={e => e.stopPropagation()}>
+        <div className="inv-modal-header">
+          <h3><PackageCheck size={15} style={{ marginRight: 6, color: '#15803d' }} />Confirm Item Pickup</h3>
+          <button className="inv-modal-close" onClick={onClose}><X size={15} /></button>
+        </div>
+        <div className="inv-modal-body">
+          <div className="bk-action-context">
+            <div className="bk-action-customer">{booking.customerName}</div>
+            <div className="bk-action-item">{booking.itemName}</div>
+            <div className="bk-action-dates">{booking.startDate} → {booking.endDate}</div>
+          </div>
+          <div style={{ padding: '0.75rem', background: 'rgba(21,128,61,0.08)', borderRadius: 8, color: '#15803d', fontSize: '0.82rem' }}>
+            <PackageCheck size={13} style={{ display: 'inline', marginRight: 6 }} />
+            Confirm that the item has been <strong>physically picked up</strong> by the customer.
+            This will activate the lease and enable Return and Extend actions.
+          </div>
+        </div>
+        <div className="inv-modal-footer">
+          <button className="inv-btn-ghost" onClick={onClose} disabled={submitting}>Cancel</button>
+          <button
+            className="inv-btn-primary"
+            style={{ background: '#15803d' }}
+            onClick={async () => { setSubmitting(true); await onConfirm(); setSubmitting(false); }}
+            disabled={submitting}
+          >
+            {submitting ? <Loader2 size={13} className="inv-spinner-inline" /> : <PackageCheck size={13} />}
+            Confirm Pickup
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── CancelConfirmModal ───────────────────────────────────────────────────────
+
+function CancelConfirmModal({ booking, onConfirm, onClose }) {
+  const [reason, setReason] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const handle = async () => {
+    if (!reason.trim()) {
+      alert('Please provide a reason for cancellation');
+      return;
+    }
+    setSubmitting(true);
+    await onConfirm(reason);
+    setSubmitting(false);
+  };
+
+  return (
+    <div className="inv-overlay" onClick={onClose}>
+      <div className="inv-modal inv-modal-sm" onClick={e => e.stopPropagation()}>
+        <div className="inv-modal-header">
+          <h3><XCircle size={15} style={{ marginRight: 6, color: '#991b1b' }} />Cancel Booking</h3>
+          <button className="inv-modal-close" onClick={onClose}><X size={15} /></button>
+        </div>
+        <div className="inv-modal-body">
+          <div className="bk-action-context">
+            <div className="bk-action-customer">{booking.customerName}</div>
+            <div className="bk-action-item">{booking.itemName}</div>
+            {booking.startDate && (
+              <div className="bk-action-dates">{booking.startDate} → {booking.endDate}</div>
+            )}
+            {booking.fittingDate && (
+              <div className="bk-action-dates">
+                <Calendar size={11} /> {booking.fittingDate} at {booking.fittingTime}
+              </div>
+            )}
+          </div>
+          <div style={{ padding: '0.75rem', background: 'rgba(153,27,27,0.07)', borderRadius: 8, color: '#991b1b', fontSize: '0.82rem', marginBottom: '0.75rem' }}>
+            <AlertTriangle size={13} style={{ display: 'inline', marginRight: 6 }} />
+            This will cancel the booking and notify the customer. This action cannot be undone.
+          </div>
+          <div className="inv-field">
+            <label className="inv-field-label">Cancellation Reason *</label>
+            <textarea
+              className="inv-textarea" rows={3} value={reason}
+              onChange={e => setReason(e.target.value)}
+              placeholder="Please explain why this booking is being cancelled..."
+              disabled={submitting}
+            />
+          </div>
+        </div>
+        <div className="inv-modal-footer">
+          <button className="inv-btn-ghost" onClick={onClose} disabled={submitting}>Keep Booking</button>
+          <button
+            className="inv-btn-primary"
+            style={{ background: '#991b1b' }}
+            onClick={handle}
+            disabled={submitting || !reason.trim()}
+          >
+            {submitting ? <Loader2 size={13} className="inv-spinner-inline" /> : <XCircle size={13} />}
+            Cancel Booking
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── ExtendLeaseModal ─────────────────────────────────────────────────────────
 
-function ExtendLeaseModal({ booking, onConfirm, onClose }) {
+function ExtendLeaseModal({ booking, onConfirm, onClose, bookingSettings }) {
   const [newEndDate, setNewEndDate] = useState('');
   const [unavailableRanges, setUnavailableRanges] = useState([]);
   const [loadingDates, setLoadingDates] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [dateError, setDateError] = useState('');
 
   const currentEndDate = booking.endDate;
 
@@ -311,7 +516,7 @@ function ExtendLeaseModal({ booking, onConfirm, onClose }) {
     return d.toISOString().split('T')[0];
   }, [currentEndDate]);
 
-  // maxDate = day before the first future conflict (if any), enforced by the native date input
+  // maxDate = day before the first future conflict (if any)
   const maxDate = useMemo(() => {
     const future = unavailableRanges
       .filter(r => r.startDate > currentEndDate)
@@ -321,6 +526,17 @@ function ExtendLeaseModal({ booking, onConfirm, onClose }) {
     d.setDate(d.getDate() - 1);
     return d.toISOString().split('T')[0];
   }, [unavailableRanges, currentEndDate]);
+
+  // All dates at or beyond the first conflict must be blocked in the picker.
+  // A cap range [maxDate+1, far future] is added so the DirectDatePicker disables
+  // any date that would cause the extension range to overlap a future booking.
+  const occupiedRangesForPicker = useMemo(() => {
+    if (!maxDate) return unavailableRanges;
+    const capD = new Date(maxDate + 'T12:00:00');
+    capD.setDate(capD.getDate() + 1);
+    const capStart = capD.toISOString().split('T')[0];
+    return [...unavailableRanges, { startDate: capStart, endDate: '9999-12-31' }];
+  }, [unavailableRanges, maxDate]);
 
   useEffect(() => {
     let cancelled = false;
@@ -339,17 +555,8 @@ function ExtendLeaseModal({ booking, onConfirm, onClose }) {
     return () => { cancelled = true; };
   }, [booking.inventoryItemId, booking.id]);
 
-  const handleDateChange = (e) => {
-    const val = e.target.value;
-    setNewEndDate(val);
-    setDateError('');
-    if (val && maxDate && val > maxDate) {
-      setDateError('Selected date conflicts with another booking for this item.');
-    }
-  };
-
   const handle = async () => {
-    if (!newEndDate || dateError) return;
+    if (!newEndDate) return;
     setSubmitting(true);
     await onConfirm(newEndDate);
     setSubmitting(false);
@@ -389,30 +596,24 @@ function ExtendLeaseModal({ booking, onConfirm, onClose }) {
 
           <div className="inv-field">
             <label className="inv-field-label"><CalendarIcon size={11} /> New End Date</label>
-            <input
-              type="date"
-              className="inv-input"
+            <DirectDatePicker
               value={newEndDate}
-              min={minDate}
-              max={maxDate || undefined}
-              onChange={handleDateChange}
+              onChange={setNewEndDate}
+              minDate={minDate}
+              bookingSettings={bookingSettings}
+              occupiedRanges={occupiedRangesForPicker}
               disabled={loadingDates}
+              label="new end date"
             />
           </div>
-
-          {dateError && (
-            <div style={{ color: '#dc2626', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: 4, marginTop: '0.25rem' }}>
-              <AlertTriangle size={11} /> {dateError}
-            </div>
-          )}
         </div>
         <div className="inv-modal-footer">
           <button className="inv-btn-ghost" onClick={onClose} disabled={submitting}>Cancel</button>
           <button
             className="inv-btn-primary"
-            style={{ background: '#7c3aed' }}
+            style={{ background: '#6b2d39' }}
             onClick={handle}
-            disabled={submitting || !newEndDate || !!dateError || loadingDates}
+            disabled={submitting || !newEndDate || loadingDates}
           >
             {submitting ? <Loader2 size={13} className="inv-spinner-inline" /> : <CalendarIcon size={13} />}
             Extend Lease
@@ -491,87 +692,235 @@ function BulkActionModal({ selectedCount, action, onConfirm, onClose }) {
   );
 }
 
+// ─── Calendar helpers (shared with EditFittingCalendar) ──────────────────────
+
+const CAL_MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const CAL_DOW_LABELS  = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+
+function calTodayStr() { return new Date().toISOString().split('T')[0]; }
+
+function calIsWorkingDay(dateStr, settings) {
+  if (!settings?.enabled) return true;
+  if (!dateStr) return true;
+  const dow = new Date(dateStr + 'T00:00:00').getDay();
+  return (settings.workingDays || [1, 2, 3, 4, 5]).includes(dow);
+}
+
+function calIsWorkdayOver(settings) {
+  const now = new Date();
+  const closeMin = ((settings?.endHour ?? 17) * 60) + (settings?.endMinute ?? 0);
+  return (now.getHours() * 60 + now.getMinutes()) >= closeMin;
+}
+
+// ─── EditFittingCalendar ──────────────────────────────────────────────────────
+// Calendar picker used in the reschedule modal. Grays out past dates, non-working
+// days, and fully booked days (all time slots taken for this item).
+
+function EditFittingCalendar({ value, onChange, bookingSettings, itemId, allTimeSlots, disabled }) {
+  const today = calTodayStr();
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef(null);
+  const [view, setView] = useState(() => {
+    const d = value ? new Date(value + 'T00:00:00') : new Date();
+    return { year: d.getFullYear(), month: d.getMonth() };
+  });
+  const [slotData, setSlotData] = useState({});
+  const fetchedRef = useRef(new Set());
+
+  useEffect(() => {
+    if (!open) return;
+    const h = e => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [open]);
+
+  const { year, month } = view;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDow    = new Date(year, month, 1).getDay();
+
+  // Pre-fetch booked slots for visible days so fully-booked days can be marked
+  useEffect(() => {
+    if (!open || !itemId || !allTimeSlots.length) return;
+    const toFetch = [];
+    for (let d = 1; d <= daysInMonth; d++) {
+      const ds  = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const key = `${itemId}__${ds}`;
+      if (ds < today) continue;
+      if (!calIsWorkingDay(ds, bookingSettings)) continue;
+      if (fetchedRef.current.has(key)) continue;
+      toFetch.push(ds);
+    }
+    if (!toFetch.length) return;
+    toFetch.forEach(ds => fetchedRef.current.add(`${itemId}__${ds}`));
+    Promise.all(
+      toFetch.map(ds =>
+        getBookedFittingSlots(itemId, ds)
+          .then(slots => ({ ds, slots }))
+          .catch(() => ({ ds, slots: [] }))
+      )
+    ).then(results => {
+      const patch = {};
+      results.forEach(({ ds, slots }) => { patch[ds] = slots; });
+      setSlotData(prev => ({ ...prev, ...patch }));
+    });
+  }, [open, year, month, itemId, allTimeSlots.length, today, bookingSettings]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const prevMonth = () => setView(v => { const d = new Date(v.year, v.month - 1, 1); return { year: d.getFullYear(), month: d.getMonth() }; });
+  const nextMonth = () => setView(v => { const d = new Date(v.year, v.month + 1, 1); return { year: d.getFullYear(), month: d.getMonth() }; });
+  const canPrev   = new Date(year, month, 0).toISOString().split('T')[0] >= today;
+
+  const cells = [];
+  for (let i = 0; i < firstDow; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+  const fmtCalDate = ds => ds ? new Date(ds + 'T00:00:00').toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' }) : '';
+
+  return (
+    <div className="fitting-cal-wrap" ref={wrapRef}>
+      <button
+        type="button"
+        className={`fitting-cal-trigger${!value ? ' fct-empty' : ''}`}
+        onClick={() => !disabled && setOpen(o => !o)}
+        disabled={disabled}
+      >
+        <CalendarIcon size={13} style={{ color: value ? '#6b2d39' : '#bbb', flexShrink: 0 }} />
+        <span style={{ flex: 1, textAlign: 'left' }}>{value ? fmtCalDate(value) : 'Select a date'}</span>
+        <ChevronDown size={13} style={{ color: '#bbb', flexShrink: 0, transition: 'transform 0.15s', transform: open ? 'rotate(180deg)' : 'none' }} />
+      </button>
+
+      {open && (
+        <div className="fitting-cal-popup">
+          <div className="fitting-cal-header">
+            <button type="button" className="fitting-cal-nav" onClick={prevMonth} disabled={!canPrev}><ChevronLeft size={13} /></button>
+            <span className="fitting-cal-title">{CAL_MONTH_NAMES[month]} {year}</span>
+            <button type="button" className="fitting-cal-nav" onClick={nextMonth}><ChevronRight size={13} /></button>
+          </div>
+
+          <div className="fitting-cal-grid">
+            {CAL_DOW_LABELS.map(d => <div key={d} className="fitting-cal-dow">{d}</div>)}
+            {cells.map((day, i) => {
+              if (!day) return <div key={`e${i}`} />;
+              const ds         = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+              const isPast     = ds < today || (ds === calTodayStr() && calIsWorkdayOver(bookingSettings));
+              const isNonWork  = !calIsWorkingDay(ds, bookingSettings);
+              const bookedForDay = slotData[ds];
+              const isFullBook = !isPast && !isNonWork && allTimeSlots.length > 0
+                && bookedForDay !== undefined && allTimeSlots.every(t => bookedForDay.includes(t));
+              const isSelected = ds === value;
+              const isToday    = ds === calTodayStr();
+              const clickable  = !isPast && !isNonWork && !isFullBook;
+
+              let cls = 'fitting-cal-day';
+              if (isPast)        cls += ' fcd-past';
+              else if (isNonWork)  cls += ' fcd-closed';
+              else if (isFullBook) cls += ' fcd-full';
+              else               cls += ' fcd-avail';
+              if (isSelected)    cls += ' fcd-selected';
+              if (isToday && !isSelected) cls += ' fcd-today';
+
+              return (
+                <button
+                  key={ds}
+                  type="button"
+                  className={cls}
+                  onClick={() => clickable && (onChange(ds), setOpen(false))}
+                  disabled={!clickable}
+                  title={isPast ? 'Past date' : isNonWork ? 'Closed day' : isFullBook ? 'Fully booked' : undefined}
+                >
+                  {day}
+                  {isFullBook && <span className="fcd-dot fcd-dot-full" />}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="fitting-cal-legend">
+            <span><span className="fcl-dot fcl-avail" />Available</span>
+            <span><span className="fcl-dot fcl-full" />Fully Booked</span>
+            <span><span className="fcl-dot fcl-closed" />Closed</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── EditFittingModal ────────────────────────────────────────────────────────
 
 function EditFittingModal({ booking, onSave, onClose, workingHours }) {
-  const [date, setDate] = useState(booking.fittingDate || '');
-  const [time, setTime] = useState(booking.fittingTime || '');
+  const [date, setDate] = useState('');
+  const [time, setTime] = useState('');
   const [saving, setSaving] = useState(false);
   const [availabilityError, setAvailabilityError] = useState('');
   const [availableSlots, setAvailableSlots] = useState([]);
+  const [bookedItemSlots, setBookedItemSlots] = useState([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
 
-  const isWorkingHour = useCallback((dateStr, timeStr) => {
-    if (!workingHours?.enabled) return { valid: true };
-    const dt = new Date(`${dateStr}T${timeStr}`);
-    const hour = dt.getHours();
-    const dayOfWeek = dt.getDay();
-    if (!workingHours.workingDays?.includes(dayOfWeek)) {
-      return { valid: false, message: 'Selected day is not a working day' };
+  // Build all time slots from settings (same logic as CreateBookingModal)
+  const allTimeSlots = useMemo(() => {
+    const openMin  = (workingHours?.startHour  ?? 9)  * 60 + (workingHours?.startMinute  ?? 0);
+    const closeMin = (workingHours?.endHour    ?? 17) * 60 + (workingHours?.endMinute    ?? 0);
+    const step     = workingHours?.fittingDurationMinutes || 30;
+    const slots    = [];
+    for (let t = openMin; t + step <= closeMin; t += step) {
+      const h = Math.floor(t / 60);
+      const m = t % 60;
+      slots.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
     }
-    if (hour < workingHours.startHour || hour >= workingHours.endHour) {
-      return { valid: false, message: `Selected time is outside working hours (${workingHours.startHour}:00 - ${workingHours.endHour}:00)` };
-    }
-    return { valid: true };
+    return slots;
   }, [workingHours]);
 
-  const loadAvailableSlots = async (selectedDate) => {
+  const loadAvailableSlots = useCallback(async (selectedDate) => {
     if (!selectedDate) return;
     setLoadingSlots(true);
+    setAvailabilityError('');
     try {
-      const slots = await getAvailableTimeSlots(selectedDate);
+      const [slots, itemSlots] = await Promise.all([
+        getAvailableTimeSlots(selectedDate),
+        getBookedFittingSlots(booking.itemId, selectedDate),
+      ]);
       setAvailableSlots(slots || []);
+      // Exclude the current booking's own slot from the "booked" list so it stays selectable
+      setBookedItemSlots((itemSlots || []).filter(s => s !== booking.fittingTime || date !== booking.fittingDate));
     } catch (error) {
       console.error('Failed to load available slots:', error);
       setAvailableSlots([]);
+      setBookedItemSlots([]);
     } finally {
       setLoadingSlots(false);
     }
-  };
+  }, [booking.itemId, booking.fittingTime, booking.fittingDate, date]);
 
-  const handleDateChange = (e) => {
-    const newDate = e.target.value;
+  const handleDateChange = (newDate) => {
     setDate(newDate);
-    setAvailabilityError('');
     setTime('');
+    setAvailabilityError('');
     if (newDate) loadAvailableSlots(newDate);
   };
 
   const handleTimeChange = (e) => {
-    const newTime = e.target.value;
-    setTime(newTime);
+    setTime(e.target.value);
     setAvailabilityError('');
-    const workingHourCheck = isWorkingHour(date, newTime);
-    if (!workingHourCheck.valid) setAvailabilityError(workingHourCheck.message);
   };
 
   const handle = async () => {
     if (!date || !time) return;
-    const workingHourCheck = isWorkingHour(date, time);
-    if (!workingHourCheck.valid) return;
     setSaving(true);
     await onSave({ fittingDate: date, fittingTime: time });
     setSaving(false);
   };
 
-  const generateTimeSlots = () => {
-    const slots = [];
-    const startH = workingHours?.startHour ?? 9;
-    const endH   = workingHours?.endHour   ?? 17;
-    const dur    = workingHours?.fittingDurationMinutes ?? 30;
-    let currentH = startH;
-    let currentM = workingHours?.startMinute ?? 0;
+  const slotIsAvailable = (slot) =>
+    availableSlots.includes(slot) && !bookedItemSlots.includes(slot);
 
-    while (currentH < endH || (currentH === endH && currentM === 0)) {
-      const slot = `${String(currentH).padStart(2, '0')}:${String(currentM).padStart(2, '0')}`;
-      slots.push(slot);
-      currentM += dur;
-      if (currentM >= 60) { currentH += Math.floor(currentM / 60); currentM = currentM % 60; }
-    }
-    return slots;
+  const dateIsFullyBooked = date && !loadingSlots && allTimeSlots.length > 0
+    && allTimeSlots.every(s => bookedItemSlots.includes(s));
+
+  const fmtSlot = (hhmm) => {
+    const [h, m] = hhmm.split(':').map(Number);
+    const period = h >= 12 ? 'PM' : 'AM';
+    return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${period}`;
   };
-
-  const allTimeSlots = generateTimeSlots();
 
   return (
     <div className="inv-overlay" onClick={onClose}>
@@ -591,35 +940,50 @@ function EditFittingModal({ booking, onSave, onClose, workingHours }) {
           <div className="inv-modal-grid">
             <div className="inv-field">
               <label className="inv-field-label"><CalendarIcon size={11} /> New Date</label>
-              <input
-                type="date" className="inv-input"
-                value={date} onChange={handleDateChange}
-                min={new Date().toISOString().split('T')[0]}
+              <EditFittingCalendar
+                value={date}
+                onChange={handleDateChange}
+                bookingSettings={workingHours}
+                itemId={booking.itemId}
+                allTimeSlots={allTimeSlots}
+                disabled={saving}
               />
             </div>
             <div className="inv-field">
-              <label className="inv-field-label"><AlarmClock size={11} /> New Time</label>
-              <select
-                className="inv-select"
-                value={time}
-                onChange={handleTimeChange}
-                disabled={!date || loadingSlots}
-              >
-                <option value="">Select time</option>
-                {allTimeSlots.map(slot => {
-                  const isAvailable = availableSlots.includes(slot) || slot === booking.fittingTime;
-                  return (
-                    <option key={slot} value={slot} disabled={!isAvailable}>
-                      {slot} {!isAvailable && '(Full)'}
-                    </option>
-                  );
-                })}
-              </select>
-              {loadingSlots && <Loader2 size={12} className="inv-spinner-inline" style={{ marginTop: 4 }} />}
+              <label className="inv-field-label">
+                <AlarmClock size={11} /> New Time
+                {loadingSlots && <Loader2 size={11} className="inv-spinner-inline" style={{ marginLeft: 4 }} />}
+              </label>
+              {!date && <div className="ts-placeholder">Select a date first</div>}
+              {date && loadingSlots && (
+                <div className="ts-placeholder"><Loader2 size={13} className="inv-spinner-inline" /> Loading…</div>
+              )}
+              {date && !loadingSlots && dateIsFullyBooked && (
+                <div className="ts-placeholder ts-placeholder-full">No available slots for this date</div>
+              )}
+              {date && !loadingSlots && !dateIsFullyBooked && (
+                <select
+                  className="inv-select"
+                  style={{ width: '100%' }}
+                  value={time}
+                  onChange={handleTimeChange}
+                  disabled={saving}
+                >
+                  <option value="">Select time</option>
+                  {allTimeSlots.map(slot => {
+                    const available = slotIsAvailable(slot);
+                    return (
+                      <option key={slot} value={slot} disabled={!available}>
+                        {fmtSlot(slot)}{!available ? ' (Booked)' : ''}
+                      </option>
+                    );
+                  })}
+                </select>
+              )}
             </div>
           </div>
           {availabilityError && (
-            <div className="bk-error-message" style={{ color: '#dc2626', fontSize: '0.75rem', marginTop: '0.5rem' }}>
+            <div style={{ color: '#dc2626', fontSize: '0.75rem', marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: 4 }}>
               <AlertTriangle size={12} /> {availabilityError}
             </div>
           )}
@@ -634,7 +998,7 @@ function EditFittingModal({ booking, onSave, onClose, workingHours }) {
           )}
           <div className="bk-info-note" style={{ marginTop: '0.5rem', fontSize: '0.7rem' }}>
             <Clock size={12} />
-            Fitting sessions are {workingHours?.fittingDurationMinutes ?? 30} minutes long. Maximum 5 bookings per time slot.
+            Fitting sessions are {workingHours?.fittingDurationMinutes ?? 30} min. Max 5 bookings per slot. Booked dates and times are grayed out.
           </div>
         </div>
         <div className="inv-modal-footer">
@@ -646,6 +1010,287 @@ function EditFittingModal({ booking, onSave, onClose, workingHours }) {
           >
             {saving ? <Loader2 size={13} className="inv-spinner-inline" /> : <Save size={13} />}
             Save Schedule
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── DirectDatePicker (rental booking edit) ───────────────────────────────────
+
+function DirectDatePicker({ value, onChange, minDate, bookingSettings, occupiedRanges, disabled, label }) {
+  const today = minDate || calTodayStr();
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef(null);
+  const [view, setView] = useState(() => {
+    const d = value ? new Date(value + 'T00:00:00') : new Date();
+    return { year: d.getFullYear(), month: d.getMonth() };
+  });
+
+  useEffect(() => {
+    if (!open) return;
+    const h = e => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [open]);
+
+  const { year, month } = view;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDow    = new Date(year, month, 1).getDay();
+
+  const prevMonth = () => setView(v => { const d = new Date(v.year, v.month - 1, 1); return { year: d.getFullYear(), month: d.getMonth() }; });
+  const nextMonth = () => setView(v => { const d = new Date(v.year, v.month + 1, 1); return { year: d.getFullYear(), month: d.getMonth() }; });
+  const canPrev   = new Date(year, month, 0).toISOString().split('T')[0] >= today;
+
+  const isDateBlocked = ds => occupiedRanges?.some(r => ds >= r.startDate && ds <= r.endDate) ?? false;
+
+  const cells = [];
+  for (let i = 0; i < firstDow; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+  const fmtDate = ds => ds ? new Date(ds + 'T00:00:00').toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' }) : '';
+
+  return (
+    <div className="fitting-cal-wrap" ref={wrapRef}>
+      <button
+        type="button"
+        className={`fitting-cal-trigger${!value ? ' fct-empty' : ''}`}
+        onClick={() => !disabled && setOpen(o => !o)}
+        disabled={disabled}
+      >
+        <CalendarIcon size={13} style={{ color: value ? '#6b2d39' : '#bbb', flexShrink: 0 }} />
+        <span style={{ flex: 1, textAlign: 'left' }}>{value ? fmtDate(value) : `Select ${label || 'date'}`}</span>
+        <ChevronDown size={13} style={{ color: '#bbb', flexShrink: 0, transition: 'transform 0.15s', transform: open ? 'rotate(180deg)' : 'none' }} />
+      </button>
+
+      {open && (
+        <div className="fitting-cal-popup">
+          <div className="fitting-cal-header">
+            <button type="button" className="fitting-cal-nav" onClick={prevMonth} disabled={!canPrev}><ChevronLeft size={13} /></button>
+            <span className="fitting-cal-title">{CAL_MONTH_NAMES[month]} {year}</span>
+            <button type="button" className="fitting-cal-nav" onClick={nextMonth}><ChevronRight size={13} /></button>
+          </div>
+
+          <div className="fitting-cal-grid">
+            {CAL_DOW_LABELS.map(d => <div key={d} className="fitting-cal-dow">{d}</div>)}
+            {cells.map((day, i) => {
+              if (!day) return <div key={`e${i}`} />;
+              const ds        = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+              const isPast    = ds < today || (ds === calTodayStr() && calIsWorkdayOver(bookingSettings));
+              const isNonWork = !calIsWorkingDay(ds, bookingSettings);
+              const isBlocked = isDateBlocked(ds);
+              const isSelected = ds === value;
+              const isToday   = ds === calTodayStr();
+              const clickable = !isPast && !isNonWork && !isBlocked;
+
+              let cls = 'fitting-cal-day';
+              if (isPast)        cls += ' fcd-past';
+              else if (isNonWork) cls += ' fcd-closed';
+              else if (isBlocked) cls += ' fcd-full';
+              else               cls += ' fcd-avail';
+              if (isSelected)   cls += ' fcd-selected';
+              if (isToday && !isSelected) cls += ' fcd-today';
+
+              return (
+                <button
+                  key={ds}
+                  type="button"
+                  className={cls}
+                  onClick={() => clickable && (onChange(ds), setOpen(false))}
+                  disabled={!clickable}
+                  title={isPast ? 'Past date' : isNonWork ? 'Closed day' : isBlocked ? 'Already booked' : undefined}
+                >
+                  {day}
+                  {isBlocked && !isPast && !isNonWork && <span className="fcd-dot fcd-dot-full" />}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="fitting-cal-legend">
+            <span><span className="fcl-dot fcl-avail" />Available</span>
+            <span><span className="fcl-dot fcl-full" />Booked</span>
+            <span><span className="fcl-dot fcl-closed" />Closed</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── EditRentalDatesModal ─────────────────────────────────────────────────────
+
+function EditRentalDatesModal({ booking, onSave, onClose, workingHours }) {
+  const [startDate, setStartDate] = useState(booking.startDate || '');
+  const [endDate, setEndDate]     = useState(booking.endDate   || '');
+  const [occupiedRanges, setOccupiedRanges] = useState([]);
+  const [loadingRanges, setLoadingRanges]   = useState(false);
+  const [saving, setSaving]   = useState(false);
+  const [error, setError]     = useState('');
+  const [availability, setAvailability] = useState(null);
+  const [checkingAvail, setCheckingAvail] = useState(false);
+
+  const today = calTodayStr();
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingRanges(true);
+    getUnavailableDates(booking.inventoryItemId, booking.id)
+      .then(ranges => { if (!cancelled) setOccupiedRanges(Array.isArray(ranges) ? ranges : []); })
+      .catch(e => console.error('Failed to load unavailable dates:', e))
+      .finally(() => { if (!cancelled) setLoadingRanges(false); });
+    return () => { cancelled = true; };
+  }, [booking.inventoryItemId, booking.id]);
+
+  useEffect(() => {
+    if (!startDate || !endDate) { setAvailability(null); return; }
+    setCheckingAvail(true);
+    checkDirectBookingAvailability(booking.inventoryItemId, startDate, endDate, booking.id)
+      .then(setAvailability)
+      .catch(() => setAvailability(null))
+      .finally(() => setCheckingAvail(false));
+  }, [booking.inventoryItemId, booking.id, startDate, endDate]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const isRangeConflicting = (start, end) =>
+    occupiedRanges.some(r => start <= r.endDate && end >= r.startDate);
+
+  const totalDays = startDate && endDate
+    ? Math.max(1, Math.ceil((new Date(endDate) - new Date(startDate)) / 86400000) + 1)
+    : 0;
+
+  const dailyRate = (booking.basePrice && booking.totalDays && booking.totalDays > 0)
+    ? booking.basePrice / booking.totalDays
+    : 0;
+
+  const newBasePrice = dailyRate * totalDays;
+
+  const handleStartChange = newStart => {
+    setStartDate(newStart);
+    if (endDate && endDate < newStart) setEndDate('');
+    setError('');
+    setAvailability(null);
+  };
+
+  const validate = () => {
+    if (!startDate || !endDate) return 'Please select both start and end dates';
+    if (endDate < startDate)    return 'End date must be on or after start date';
+    if (availability === false || (!checkingAvail && availability === null && isRangeConflicting(startDate, endDate)))
+      return 'Selected dates conflict with another booking';
+    if (startDate === booking.startDate && endDate === booking.endDate) return 'No changes were made to the dates';
+    return null;
+  };
+
+  const handle = async () => {
+    const err = validate();
+    if (err) { setError(err); return; }
+    setSaving(true);
+    await onSave({ startDate, endDate });
+    setSaving(false);
+  };
+
+  return (
+    <div className="inv-overlay" onClick={onClose}>
+      <div className="inv-modal inv-modal-sm" style={{ maxWidth: 460 }} onClick={e => e.stopPropagation()}>
+        <div className="inv-modal-header">
+          <h3><Edit3 size={15} style={{ marginRight: 6 }} />Edit Rental Dates</h3>
+          <button className="inv-modal-close" onClick={onClose}><X size={15} /></button>
+        </div>
+        <div className="inv-modal-body">
+          <div className="bk-action-context">
+            <div className="bk-action-customer">{booking.customerName}</div>
+            <div className="bk-action-item">{booking.itemName}</div>
+            <div className="bk-action-dates" style={{ color: '#b45309', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <AlertTriangle size={11} /> Current: {booking.startDate} → {booking.endDate}
+            </div>
+          </div>
+
+          {loadingRanges && (
+            <div style={{ fontSize: '0.75rem', color: '#aaa', display: 'flex', alignItems: 'center', gap: 6, marginBottom: '0.5rem' }}>
+              <Loader2 size={12} className="inv-spinner-inline" /> Checking availability…
+            </div>
+          )}
+
+          <div className="inv-modal-grid">
+            <div className="inv-field">
+              <label className="inv-field-label"><CalendarIcon size={11} /> New Start Date</label>
+              <DirectDatePicker
+                value={startDate}
+                onChange={handleStartChange}
+                minDate={today}
+                bookingSettings={workingHours}
+                occupiedRanges={occupiedRanges}
+                disabled={saving || loadingRanges}
+                label="start date"
+              />
+            </div>
+            <div className="inv-field">
+              <label className="inv-field-label"><CalendarIcon size={11} /> New End Date</label>
+              <DirectDatePicker
+                value={endDate}
+                onChange={d => { setEndDate(d); setError(''); }}
+                minDate={startDate || today}
+                bookingSettings={workingHours}
+                occupiedRanges={occupiedRanges}
+                disabled={saving || loadingRanges || !startDate}
+                label="end date"
+              />
+            </div>
+          </div>
+
+          {startDate && endDate && !loadingRanges && (
+            <div style={{
+              marginTop: '0.5rem', padding: '8px 12px', borderRadius: 6, fontSize: 13,
+              display: 'flex', alignItems: 'center', gap: 7,
+              background: checkingAvail ? '#f9fafb'
+                : availability === true  ? 'rgba(21,128,61,0.08)'
+                : availability === false ? 'rgba(153,27,27,0.08)'
+                : !isRangeConflicting(startDate, endDate) ? 'rgba(21,128,61,0.08)' : 'rgba(153,27,27,0.08)',
+              color: checkingAvail ? '#6b7280'
+                : availability === true  ? '#15803d'
+                : availability === false ? '#991b1b'
+                : !isRangeConflicting(startDate, endDate) ? '#15803d' : '#991b1b',
+            }}>
+              {checkingAvail
+                ? <><Loader2 size={13} className="inv-spinner-inline" /> Checking availability…</>
+                : availability === true
+                  ? <><CheckCircle size={13} /> Dates are available</>
+                  : availability === false
+                    ? <><AlertCircle size={13} /> Dates conflict with another booking</>
+                    : !isRangeConflicting(startDate, endDate)
+                      ? <><CheckCircle size={13} /> Dates are available</>
+                      : <><AlertCircle size={13} /> Dates conflict with another booking</>}
+            </div>
+          )}
+
+          {totalDays > 0 && dailyRate > 0 && (
+            <div style={{ background: '#f9fafb', borderRadius: 8, padding: '10px 14px', marginTop: '0.75rem', fontSize: 13 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#6b7280', marginBottom: 6 }}>
+                <span>₱{dailyRate.toLocaleString('en-PH', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} × {totalDays} day{totalDays !== 1 ? 's' : ''}</span>
+                <span>₱{newBasePrice.toLocaleString('en-PH', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, borderTop: '1px solid #e5e7eb', paddingTop: 6 }}>
+                <span>New Total</span>
+                <span style={{ color: '#c4717f' }}>₱{newBasePrice.toLocaleString('en-PH', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+              </div>
+            </div>
+          )}
+
+          {error && (
+            <div style={{ marginTop: '0.75rem', padding: '8px 12px', borderRadius: 6, fontSize: 13, background: 'rgba(153,27,27,0.08)', color: '#991b1b', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <AlertCircle size={13} /> {error}
+            </div>
+          )}
+        </div>
+        <div className="inv-modal-footer">
+          <button className="inv-btn-ghost" onClick={onClose} disabled={saving}>Cancel</button>
+          <button
+            className="inv-btn-primary"
+            onClick={handle}
+            disabled={saving || !startDate || !endDate || loadingRanges || checkingAvail}
+          >
+            {saving ? <Loader2 size={13} className="inv-spinner-inline" /> : <Save size={13} />}
+            Save Dates
           </button>
         </div>
       </div>
@@ -671,13 +1316,20 @@ function MediaViewer({ file }) {
 
 // ─── BookingDrawer ────────────────────────────────────────────────────────────
 
-function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, onCompleteNoLease, onProceedToLease, onReturn, onExtend, isFitting, workingHours }) {
+function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, onEditRentalDates, onCompleteNoLease, onProceedToLease, onReturn, onExtend, onPickedUp, isFitting, workingHours }) {
   const [itemDetails, setItemDetails] = useState(null);
   const [loadingItem, setLoadingItem] = useState(false);
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
   const [activeTab, setActiveTab] = useState('details');
   const [emailStatus, setEmailStatus] = useState(null);
   const [emailSending, setEmailSending] = useState(false);
+  // Tracks current time so the Done button enables/disables automatically
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(new Date()), 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   const nextActions = isFitting ? FITTING_NEXT_ACTIONS : DIRECT_NEXT_ACTIONS;
   const actionDef = nextActions[booking.status];
@@ -685,8 +1337,42 @@ function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, on
   const isTerminal = TERMINAL.includes(booking.status);
   const pastFitting = isFitting && isFittingPast(booking);
   const hasLeaseStarted = booking.leaseStarted || booking.leaseBookingId;
-  const isCompletedWithoutLease = isFitting && booking.status === 'COMPLETED' && !hasLeaseStarted;
+  const isCompletedWithoutLease = isFitting && ['COMPLETED', 'Completed'].includes(booking.status) && !hasLeaseStarted;
   const canCompleteNoLease = isFitting && booking.status === 'CONFIRMED' && !hasLeaseStarted;
+  const canProceedToRentalFromConfirmed = isFitting && booking.status === 'CONFIRMED' && !hasLeaseStarted;
+
+  // Done button is only active during the fitting duty window:
+  // [fittingTime, workingHoursEndTime) — the working-hours end time is the hard expiry wall.
+  const fittingDuration = workingHours?.fittingDurationMinutes || 30;
+  const doneWindowActive = useMemo(() => {
+    if (!canCompleteNoLease || !booking.fittingDate || !booking.fittingTime) return false;
+    const start  = new Date(`${booking.fittingDate}T${booking.fittingTime}:00`);
+    // Use working-hours end time as the upper boundary when available.
+    const expiry = workingHours
+      ? getFittingWorkingEndTime(booking, workingHours)
+      : new Date(start.getTime() + fittingDuration * 60000);
+    if (!expiry) return false;
+    return now >= start && now < expiry;
+  }, [canCompleteNoLease, booking.fittingDate, booking.fittingTime, fittingDuration, workingHours, now]);
+
+  const fittingEndTimeLabel = useMemo(() => {
+    // Show the working-hours end time as the deadline label when available.
+    if (workingHours) {
+      const endHour   = workingHours.endHour   ?? 17;
+      const endMinute = workingHours.endMinute ?? 0;
+      const period    = endHour >= 12 ? 'PM' : 'AM';
+      return `${endHour % 12 || 12}:${String(endMinute).padStart(2,'0')} ${period}`;
+    }
+    // Legacy fallback: fittingTime + duration
+    if (!booking.fittingTime) return '';
+    const [h, m] = booking.fittingTime.split(':').map(Number);
+    const totalMin = h * 60 + m + fittingDuration;
+    const eh = Math.floor(totalMin / 60) % 24;
+    const em = totalMin % 60;
+    const period = eh >= 12 ? 'PM' : 'AM';
+    const h12 = eh % 12 || 12;
+    return `${h12}:${String(em).padStart(2, '0')} ${period}`;
+  }, [booking.fittingTime, fittingDuration, workingHours]);
 
   useEffect(() => {
     let cancelled = false;
@@ -777,12 +1463,27 @@ function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, on
                 </div>
               )}
 
-              {isFitting && pastFitting && booking.status === 'Approved' && (
-                <div className="bk-damage-warning" style={{ background: 'rgba(29,78,216,0.07)', borderColor: 'rgba(29,78,216,0.2)', color: '#1d4ed8' }}>
-                  <AlertTriangle size={13} />
-                  <span>This fitting appointment has passed. Mark it as Done or reschedule.</span>
-                </div>
-              )}
+              {isFitting && booking.status === 'CONFIRMED' && (() => {
+                const dur = workingHours?.fittingDurationMinutes || 30;
+                // Use working-hours end time as the expiry wall (canonical rule).
+                const expired  = isFittingExpiredByWorkingHours(booking, workingHours);
+                // Only show "in progress" warning inside the attention window and before expiry.
+                const inWindow = !expired && isFittingInAttentionWindow(booking, dur, workingHours);
+                if (inWindow) {
+                  const endHour   = workingHours?.endHour   ?? 17;
+                  const endMinute = workingHours?.endMinute ?? 0;
+                  const endLabel  = `${endHour % 12 || 12}:${String(endMinute).padStart(2,'0')} ${endHour >= 12 ? 'PM' : 'AM'}`;
+                  return (
+                    <div className="bk-damage-warning" style={{ background: 'rgba(180,83,9,0.07)', borderColor: 'rgba(180,83,9,0.25)', color: '#b45309' }}>
+                      <AlertTriangle size={13} />
+                      <span>This fitting is in progress. Mark it as Done before {endLabel} (working hours end), or it will be automatically cancelled.</span>
+                    </div>
+                  );
+                }
+                // Once expired, show nothing — the booking is either already cancelled
+                // by the backend or will be on the next poll. No warning state needed.
+                return null;
+              })()}
 
               {hasLeaseStarted && (
                 <div className="bk-damage-warning" style={{ background: 'rgba(124,58,237,0.07)', borderColor: 'rgba(124,58,237,0.2)', color: '#7c3aed' }}>
@@ -790,6 +1491,25 @@ function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, on
                   <span>Rental booking #{booking.leaseBookingId?.slice(-8)} has been created from this fitting.</span>
                 </div>
               )}
+
+              {!isFitting && booking.status === 'Approved' && booking.startDate && (() => {
+                const today = new Date().toISOString().split('T')[0];
+                if (booking.startDate <= today) {
+                  const endHour   = workingHours?.endHour   ?? 17;
+                  const endMinute = workingHours?.endMinute ?? 0;
+                  const endLabel  = `${endHour % 12 || 12}:${String(endMinute).padStart(2,'0')} ${endHour >= 12 ? 'PM' : 'AM'}`;
+                  return (
+                    <div className="bk-damage-warning" style={{ background: 'rgba(180,83,9,0.07)', borderColor: 'rgba(180,83,9,0.25)', color: '#b45309' }}>
+                      <AlertTriangle size={13} />
+                      <span>
+                        Pickup scheduled for today. Click <strong>Picked Up</strong> once the customer collects the item,
+                        or cancel. If not confirmed by {workingHours?.enabled ? endLabel : 'end of day'}, this booking will be automatically cancelled.
+                      </span>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
 
               <FlowStepper current={booking.status} isFitting={isFitting} />
 
@@ -899,7 +1619,19 @@ function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, on
 
               {!isFitting && booking.startDate && (
                 <div className="bk-detail-section">
-                  <div className="bk-section-label">Rental Schedule</div>
+                  <div className="bk-section-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span>Rental Schedule</span>
+                    {(booking.status === 'Pending' || booking.status === 'Approved') && !isTerminal && (
+                      <button
+                        type="button"
+                        className="inv-btn-sm outline"
+                        style={{ fontSize: '0.68rem', padding: '0.2rem 0.6rem' }}
+                        onClick={() => onEditRentalDates(booking)}
+                      >
+                        <Edit3 size={10} /> Edit Dates
+                      </button>
+                    )}
+                  </div>
                   <div className="bk-dates-grid">
                     <div className="bk-date-card">
                       <div className="bk-date-label">Start</div>
@@ -953,7 +1685,7 @@ function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, on
           {canCancel && !hasLeaseStarted && (
             <button
               className="inv-btn-sm danger"
-              onClick={() => onCancel(booking.id, isFitting)}
+              onClick={() => onCancel(booking, isFitting)}
             >
               <XCircle size={12} /> Cancel Booking
             </button>
@@ -962,11 +1694,19 @@ function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, on
 
           {canCompleteNoLease && (
             <button
-              className="inv-btn-sm outline"
-              style={{ borderColor: '#1d4ed8', color: '#1d4ed8' }}
-              onClick={() => onCompleteNoLease(booking)}
+              className="inv-btn-primary"
+              style={{
+                background: '#15803d',
+                opacity: doneWindowActive ? 1 : 0.5,
+                cursor: doneWindowActive ? 'pointer' : 'not-allowed',
+              }}
+              onClick={() => doneWindowActive && onCompleteNoLease(booking)}
+              disabled={!doneWindowActive}
+              title={doneWindowActive
+                ? 'Mark fitting as done'
+                : `Done is active only during the fitting window: ${booking.fittingTime} – ${fittingEndTimeLabel}`}
             >
-              <XCircle size={12} /> Did Not Proceed
+              <CheckCircle size={13} /> Done <ChevronRight size={13} />
             </button>
           )}
 
@@ -980,19 +1720,40 @@ function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, on
             </button>
           )}
 
+          {canProceedToRentalFromConfirmed && (
+            <button
+              className="inv-btn-primary"
+              style={{ background: '#7c3aed' }}
+              onClick={() => onProceedToLease(booking)}
+            >
+              <PackageCheck size={13} /> Skip to Rental <ChevronRight size={13} />
+            </button>
+          )}
+
+          {/* Approved rental: admin confirms physical pickup → transitions to Active Lease */}
+          {!isFitting && booking.status === 'Approved' && (
+            <button
+              className="inv-btn-primary"
+              style={{ background: '#15803d' }}
+              onClick={() => onPickedUp(booking)}
+            >
+              <PackageCheck size={13} /> Picked Up <ChevronRight size={13} />
+            </button>
+          )}
+
           {/* Active Lease: two dedicated action buttons replace the single next-action pattern */}
           {!isFitting && booking.status === 'Active Lease' && (
             <>
               <button
                 className="inv-btn-primary"
-                style={{ background: '#0e7490' }}
+                style={{ background: '#0d9488' }}
                 onClick={() => onReturn(booking)}
               >
                 <RotateCcw size={13} /> Returned <ChevronRight size={13} />
               </button>
               <button
                 className="inv-btn-primary"
-                style={{ background: '#7c3aed' }}
+                style={{ background: '#6b2d39' }}
                 onClick={() => onExtend(booking)}
               >
                 <CalendarIcon size={13} /> Extend <ChevronRight size={13} />
@@ -1000,7 +1761,7 @@ function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, on
             </>
           )}
 
-          {actionDef && !isTerminal && !hasLeaseStarted && booking.status !== 'Active Lease' && (
+          {actionDef && !isTerminal && !hasLeaseStarted && booking.status !== 'Active Lease' && booking.status !== 'Approved' && (
             <button
               className="inv-btn-primary"
               style={{ background: actionDef.color }}
@@ -1017,15 +1778,19 @@ function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, on
 
 // ─── BookingCard ──────────────────────────────────────────────────────────────
 
-function BookingCard({ booking, isFitting, onOpen, onAction, onReturn, onExtend, selected, onSelect }) {
+function BookingCard({ booking, isFitting, onOpen, onAction, onReturn, onExtend, onPickedUp, onCancelBooking, selected, onSelect, fittingDurationMinutes = 30, workingHours = null }) {
   const nextActions = isFitting ? FITTING_NEXT_ACTIONS : DIRECT_NEXT_ACTIONS;
   const actionDef = nextActions[booking.status];
-  const isPast = isFitting && isFittingPast(booking) && booking.status === 'Approved';
+  // isPast = started, within working-hours end window (needs attention)
+  // Once working-hours end passes the booking is expired — no "Past Due" badge shown.
+  const expired = isFitting && booking.status === 'CONFIRMED' && isFittingExpiredByWorkingHours(booking, workingHours);
+  const isPast  = !expired && isFitting && booking.status === 'CONFIRMED' && isFittingInAttentionWindow(booking, fittingDurationMinutes, workingHours);
   const hasLeaseStarted = booking.leaseStarted || booking.leaseBookingId;
-  const isCompletedWithoutLease = isFitting && booking.status === 'COMPLETED' && !hasLeaseStarted;
+  const isCompletedWithoutLease = isFitting && ['COMPLETED', 'Completed'].includes(booking.status) && !hasLeaseStarted;
+  const isBookingToday = !isPast && isToday(booking);
 
   return (
-    <div className={`bk-card ${isPast ? 'bk-card--alert' : ''}`}>
+    <div className={`bk-card ${isPast ? 'bk-card--alert' : ''} ${isBookingToday ? 'bk-card--today' : ''}`}>
       <div className="bk-card-select" onClick={e => e.stopPropagation()}>
         <button className="bk-checkbox-btn" onClick={() => onSelect(booking.id)}>
           {selected ? <CheckSquare size={16} color="#c4717f" /> : <Square size={16} />}
@@ -1038,6 +1803,9 @@ function BookingCard({ booking, isFitting, onOpen, onAction, onReturn, onExtend,
             {booking.customerName}
             {isPast && (
               <span className="bk-overdue-badge"><AlertTriangle size={9} /> Past Due</span>
+            )}
+            {isBookingToday && (
+              <span className="bk-today-badge"><Sun size={9} /> Today</span>
             )}
             {isCompletedWithoutLease && (
               <span className="bk-overdue-badge" style={{ background: 'rgba(29,78,216,0.1)', color: '#1d4ed8' }}>
@@ -1073,17 +1841,53 @@ function BookingCard({ booking, isFitting, onOpen, onAction, onReturn, onExtend,
           <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
             <button
               className="inv-btn-sm"
-              style={{ background: '#0e7490', fontSize: '0.68rem' }}
+              style={{ background: '#0d9488', fontSize: '0.68rem' }}
               onClick={e => { e.stopPropagation(); onReturn(booking); }}
             >
               <RotateCcw size={10} /> Returned
             </button>
             <button
               className="inv-btn-sm"
-              style={{ background: '#7c3aed', fontSize: '0.68rem' }}
+              style={{ background: '#6b2d39', fontSize: '0.68rem' }}
               onClick={e => { e.stopPropagation(); onExtend(booking); }}
             >
               <CalendarIcon size={10} /> Extend
+            </button>
+          </div>
+        ) : !isFitting && booking.status === 'Approved' ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <button
+              className="inv-btn-sm"
+              style={{ background: '#15803d', fontSize: '0.68rem' }}
+              onClick={e => { e.stopPropagation(); onPickedUp(booking); }}
+            >
+              <PackageCheck size={10} /> Picked Up
+            </button>
+            <button
+              className="inv-btn-sm"
+              style={{ background: '#991b1b', fontSize: '0.68rem' }}
+              onClick={e => { e.stopPropagation(); onCancelBooking(booking, isFitting); }}
+            >
+              <XCircle size={10} /> Cancel
+            </button>
+          </div>
+        ) : !isFitting && booking.status === 'Pending' ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            {actionDef && (
+              <button
+                className="inv-btn-sm"
+                style={{ background: actionDef.color, fontSize: '0.7rem' }}
+                onClick={e => { e.stopPropagation(); onAction(booking, actionDef); }}
+              >
+                <actionDef.icon size={10} /> {actionDef.label}
+              </button>
+            )}
+            <button
+              className="inv-btn-sm"
+              style={{ background: '#991b1b', fontSize: '0.68rem' }}
+              onClick={e => { e.stopPropagation(); onCancelBooking(booking, isFitting); }}
+            >
+              <XCircle size={10} /> Cancel
             </button>
           </div>
         ) : (
@@ -1327,7 +2131,11 @@ export default function BookingsManagement() {
   const [toast, setToast] = useState({ show: false, type: 'success', message: '' });
   const [returnModal, setReturnModal] = useState(null);
   const [extendModal, setExtendModal] = useState(null);
+  const [pickedUpModal, setPickedUpModal] = useState(null);
+  const [cancelModal, setCancelModal] = useState(null);
+  const [editRentalDatesModal, setEditRentalDatesModal] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [selectedBookings, setSelectedBookings] = useState(new Set());
   const [bulkAction, setBulkAction] = useState(null);
@@ -1347,9 +2155,10 @@ export default function BookingsManagement() {
     setToast({ show: true, type, message: msg });
   }, []);
 
-  const loadData = useCallback(async (showRefreshIndicator = false) => {
-    if (showRefreshIndicator) setRefreshing(true);
-    else setLoading(true);
+  // mode: 'loading' (initial full-screen), 'refresh' (spinner only), 'silent' (no indicator)
+  const loadData = useCallback(async (mode = 'loading') => {
+    if (mode === 'loading') setLoading(true);
+    else if (mode === 'refresh') setRefreshing(true);
 
     try {
       const [fRes, dRes] = await Promise.all([
@@ -1360,21 +2169,28 @@ export default function BookingsManagement() {
       let fitting = Array.isArray(fRes?.content) ? fRes.content : [];
       let direct = Array.isArray(dRes?.content) ? dRes.content : [];
 
-      let fittingUpdated = false;
-      fitting = fitting.map(booking => {
-        if (booking.status === 'Approved' && isFittingPast(booking)) {
-          fittingUpdated = true;
-          updateFittingBookingStatus(booking.id, 'Completed').catch(console.error);
-          return { ...booking, status: 'Completed', history: booking.history || [] };
-        }
-        return { ...booking, history: booking.history || [], leaseStarted: booking.leaseStarted || false, leaseBookingId: booking.leaseBookingId };
-      });
+      // Normalize backend uppercase statuses to the consistent mixed-case the frontend uses.
+      // e.g. "CANCELLED" → "Cancelled", "COMPLETED" → "Completed"
+      // NOTE: fitting bookings with status "CONFIRMED" are kept as "CONFIRMED" — the backend
+      // auto-confirms them on creation and auto-cancels them if the Done window passes.
+      const normalizeStatus = (s) => {
+        const map = { CANCELLED: 'Cancelled', COMPLETED: 'Completed', REJECTED: 'Rejected' };
+        return map[s] || s;
+      };
 
-      direct = direct.map(booking => ({ ...booking, history: booking.history || [] }));
+      fitting = fitting.map(booking => ({
+        ...booking,
+        status: normalizeStatus(booking.status),
+        history: booking.history || [],
+        leaseStarted: booking.leaseStarted || false,
+        leaseBookingId: booking.leaseBookingId,
+      }));
 
-      if (fittingUpdated) {
-        showToastMsg('success', `${fittingUpdated} past fitting${fittingUpdated > 1 ? 's were' : ' was'} auto-completed`);
-      }
+      direct = direct.map(booking => ({
+        ...booking,
+        bookingStatus: normalizeStatus(booking.bookingStatus),
+        history: booking.history || [],
+      }));
 
       setFittingBookings(fitting);
       setDirectBookings(direct);
@@ -1389,9 +2205,40 @@ export default function BookingsManagement() {
 
   useEffect(() => {
     if (!autoRefresh) return;
-    const interval = setInterval(() => { loadData(false); }, 60000);
+    const interval = setInterval(() => { loadData('silent'); }, 60000);
     return () => clearInterval(interval);
   }, [autoRefresh, loadData]);
+
+  // ── Working-hours expiry watcher ──────────────────────────────────────────
+  // Checks every 30 seconds whether any CONFIRMED fitting booking has crossed
+  // the working-hours end time. When one is detected the data is silently
+  // refreshed so the backend-cancelled status is reflected immediately
+  // without waiting for the 60-second general auto-refresh cycle.
+  useEffect(() => {
+    if (!workingHours) return;
+    const check = () => {
+      const hasExpired = fittingBookings.some(
+        b => b.status === 'CONFIRMED' && isFittingExpiredByWorkingHours(b, workingHours)
+      );
+      if (hasExpired) loadData('silent');
+    };
+    const interval = setInterval(check, 30000);
+    return () => clearInterval(interval);
+  }, [fittingBookings, workingHours, loadData]);
+
+  // ── Approved-rental pickup-deadline watcher ───────────────────────────────
+  // Mirrors the backend autoExpireApprovedBookings logic: silently refreshes
+  // when an Approved booking's startDate + working-hours end time has passed.
+  useEffect(() => {
+    const check = () => {
+      const hasExpired = directBookings.some(
+        b => b.bookingStatus === 'Approved' && isApprovedDirectBookingExpired(b, workingHours)
+      );
+      if (hasExpired) loadData('silent');
+    };
+    const interval = setInterval(check, 30000);
+    return () => clearInterval(interval);
+  }, [directBookings, workingHours, loadData]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -1405,8 +2252,27 @@ export default function BookingsManagement() {
   }, []);
 
   const allBookings = useMemo(() => {
-    const fitting = fittingBookings.map(b => ({ ...b, _type: 'fitting', status: b.status }));
-    const direct = directBookings.map(b => ({ ...b, _type: 'direct', status: b.bookingStatus }));
+    const fitting = fittingBookings.map(b => {
+      // Optimistic cancellation: if the working-hours end time for the booking's day
+      // has passed and the booking is still CONFIRMED, treat it as Cancelled in the UI
+      // immediately. The backend will confirm this on the next poll.
+      let status = b.status;
+      if (
+        status === 'CONFIRMED' &&
+        workingHours &&
+        isFittingExpiredByWorkingHours(b, workingHours)
+      ) {
+        status = 'Cancelled';
+      }
+      return { ...b, _type: 'fitting', status };
+    });
+    const direct = directBookings.map(b => {
+      let status = b.bookingStatus;
+      if (status === 'Approved' && isApprovedDirectBookingExpired(b, workingHours)) {
+        status = 'Cancelled';
+      }
+      return { ...b, _type: 'direct', status };
+    });
 
     let combined = bookingType === 'fitting' ? fitting
                  : bookingType === 'direct'  ? direct
@@ -1414,7 +2280,9 @@ export default function BookingsManagement() {
 
     combined = viewTab === 'active'
       ? combined.filter(b => !TERMINAL.includes(b.status))
-      : combined.filter(b => TERMINAL.includes(b.status));
+      : viewTab === 'cancelled'
+      ? combined.filter(b => ['Cancelled', 'Rejected'].includes(b.status))
+      : combined.filter(b => ['Completed', 'COMPLETED', 'LEASE_CONVERTED'].includes(b.status));
 
     const q = search.toLowerCase();
     if (q) combined = combined.filter(b =>
@@ -1443,33 +2311,49 @@ export default function BookingsManagement() {
     if (priceRangeFilter.min) combined = combined.filter(b => price(b) >= parseFloat(priceRangeFilter.min));
     if (priceRangeFilter.max) combined = combined.filter(b => price(b) <= parseFloat(priceRangeFilter.max));
 
+    const fittingDur = workingHours?.fittingDurationMinutes || 30;
     combined.sort((a, b) => {
-      const aPast = a._type === 'fitting' && isFittingPast(a) && a.status === 'Approved';
-      const bPast = b._type === 'fitting' && isFittingPast(b) && b.status === 'Approved';
+      // Only bookings within the attention window (started, within working hours end) sort to top
+      const aPast = a._type === 'fitting' && a.status === 'CONFIRMED' && isFittingInAttentionWindow(a, fittingDur, workingHours);
+      const bPast = b._type === 'fitting' && b.status === 'CONFIRMED' && isFittingInAttentionWindow(b, fittingDur, workingHours);
+      const aToday = !aPast && isToday(a);
+      const bToday = !bPast && isToday(b);
       if (aPast !== bPast) return aPast ? -1 : 1;
+      if (aToday !== bToday) return aToday ? -1 : 1;
       return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
     });
 
     return combined;
-  }, [fittingBookings, directBookings, bookingType, viewTab, search, filterStat, dateRangeFilter, priceRangeFilter]);
+  }, [fittingBookings, directBookings, bookingType, viewTab, search, filterStat, dateRangeFilter, priceRangeFilter, workingHours]);
 
   const stats = useMemo(() => {
-    const pendingFit   = fittingBookings.filter(b => b.status === 'Pending').length;
+    const pendingFit   = 0; // fitting bookings are auto-confirmed — no Pending state
     const pendingDir   = directBookings.filter(b => b.bookingStatus === 'Pending').length;
-    const approvedFit  = fittingBookings.filter(b => b.status === 'Approved').length;
+    const approvedFit  = fittingBookings.filter(b => b.status === 'CONFIRMED').length;
     const approvedDir  = directBookings.filter(b => b.bookingStatus === 'Approved').length;
     const activeLease  = directBookings.filter(b => b.bookingStatus === 'Active Lease').length;
-    const completedFit = fittingBookings.filter(b => b.status === 'Completed').length;
+    const completedFit = fittingBookings.filter(b => b.status === 'Completed' || b.status === 'COMPLETED').length;
     const completedDir = directBookings.filter(b => b.bookingStatus === 'Completed').length;
-    const pastFitting  = fittingBookings.filter(b => isFittingPast(b) && b.status === 'Approved').length;
+    // Only count fittings whose start has passed AND the working-hours end time
+    // has NOT yet been reached. Bookings past the end time are expired/auto-cancelled
+    // by the backend and must NOT appear in the attention counter.
+    const fittingDuration = workingHours?.fittingDurationMinutes || 30;
+    const pastFitting  = fittingBookings.filter(
+      b => b.status === 'CONFIRMED' &&
+           isFittingInAttentionWindow(b, fittingDuration, workingHours) &&
+           !isFittingExpiredByWorkingHours(b, workingHours)
+    ).length;
+    const cancelledFit = fittingBookings.filter(b => ['Cancelled', 'Rejected'].includes(b.status)).length;
+    const cancelledDir = directBookings.filter(b => ['Cancelled', 'Rejected'].includes(b.bookingStatus)).length;
     return {
       pending: pendingFit + pendingDir,
       approved: approvedFit + approvedDir,
       active: activeLease,
       completed: completedFit + completedDir,
       pastFitting,
+      cancelled: cancelledFit + cancelledDir,
     };
-  }, [fittingBookings, directBookings]);
+  }, [fittingBookings, directBookings, workingHours]);
 
   const toggleSelectAll = useCallback(() => {
     if (selectedBookings.size === allBookings.length) {
@@ -1568,7 +2452,7 @@ export default function BookingsManagement() {
       setNoLeaseModal(null);
     } catch (error) {
       console.error('Error completing fitting without lease:', error);
-      showToastMsg('error', 'Failed to complete fitting');
+      showToastMsg('error', error.message || 'Failed to complete fitting');
     }
   }, [showToastMsg, drawer]);
 
@@ -1576,6 +2460,28 @@ export default function BookingsManagement() {
     fetchItemForLease(booking.itemId);
     setLeaseModal(booking);
   }, [fetchItemForLease]);
+
+  const handlePickedUp = useCallback((booking) => {
+    setPickedUpModal(booking);
+  }, []);
+
+  const confirmPickedUp = useCallback(async () => {
+    if (!pickedUpModal) return;
+    try {
+      await markDirectBookingPickedUp(pickedUpModal.id);
+      setDirectBookings(prev => prev.map(b =>
+        b.id === pickedUpModal.id ? { ...b, bookingStatus: 'Active Lease' } : b
+      ));
+      if (drawer?.id === pickedUpModal.id) {
+        setDrawer(prev => prev ? { ...prev, status: 'Active Lease' } : null);
+      }
+      showToastMsg('success', 'Item picked up — lease is now active');
+      setPickedUpModal(null);
+    } catch (e) {
+      console.error(e);
+      showToastMsg('error', e.message || 'Failed to confirm pickup');
+    }
+  }, [pickedUpModal, drawer, showToastMsg]);
 
   const handleReturnLease = useCallback((booking) => {
     setReturnModal(booking);
@@ -1623,6 +2529,29 @@ export default function BookingsManagement() {
     }
   }, [extendModal, drawer, showToastMsg]);
 
+  const saveRentalDates = useCallback(async ({ startDate, endDate }) => {
+    const booking = editRentalDatesModal;
+    if (!booking) return;
+    try {
+      const updated = await updateDirectBookingDates(booking.id, startDate, endDate);
+      setDirectBookings(prev => prev.map(b =>
+        b.id === booking.id
+          ? { ...b, startDate: updated.startDate, endDate: updated.endDate, totalDays: updated.totalDays, basePrice: updated.basePrice, finalPrice: updated.finalPrice }
+          : b
+      ));
+      if (drawer?.id === booking.id) {
+        setDrawer(prev => prev
+          ? { ...prev, startDate: updated.startDate, endDate: updated.endDate, totalDays: updated.totalDays, basePrice: updated.basePrice, finalPrice: updated.finalPrice }
+          : null);
+      }
+      showToastMsg('success', `Rental dates updated: ${startDate} → ${endDate}`);
+      setEditRentalDatesModal(null);
+    } catch (e) {
+      console.error(e);
+      showToastMsg('error', e.message || 'Failed to update rental dates');
+    }
+  }, [editRentalDatesModal, drawer, showToastMsg]);
+
   const handleLeaseConfirm = useCallback(async (result) => {
     try {
       await authFetch(`/admin/bookings/fitting/${leaseModal.id}/lease-started`, {
@@ -1635,7 +2564,7 @@ export default function BookingsManagement() {
           : b
       ));
       if (result) {
-        setDirectBookings(prev => [...prev, { ...result, _type: 'direct', bookingStatus: result.status || 'Pending' }]);
+        setDirectBookings(prev => [...prev, { ...result, _type: 'direct', bookingStatus: result.bookingStatus || result.status || 'Pending' }]);
       }
       showToastMsg('success', 'Rental booking created successfully!');
       setLeaseModal(null);
@@ -1711,17 +2640,49 @@ export default function BookingsManagement() {
     setBulkAction(null);
   }, [selectedBookings, fittingBookings, directBookings, showToastMsg]);
 
-  const cancelFitting = useCallback(async (id) => {
-    await updateFittingStatus(id, 'Cancelled', 'Cancelled by admin');
-    setDrawer(null);
-  }, [updateFittingStatus]);
+  const handleCancelBooking = useCallback((booking, isFitting) => {
+    setCancelModal({ booking, isFitting });
+  }, []);
 
-  const cancelDirect = useCallback(async (id) => {
-    await updateDirectStatus(id, 'Cancelled', 'Cancelled by admin');
-    setDrawer(null);
-  }, [updateDirectStatus]);
+  const confirmCancelBooking = useCallback(async (reason) => {
+    if (!cancelModal) return;
+    const { booking, isFitting } = cancelModal;
+    try {
+      if (isFitting) {
+        await updateFittingBookingStatus(booking.id, 'Cancelled');
+        setFittingBookings(prev => prev.map(b => {
+          if (b.id === booking.id) {
+            const newHistory = [...(b.history || []), {
+              oldStatus: b.status, newStatus: 'Cancelled',
+              timestamp: new Date().toISOString(), actor: 'Admin', note: reason,
+            }];
+            return { ...b, status: 'Cancelled', history: newHistory };
+          }
+          return b;
+        }));
+      } else {
+        await updateDirectBookingStatus(booking.id, 'Cancelled');
+        setDirectBookings(prev => prev.map(b => {
+          if (b.id === booking.id) {
+            const newHistory = [...(b.history || []), {
+              oldStatus: b.bookingStatus, newStatus: 'Cancelled',
+              timestamp: new Date().toISOString(), actor: 'Admin', note: reason,
+            }];
+            return { ...b, bookingStatus: 'Cancelled', history: newHistory };
+          }
+          return b;
+        }));
+      }
+      if (drawer?.id === booking.id) setDrawer(null);
+      setCancelModal(null);
+      showToastMsg('success', 'Booking cancelled successfully');
+    } catch (e) {
+      console.error(e);
+      showToastMsg('error', e.message || 'Failed to cancel booking');
+    }
+  }, [cancelModal, drawer, showToastMsg]);
 
-  const handleRefresh = useCallback(() => { loadData(true); }, [loadData]);
+  const handleRefresh = useCallback(() => { loadData('refresh'); }, [loadData]);
 
   const handleExport = useCallback((bookingsToExport, format) => {
     const exportData = bookingsToExport.map(b => ({
@@ -1782,6 +2743,9 @@ export default function BookingsManagement() {
     );
   }
 
+  const todayBookings = viewTab === 'active' ? allBookings.filter(b => isToday(b)) : [];
+  const otherBookings = viewTab === 'active' ? allBookings.filter(b => !isToday(b)) : allBookings;
+
   return (
     <div className="bk-root">
 
@@ -1797,6 +2761,9 @@ export default function BookingsManagement() {
           </div>
           <button className="inv-icon-btn" onClick={handleRefresh} disabled={refreshing} title="Refresh now">
             <RefreshCw size={16} className={refreshing ? 'inv-spinner-inline' : ''} />
+          </button>
+          <button className="inv-btn-primary" onClick={() => setShowCreateModal(true)}>
+            <Plus size={14} /> New Booking
           </button>
           <button className="inv-btn-primary" onClick={() => setShowSettings(true)}>
             <Settings size={14} /> Settings
@@ -1825,12 +2792,12 @@ export default function BookingsManagement() {
         <div className="bk-alert-banner">
           <AlertTriangle size={15} />
           <span>
-            <b>{stats.pastFitting}</b> fitting appointment{stats.pastFitting > 1 ? 's have' : ' has'} passed their scheduled time and need attention.
+            <b>{stats.pastFitting}</b> fitting appointment{stats.pastFitting > 1 ? 's have' : ' has'} passed their scheduled time and {stats.pastFitting > 1 ? 'need' : 'needs'} attention.
           </span>
           <button
             className="inv-btn-sm"
             style={{ background: '#b45309', marginLeft: 'auto' }}
-            onClick={() => { setBookingType('fitting'); setViewTab('active'); setFilterStat('Approved'); }}
+            onClick={() => { setBookingType('fitting'); setViewTab('active'); setFilterStat('CONFIRMED'); }}
           >
             View Now
           </button>
@@ -1838,11 +2805,15 @@ export default function BookingsManagement() {
       )}
 
       <div className="inv-tabs">
-        <button className={`inv-tab ${viewTab === 'active' ? 'active' : ''}`} onClick={() => setViewTab('active')}>
+        <button className={`inv-tab ${viewTab === 'active' ? 'active' : ''}`} onClick={() => { setViewTab('active'); setFilterStat('All'); }}>
           <PackageCheck size={14} /> Active Bookings
         </button>
-        <button className={`inv-tab ${viewTab === 'completed' ? 'active' : ''}`} onClick={() => setViewTab('completed')}>
+        <button className={`inv-tab ${viewTab === 'completed' ? 'active' : ''}`} onClick={() => { setViewTab('completed'); setFilterStat('All'); }}>
           <Star size={14} /> Completed &amp; Archived
+        </button>
+        <button className={`inv-tab ${viewTab === 'cancelled' ? 'active' : ''}`} onClick={() => { setViewTab('cancelled'); setFilterStat('All'); }}>
+          <XCircle size={14} /> Cancelled
+          {stats.cancelled > 0 && <span className="bk-tab-count">{stats.cancelled}</span>}
         </button>
       </div>
 
@@ -1868,15 +2839,19 @@ export default function BookingsManagement() {
               {viewTab === 'active' ? (
                 <>
                   <option value="Pending">Pending</option>
+                  <option value="CONFIRMED">Confirmed (Fitting)</option>
                   <option value="Approved">Approved</option>
                   <option value="Active Lease">Active Lease</option>
                   <option value="Returned">Returned</option>
                 </>
+              ) : viewTab === 'cancelled' ? (
+                <>
+                  <option value="Cancelled">Cancelled</option>
+                  <option value="Rejected">Rejected</option>
+                </>
               ) : (
                 <>
                   <option value="Completed">Completed</option>
-                  <option value="Rejected">Rejected</option>
-                  <option value="Cancelled">Cancelled</option>
                   <option value="LEASE_CONVERTED">Lease Converted</option>
                 </>
               )}
@@ -1956,21 +2931,59 @@ export default function BookingsManagement() {
         {allBookings.length === 0 ? (
           <div className="inv-card" style={{ textAlign: 'center', padding: '3rem', color: '#ccc' }}>
             <ShoppingBag size={32} style={{ opacity: 0.3, marginBottom: 12 }} />
-            <p style={{ margin: 0 }}>{viewTab === 'active' ? 'No active bookings found.' : 'No completed bookings found.'}</p>
+            <p style={{ margin: 0 }}>
+              {viewTab === 'active' ? 'No active bookings found.' : viewTab === 'cancelled' ? 'No cancelled bookings.' : 'No completed bookings found.'}
+            </p>
           </div>
-        ) : allBookings.map(b => (
-          <BookingCard
-            key={b.id}
-            booking={b}
-            isFitting={b._type === 'fitting'}
-            onOpen={setDrawer}
-            onAction={(booking, actionDef) => setActionModal({ booking, actionDef, isFitting: booking._type === 'fitting' })}
-            onReturn={handleReturnLease}
-            onExtend={handleExtendLease}
-            selected={selectedBookings.has(b.id)}
-            onSelect={toggleSelect}
-          />
-        ))}
+        ) : (
+          <>
+            {todayBookings.length > 0 && (
+              <>
+                <div className="bk-section-divider bk-section-divider--today">
+                  <Sun size={13} /> Today's Bookings
+                  <span className="bk-section-count">{todayBookings.length}</span>
+                </div>
+                {todayBookings.map(b => (
+                  <BookingCard
+                    key={b.id}
+                    booking={b}
+                    isFitting={b._type === 'fitting'}
+                    onOpen={setDrawer}
+                    onAction={(booking, actionDef) => setActionModal({ booking, actionDef, isFitting: booking._type === 'fitting' })}
+                    onReturn={handleReturnLease}
+                    onExtend={handleExtendLease}
+                    onPickedUp={handlePickedUp}
+                    onCancelBooking={handleCancelBooking}
+                    selected={selectedBookings.has(b.id)}
+                    onSelect={toggleSelect}
+                    fittingDurationMinutes={workingHours?.fittingDurationMinutes || 30}
+                    workingHours={workingHours}
+                  />
+                ))}
+                {otherBookings.length > 0 && (
+                  <div className="bk-section-divider">Other Bookings</div>
+                )}
+              </>
+            )}
+            {otherBookings.map(b => (
+              <BookingCard
+                key={b.id}
+                booking={b}
+                isFitting={b._type === 'fitting'}
+                onOpen={setDrawer}
+                onAction={(booking, actionDef) => setActionModal({ booking, actionDef, isFitting: booking._type === 'fitting' })}
+                onReturn={handleReturnLease}
+                onExtend={handleExtendLease}
+                onPickedUp={handlePickedUp}
+                onCancelBooking={handleCancelBooking}
+                selected={selectedBookings.has(b.id)}
+                onSelect={toggleSelect}
+                fittingDurationMinutes={workingHours?.fittingDurationMinutes || 30}
+                workingHours={workingHours}
+              />
+            ))}
+          </>
+        )}
       </div>
 
       {drawer && (
@@ -1978,12 +2991,14 @@ export default function BookingsManagement() {
           booking={drawer}
           isFitting={drawer._type === 'fitting'}
           onAction={(b, a) => setActionModal({ booking: b, actionDef: a, isFitting: b._type === 'fitting' })}
-          onCancel={(id, isFit) => isFit ? cancelFitting(id) : cancelDirect(id)}
+          onCancel={(bk, isFit) => handleCancelBooking(bk, isFit)}
           onEditFitting={setEditFittingModal}
+          onEditRentalDates={setEditRentalDatesModal}
           onCompleteNoLease={setNoLeaseModal}
           onProceedToLease={handleProceedToLease}
           onReturn={handleReturnLease}
           onExtend={handleExtendLease}
+          onPickedUp={handlePickedUp}
           onClose={() => setDrawer(null)}
           workingHours={workingHours}
         />
@@ -2014,6 +3029,22 @@ export default function BookingsManagement() {
         />
       )}
 
+      {pickedUpModal && (
+        <PickedUpModal
+          booking={pickedUpModal}
+          onConfirm={confirmPickedUp}
+          onClose={() => setPickedUpModal(null)}
+        />
+      )}
+
+      {cancelModal && (
+        <CancelConfirmModal
+          booking={cancelModal.booking}
+          onConfirm={confirmCancelBooking}
+          onClose={() => setCancelModal(null)}
+        />
+      )}
+
       {returnModal && (
         <ReturnLeaseModal
           booking={returnModal}
@@ -2027,6 +3058,16 @@ export default function BookingsManagement() {
           booking={extendModal}
           onConfirm={confirmExtendLease}
           onClose={() => setExtendModal(null)}
+          bookingSettings={workingHours}
+        />
+      )}
+
+      {editRentalDatesModal && (
+        <EditRentalDatesModal
+          booking={editRentalDatesModal}
+          onSave={saveRentalDates}
+          onClose={() => setEditRentalDatesModal(null)}
+          workingHours={workingHours}
         />
       )}
 
@@ -2066,6 +3107,13 @@ export default function BookingsManagement() {
             setLeaseModal(null);
             setItemDetailsForLease(null);
           }}
+        />
+      )}
+
+      {showCreateModal && (
+        <CreateBookingModal
+          onSuccess={() => { loadData('refresh'); setShowCreateModal(false); }}
+          onClose={() => setShowCreateModal(false)}
         />
       )}
 
