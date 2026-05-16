@@ -246,7 +246,7 @@ function MediaGallery({ item, startIndex = 0, onClose }) {
       <div className="inv-lightbox-inner" onClick={e => e.stopPropagation()}>
         <div className="inv-lightbox-topbar">
           <span className="inv-lightbox-itemname">{item.name}</span>
-          <span className="inv-lightbox-catnote">{item.category}{item.subtype ? ` · ${item.subtype}` : ''} · Size {item.size}</span>
+          <span className="inv-lightbox-catnote">{item.category}{item.subtype ? ` · ${item.subtype}` : ''}{(Array.isArray(item.sizes) && item.sizes.length ? ` · Size ${item.sizes.join(', ')}` : item.size ? ` · Size ${item.size}` : '')}</span>
         </div>
         <div className="inv-gallery-stage">
           {current.type === 'video'
@@ -692,7 +692,7 @@ function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, c
         customerName:   form.name,
         customerEmail:  form.email,
         customerPhone:  form.phone,
-        preferredSize:  form.preferredSize || item.size,
+        preferredSize:  form.preferredSize || (Array.isArray(item.sizes) ? item.sizes[0] : item.size) || '',
       });
       onSuccess({
         id:            result.id,
@@ -914,7 +914,7 @@ function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, c
               <label className="inv-field-label">Preferred Size</label>
               <select className="inv-select" value={form.preferredSize} onChange={e => setForm(p => ({ ...p, preferredSize: e.target.value }))} disabled={submitting} style={{ width:'100%' }}>
                 <option value="">Select size (optional)</option>
-                {['XS','S','M','L','XL','XXL'].map(s => <option key={s}>{s}</option>)}
+                {(Array.isArray(item.sizes) && item.sizes.length ? item.sizes : item.size ? [item.size] : ['XS','S','M','L','XL','XXL','3XL']).map(s => <option key={s}>{s}</option>)}
               </select>
             </div>
           </div>
@@ -1244,7 +1244,14 @@ export default function BrowseOutfitsFragment() {
     return [...new Set(availableItems.filter(i => i.category === filterCat).map(i => i.subtype).filter(Boolean))].sort();
   }, [availableItems, filterCat]);
   useEffect(() => { setFilterSubcat('All'); }, [filterCat]);
-  const sizes = useMemo(() => [...new Set(availableItems.map(i => i.size))].sort(), [availableItems]);
+  const sizes = useMemo(() => {
+    const all = new Set();
+    availableItems.forEach(i => {
+      if (Array.isArray(i.sizes)) i.sizes.forEach(s => all.add(s));
+      else if (i.size) all.add(i.size);
+    });
+    return [...all].sort();
+  }, [availableItems]);
 
   // Filter out items that the user has already booked
   const visibleItems = useMemo(() => availableItems.filter(i => {
@@ -1254,7 +1261,7 @@ export default function BrowseOutfitsFragment() {
     return (!q || i.name.toLowerCase().includes(q) || i.category.toLowerCase().includes(q) || (i.subtype||'').toLowerCase().includes(q))
       && (filterCat === 'All'    || i.category === filterCat)
       && (filterSubcat === 'All' || i.subtype  === filterSubcat)
-      && (filterSize === 'All'   || i.size     === filterSize);
+      && (filterSize === 'All'   || (Array.isArray(i.sizes) ? i.sizes.includes(filterSize) : i.size === filterSize));
   }), [availableItems, search, filterCat, filterSubcat, filterSize, bookedItemIds]);
 
   const handleBookingSubmit = async () => {
@@ -1286,7 +1293,7 @@ export default function BrowseOutfitsFragment() {
         fittingDate: booking.fittingDate,
         fittingTime: to24Hour(booking.fittingTime),  
         customerName: booking.name, customerEmail: booking.email, customerPhone: booking.phone,
-        preferredSize: booking.preferredSize || selectedItem.size,
+        preferredSize: booking.preferredSize || (Array.isArray(selectedItem.sizes) ? selectedItem.sizes[0] : selectedItem.size) || '',
         notes: booking.notes, userId: currentUser.id || null,
       });
       const confirmation = {
@@ -1294,7 +1301,7 @@ export default function BrowseOutfitsFragment() {
         item: selectedItem,
         date: booking.fittingDate, time: booking.fittingTime,
         customerName: booking.name, customerEmail: booking.email, customerPhone: booking.phone,
-        preferredSize: booking.preferredSize || selectedItem.size,
+        preferredSize: booking.preferredSize || (Array.isArray(selectedItem.sizes) ? selectedItem.sizes[0] : selectedItem.size) || '',
         notes: booking.notes, status: 'confirmed', createdAt: new Date().toISOString(),
       };
       setBookingConfirmed(confirmation);
@@ -1441,7 +1448,9 @@ export default function BrowseOutfitsFragment() {
                     <div className="inv-grid-meta">
                       <span className="inv-cat-tag">{item.category}</span>
                       {item.subtype && <span className="inv-subtype-tag">{item.subtype}</span>}
-                      <span className="inv-grid-size">{item.size}</span>
+                      {(Array.isArray(item.sizes) ? item.sizes : item.size ? [item.size] : []).length > 0 && (
+                        <span className="inv-grid-size">{(Array.isArray(item.sizes) ? item.sizes : [item.size]).join(', ')}</span>
+                      )}
                     </div>
                     <div className="inv-grid-price-row">
                       {promo
@@ -1564,7 +1573,7 @@ export default function BrowseOutfitsFragment() {
                       </td>
                       <td><span className="inv-cat-tag">{item.category}</span></td>
                       <td><span className="inv-subtype-tag">{item.subtype}</span></td>
-                      <td>{item.size}</td>
+                      <td>{Array.isArray(item.sizes) ? item.sizes.join(', ') : item.size || '—'}</td>
                       <td>
                         {promo
                           ? <div><div className="inv-price-old">₱{item.price.toLocaleString()}</div><div className="inv-price-new">₱{Math.round(price).toLocaleString()}</div></div>
@@ -1690,8 +1699,7 @@ export default function BrowseOutfitsFragment() {
                     {[
                       ['Category', selectedItem.category],
                       ['Type', selectedItem.subtype],
-                      ['Size', selectedItem.size],
-                      ['Color', selectedItem.color],
+                      ['Sizes', Array.isArray(selectedItem.sizes) && selectedItem.sizes.length ? selectedItem.sizes.join(', ') : (selectedItem.size || null)],
                       ['Age Range', selectedItem.ageRange],
                       ['Daily Rate', promo
                         ? <><span style={{ textDecoration:'line-through', color:'#bbb', marginRight:'0.4rem' }}>₱{selectedItem.price.toLocaleString()}</span><strong style={{ color:'#15803d' }}>₱{Math.round(price).toLocaleString()}</strong></>
@@ -1908,7 +1916,7 @@ export default function BrowseOutfitsFragment() {
                   <label className="inv-field-label">Preferred Size</label>
                   <select className="inv-select" value={booking.preferredSize} onChange={e => setBooking(p => ({ ...p, preferredSize: e.target.value }))} disabled={submitting}>
                     <option value="">Select size (optional)</option>
-                    {['XS','S','M','L','XL','XXL'].map(s => <option key={s}>{s}</option>)}
+                    {(Array.isArray(selectedItem?.sizes) && selectedItem.sizes.length ? selectedItem.sizes : selectedItem?.size ? [selectedItem.size] : ['XS','S','M','L','XL','XXL','3XL']).map(s => <option key={s}>{s}</option>)}
                   </select>
                 </div>
                 <div className="inv-field">

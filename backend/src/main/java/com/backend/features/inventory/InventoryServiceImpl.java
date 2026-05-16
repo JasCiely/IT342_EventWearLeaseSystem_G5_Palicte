@@ -137,8 +137,7 @@ public class InventoryServiceImpl implements InventoryService {
         item.setName(r.getName());
         item.setCategory(r.getCategory());
         item.setSubtype(r.getSubtype());
-        item.setSize(r.getSize());
-        item.setColor(r.getColor());
+        item.setSize(r.getSizes() != null ? String.join(",", r.getSizes()) : null);
         item.setPrice(r.getPrice());
         item.setStatus(r.getStatus() != null ? r.getStatus() : "Available");
         item.setAgeRange(r.getAgeRange());
@@ -175,8 +174,7 @@ public class InventoryServiceImpl implements InventoryService {
         r.setName(item.getName());
         r.setCategory(item.getCategory());
         r.setSubtype(item.getSubtype());
-        r.setSize(item.getSize());
-        r.setColor(item.getColor());
+        r.setSizes(parseList(item.getSize()));
         r.setPrice(item.getPrice());
         r.setStatus(item.getStatus());
         r.setAgeRange(item.getAgeRange());

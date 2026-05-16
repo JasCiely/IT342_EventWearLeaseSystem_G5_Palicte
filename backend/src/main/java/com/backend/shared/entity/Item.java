@@ -27,7 +27,6 @@ public class Item {
 
     private String subtype;
     private String size;
-    private String color;
 
     @Column(nullable = false)
     private Double price;

@@ -8,8 +8,7 @@ public class ItemRequest {
     private String name;
     private String category;
     private String subtype;
-    private String size;
-    private String color;
+    private List<String> sizes;
     private Double price;
     private String status;
     private String ageRange;

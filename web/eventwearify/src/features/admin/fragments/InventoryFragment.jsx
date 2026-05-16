@@ -6,7 +6,7 @@ import {
   ChevronDown, ChevronLeft, ChevronRight, Loader2, Sparkles,
 } from 'lucide-react';
 import {
-  CATEGORIES, CATEGORY_MAP, SIZES, COLORS, COLOR_SWATCHES, LIGHT_COLORS,
+  CATEGORIES, CATEGORY_MAP, SIZES,
   CAT_COLORS, ITEM_STATUS_META, MANUAL_ITEM_STATUSES,
   todayStr, fmtDate,
 } from '../../../shared/constants/sharedData.js';
@@ -134,7 +134,7 @@ function MediaGallery({ item, startIndex = 0, onClose }) {
       <div className="inv-lightbox-inner" onClick={e => e.stopPropagation()}>
         <div className="inv-lightbox-topbar">
           <span className="inv-lightbox-itemname">{item.name}</span>
-          <span className="inv-lightbox-catnote">{item.category}{item.subtype ? ` · ${item.subtype}` : ''} · Size {item.size}</span>
+          <span className="inv-lightbox-catnote">{item.category}{item.subtype ? ` · ${item.subtype}` : ''}{(Array.isArray(item.sizes) && item.sizes.length ? ` · Size ${item.sizes.join(', ')}` : item.size ? ` · Size ${item.size}` : '')}</span>
         </div>
         <div className="inv-gallery-stage"
           onTouchStart={e => { touchX.current = e.touches[0].clientX; }}
@@ -511,7 +511,7 @@ function GroupedItemCheckboxes({ items, selected, onChange }) {
                               <div className="inv-group-item-info">
                                 <span className="inv-group-item-name">{item.name}</span>
                                 <span className="inv-group-item-sub">
-                                  Size: {item.size} · Color: {item.color} · ₱{item.price.toLocaleString()}
+                                  {Array.isArray(item.sizes) && item.sizes.length ? `Size: ${item.sizes.join(', ')} · ` : ''}₱{item.price.toLocaleString()}
                                 </span>
                               </div>
                             </label>
@@ -648,7 +648,7 @@ export default function InventoryFragment() {
     loadSettings();
   }, []);
 
-  const blank      = { name:'', category:'', subtype:'', size:'', color:'Ivory', price:'', status:'Available', mediaFiles:[], ageRange:'', description:'' };
+  const blank      = { name:'', category:'', subtype:'', sizes:[], price:'', status:'Available', mediaFiles:[], ageRange:'', description:'' };
   const blankPromo = { code:'', type:'percentage', value:'', items:[], start:'', end:'', active:true };
   const [form,      setForm]      = useState(blank);
   const [promoForm, setPromoForm] = useState(blankPromo);
@@ -714,7 +714,6 @@ export default function InventoryFragment() {
     if (!finalForm.name.trim())                               e.name     = 'Item name is required.';
     if (!finalForm.category)                                  e.category = 'Category is required.';
     if (!finalForm.subtype || finalForm.subtype === 'Others') e.subtype  = 'Please specify the type.';
-    if (!finalForm.size)                                      e.size     = 'Size is required.';
     if (!finalForm.price || Number(finalForm.price) <= 0)    e.price    = 'Valid price is required.';
     if (Object.keys(e).length) { setErrors(e); return; }
 
@@ -725,7 +724,7 @@ export default function InventoryFragment() {
 
     const itemData = {
       name: finalForm.name, category: finalForm.category,
-      subtype: finalSubtype, size: finalForm.size, color: finalForm.color,
+      subtype: finalSubtype, sizes: finalForm.sizes || [],
       price: Number(finalForm.price), status: finalForm.status,
       ageRange: finalForm.ageRange, description: finalForm.description,
     };
@@ -855,7 +854,7 @@ export default function InventoryFragment() {
       file: null, url: mf.url, type: mf.type,
       name: mf.url.split('/').pop(), isExisting: true,
     }));
-    setForm({ ...item, price: String(item.price), mediaFiles: existingMedia });
+    setForm({ ...item, price: String(item.price), mediaFiles: existingMedia, sizes: Array.isArray(item.sizes) ? item.sizes : (item.size ? [item.size] : []) });
     setSelected(item); setErrors({}); setModal('edit');
   };
 
@@ -991,7 +990,9 @@ export default function InventoryFragment() {
                       <div className="inv-grid-meta">
                         <span className="inv-cat-tag">{item.category}</span>
                         {item.subtype && <span className="inv-subtype-tag">{item.subtype}</span>}
-                        <span className="inv-grid-size">{item.size}</span>
+                        {(Array.isArray(item.sizes) ? item.sizes : item.size ? [item.size] : []).length > 0 && (
+                          <span className="inv-grid-size">{(Array.isArray(item.sizes) ? item.sizes : [item.size]).join(', ')}</span>
+                        )}
                       </div>
                       <div className="inv-grid-price-row">
                         {promo ? (
@@ -1062,7 +1063,7 @@ export default function InventoryFragment() {
                         </td>
                         <td><span className="inv-cat-tag">{item.category}</span></td>
                         <td><span className="inv-subtype-tag">{item.subtype}</span></td>
-                        <td>{item.size}</td>
+                        <td>{Array.isArray(item.sizes) ? item.sizes.join(', ') : item.size || '—'}</td>
                         <td>
                           {promo ? (
                             <div>
@@ -1138,14 +1139,34 @@ export default function InventoryFragment() {
       {/* ══ MODAL: Add / Edit Item ══ */}
       {(modal==='add'||modal==='edit') && (
         <div className="inv-overlay" onClick={closeModal}>
-          <div className="inv-modal" onClick={e=>e.stopPropagation()}>
-            <div className="inv-modal-header">
-              <h3>{modal==='add'?'Add New Item':'Edit Item'}</h3>
+          <div className="inv-modal inv-modal-form" onClick={e=>e.stopPropagation()}>
+
+            {/* Header */}
+            <div className="inv-modal-header inv-modal-header-form">
+              <div className="inv-modal-header-left">
+                <div className="inv-modal-form-icon">
+                  {modal==='add' ? <Plus size={16}/> : <Edit2 size={14}/>}
+                </div>
+                <div>
+                  <h3>{modal==='add'?'Add New Item':'Edit Item'}</h3>
+                  <p className="inv-modal-subtitle">
+                    {modal==='add'
+                      ? 'Fill in the details below to add a new item to your inventory.'
+                      : 'Update the item information below.'}
+                  </p>
+                </div>
+              </div>
               <button className="inv-modal-close" onClick={closeModal} disabled={saving}><X size={15}/></button>
             </div>
+
             <div className="inv-modal-body">
-              <div className="inv-field">
-                <label className="inv-field-label">Photos / Videos <span className="inv-required">*</span></label>
+
+              {/* ── Section: Media ── */}
+              <div className="inv-form-section">
+                <div className="inv-form-section-label">
+                  <Image size={11}/> Photos &amp; Videos
+                  <span className="inv-required-inline">* required</span>
+                </div>
                 <MediaDropZone
                   files={form.mediaFiles||[]}
                   hasError={!!errors.media}
@@ -1153,136 +1174,193 @@ export default function InventoryFragment() {
                 />
                 {errors.media && <span className="inv-field-error"><AlertCircle size={11}/> {errors.media}</span>}
               </div>
-              <p className="inv-required-note"><span className="inv-required">*</span> Required fields</p>
-              <div className="inv-modal-grid">
-                <div className="inv-field inv-field-full">
+
+              {/* ── Section: Basic Info ── */}
+              <div className="inv-form-section">
+                <div className="inv-form-section-label">
+                  <Tag size={11}/> Basic Information
+                  <span className="inv-required-inline">* required fields</span>
+                </div>
+                <div className="inv-field">
                   <label className="inv-field-label">Item Name <span className="inv-required">*</span></label>
-                  <input className={`inv-input${errors.name?' inv-input-err':''}`} value={form.name}
+                  <input
+                    className={`inv-input${errors.name?' inv-input-err':''}`}
+                    value={form.name}
                     onChange={e=>{ setF({name:e.target.value}); setErrors(p=>({...p,name:undefined})); }}
-                    placeholder="e.g. Ivory Lace Ballgown" disabled={saving}/>
+                    placeholder="e.g. Ivory Lace Ballgown"
+                    disabled={saving}
+                  />
                   <ErrMsg field="name"/>
                 </div>
-                <div className="inv-field-full inv-modal-grid" style={{gap:'0.75rem'}}>
+                <div className="inv-modal-grid" style={{gap:'0.75rem'}}>
                   <div className="inv-field">
                     <label className="inv-field-label">Category <span className="inv-required">*</span></label>
-                    <select className={`inv-input${errors.category?' inv-input-err':''}`} value={form.category}
-                      onChange={e=>{ 
-                        setF({category:e.target.value, subtype:''}); 
-                        setErrors(p=>({...p,category:undefined,subtype:undefined}));
-                      }}
-                      disabled={saving}>
+                    <select
+                      className={`inv-input${errors.category?' inv-input-err':''}`}
+                      value={form.category}
+                      onChange={e=>{ setF({category:e.target.value, subtype:''}); setErrors(p=>({...p,category:undefined,subtype:undefined})); }}
+                      disabled={saving}
+                    >
                       <option value="">— Select category —</option>
                       {CATEGORIES.map(c=><option key={c}>{c}</option>)}
                     </select>
                     <ErrMsg field="category"/>
                     {!form.category && (
-                      <span className="inv-field-hint" style={{color:'#c4717f', marginTop:'0.25rem'}}>
-                        ⚠ Please select a category first to see available types
+                      <span className="inv-field-hint inv-field-hint-warn">
+                        Select a category first to unlock available types
                       </span>
                     )}
                   </div>
-                  {form.category && form.category !== '' && (
-                    <div className="inv-field">
-                      <label className="inv-field-label">Type / Subtype <span className="inv-required">*</span></label>
-                      <select className={`inv-input${errors.subtype?' inv-input-err':''}`} value={_subtypeSelectVal}
-                        onChange={e=>{ 
-                          setF({subtype:e.target.value}); 
-                          setCustomSubtype(''); 
-                          setErrors(p=>({...p,subtype:undefined}));
-                        }}
-                        disabled={saving}>
-                        <option value="">— Select type —</option>
-                        {_subtypeVisible.map(s=><option key={s}>{s}</option>)}
-                      </select>
-                      {_subtypeShowCustom && (
-                        <input className="inv-input" style={{marginTop:'0.5rem'}} value={customSubtype}
-                          onChange={e=>setCustomSubtype(e.target.value)} 
-                          placeholder="Type new subtype…" 
-                          disabled={saving}/>
-                      )}
-                      <ErrMsg field="subtype"/>
-                      <span className="inv-field-hint">
-                        Select a type or choose "Others" to add a new one
-                      </span>
-                    </div>
-                  )}
+                  <div className="inv-field">
+                    <label className="inv-field-label">Type / Subtype <span className="inv-required">*</span></label>
+                    {!form.category ? (
+                      <div className="inv-select-locked">
+                        <span>Select a category first</span>
+                      </div>
+                    ) : (
+                      <>
+                        <select
+                          className={`inv-input${errors.subtype?' inv-input-err':''}`}
+                          value={_subtypeSelectVal}
+                          onChange={e=>{ setF({subtype:e.target.value}); setCustomSubtype(''); setErrors(p=>({...p,subtype:undefined})); }}
+                          disabled={saving}
+                        >
+                          <option value="">— Select type —</option>
+                          {_subtypeVisible.map(s=><option key={s}>{s}</option>)}
+                        </select>
+                        {_subtypeShowCustom && (
+                          <input
+                            className="inv-input"
+                            style={{marginTop:'0.5rem'}}
+                            value={customSubtype}
+                            onChange={e=>setCustomSubtype(e.target.value)}
+                            placeholder="Enter new subtype name…"
+                            disabled={saving}
+                          />
+                        )}
+                        <ErrMsg field="subtype"/>
+                        {!errors.subtype && (
+                          <span className="inv-field-hint">Choose "Others" to add a custom type</span>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
-                <div className="inv-field">
-                  <label className="inv-field-label">Size <span className="inv-required">*</span></label>
-                  <select className={`inv-input${errors.size?' inv-input-err':''}`} value={form.size}
-                    onChange={e=>{ setF({size:e.target.value}); setErrors(p=>({...p,size:undefined})); }}
-                    disabled={saving}>
-                    <option value="">— Select size —</option>
-                    {SIZES.map(s=><option key={s}>{s}</option>)}
-                  </select>
-                  <ErrMsg field="size"/>
+              </div>
+
+              {/* ── Section: Pricing & Details ── */}
+              <div className="inv-form-section">
+                <div className="inv-form-section-label">
+                  <Package size={11}/> Pricing &amp; Details
                 </div>
-                <div className="inv-field">
-                  <label className="inv-field-label">Color</label>
-                  <div className="inv-color-wrap">
-                    <div className="inv-color-swatches">
-                      {COLORS.map(c => {
-                        const sw = COLOR_SWATCHES[c] || '#ccc';
-                        const isLight = LIGHT_COLORS.includes(c);
+                <div className="inv-modal-grid">
+
+                  {/* Sizes — full width pill selector */}
+                  <div className="inv-field inv-field-full">
+                    <label className="inv-field-label">
+                      Available Sizes
+                      <span className="inv-optional-tag">optional · select all that apply</span>
+                    </label>
+                    <div className="inv-size-pills">
+                      {SIZES.map(s => {
+                        const active = (form.sizes || []).includes(s);
                         return (
-                          <button key={c} type="button"
-                            className={`inv-swatch${form.color===c?' active':''}`}
-                            style={{ background:sw, border: isLight ? '1.5px solid #e4e2df' : '1.5px solid transparent' }}
-                            title={c} onClick={()=>setF({color:c})} disabled={saving}>
-                            {form.color===c && <span className="inv-swatch-check" style={{color: isLight ? '#555' : '#fff'}}>✓</span>}
+                          <button
+                            key={s}
+                            type="button"
+                            className={`inv-size-pill${active?' active':''}`}
+                            onClick={()=>{ if(saving) return; const cur=form.sizes||[]; setF({sizes:active?cur.filter(x=>x!==s):[...cur,s]}); }}
+                            disabled={saving}
+                          >
+                            {s}
                           </button>
                         );
                       })}
+                      {(form.sizes||[]).length > 0 && (
+                        <button
+                          type="button"
+                          className="inv-size-pill-clear"
+                          onClick={()=>setF({sizes:[]})}
+                          disabled={saving}
+                        >
+                          Clear
+                        </button>
+                      )}
                     </div>
-                    <input className="inv-input inv-color-input" value={form.color}
-                      onChange={e=>setF({color:e.target.value})} placeholder="Or type a color…" disabled={saving}/>
+                    {(form.sizes||[]).length > 0 && (
+                      <span className="inv-field-hint" style={{color:'#6b2d39'}}>
+                        Selected: {form.sizes.join(', ')}
+                      </span>
+                    )}
                   </div>
-                </div>
-                <div className="inv-field">
-                  <label className="inv-field-label">Rental Price (₱) <span className="inv-required">*</span></label>
-                  <input className={`inv-input${errors.price?' inv-input-err':''}`} type="number" min="0" value={form.price}
-                    onChange={e=>{ setF({price:e.target.value}); setErrors(p=>({...p,price:undefined})); }}
-                    placeholder="0" disabled={saving}/>
-                  <ErrMsg field="price"/>
-                </div>
-                <div className="inv-field">
-                  <label className="inv-field-label">Status</label>
-                  <select className="inv-input" value={form.status} onChange={e=>setF({status:e.target.value})} disabled={saving}>
-                    {MANUAL_ITEM_STATUSES.map(s=><option key={s}>{s}</option>)}
-                  </select>
-                  <span className="inv-field-hint">Note: "Ready for Rental" is set automatically after inspection.</span>
-                </div>
-                <div className="inv-field">
-                  <label className="inv-field-label">
-                    Estimated Age Range
-                    <span className="inv-optional-tag">optional</span>
-                  </label>
-                  <div className="inv-age-range-wrap">
-                    <input className="inv-input inv-age-input" type="number" min="0" max="120"
-                      value={form.ageRange?.split('–')[0] || ''}
-                      onChange={e => { const from=e.target.value; const to=form.ageRange?.split('–')[1]||''; setF({ageRange:from||to?`${from}–${to}`:''}); }}
-                      placeholder="From" disabled={saving}/>
-                    <span className="inv-age-sep">–</span>
-                    <input className="inv-input inv-age-input" type="number" min="0" max="120"
-                      value={form.ageRange?.split('–')[1] || ''}
-                      onChange={e => { const to=e.target.value; const from=form.ageRange?.split('–')[0]||''; setF({ageRange:from||to?`${from}–${to}`:''}); }}
-                      placeholder="To" disabled={saving}/>
-                    <span className="inv-age-unit">yrs</span>
+
+                  <div className="inv-field">
+                    <label className="inv-field-label">Rental Price (₱) <span className="inv-required">*</span></label>
+                    <div className="inv-price-input-wrap">
+                      <span className="inv-price-prefix">₱</span>
+                      <input
+                        className={`inv-input inv-price-input${errors.price?' inv-input-err':''}`}
+                        type="number" min="0"
+                        value={form.price}
+                        onChange={e=>{ setF({price:e.target.value}); setErrors(p=>({...p,price:undefined})); }}
+                        placeholder="0.00"
+                        disabled={saving}
+                      />
+                    </div>
+                    <ErrMsg field="price"/>
                   </div>
-                  <span className="inv-field-hint">e.g. 18–35 yrs — helps clients find the right fit</span>
-                </div>
-                <div className="inv-field inv-field-full">
-                  <label className="inv-field-label">Description</label>
-                  <textarea className="inv-textarea" rows={3} value={form.description}
-                    onChange={e=>setF({description:e.target.value})}
-                    placeholder="Describe the item…" disabled={saving}/>
+
+                  <div className="inv-field">
+                    <label className="inv-field-label">Status</label>
+                    <select className="inv-input" value={form.status} onChange={e=>setF({status:e.target.value})} disabled={saving}>
+                      {MANUAL_ITEM_STATUSES.map(s=><option key={s}>{s}</option>)}
+                    </select>
+                    <span className="inv-field-hint">"Ready for Rental" is set automatically after inspection.</span>
+                  </div>
+
+                  <div className="inv-field inv-field-full">
+                    <label className="inv-field-label">
+                      Estimated Age Range
+                      <span className="inv-optional-tag">optional</span>
+                    </label>
+                    <div className="inv-age-range-wrap">
+                      <input className="inv-input inv-age-input" type="number" min="0" max="120"
+                        value={form.ageRange?.split('–')[0] || ''}
+                        onChange={e => { const from=e.target.value; const to=form.ageRange?.split('–')[1]||''; setF({ageRange:from||to?`${from}–${to}`:''}); }}
+                        placeholder="From" disabled={saving}/>
+                      <span className="inv-age-sep">–</span>
+                      <input className="inv-input inv-age-input" type="number" min="0" max="120"
+                        value={form.ageRange?.split('–')[1] || ''}
+                        onChange={e => { const to=e.target.value; const from=form.ageRange?.split('–')[0]||''; setF({ageRange:from||to?`${from}–${to}`:''}); }}
+                        placeholder="To" disabled={saving}/>
+                      <span className="inv-age-unit">yrs</span>
+                    </div>
+                    <span className="inv-field-hint">e.g. 18–35 yrs — helps customers find the right fit</span>
+                  </div>
+
+                  <div className="inv-field inv-field-full">
+                    <label className="inv-field-label">Description <span className="inv-optional-tag">optional</span></label>
+                    <textarea
+                      className="inv-textarea"
+                      rows={3}
+                      value={form.description}
+                      onChange={e=>setF({description:e.target.value})}
+                      placeholder="Describe the fabric, style, embellishments, or any other details customers should know…"
+                      disabled={saving}
+                    />
+                  </div>
+
                 </div>
               </div>
+
             </div>
+
             <div className="inv-modal-footer">
               <button className="inv-btn-ghost" onClick={closeModal} disabled={saving}>Cancel</button>
               <button className="inv-btn-primary" onClick={saveItem} disabled={saving}>
-                {saving ? <><Loader2 size={13} className="inv-spinner-inline"/> Saving…</> : (modal==='add'?'Add Item':'Save Changes')}
+                {saving
+                  ? <><Loader2 size={13} className="inv-spinner-inline"/> Saving…</>
+                  : modal==='add' ? <><Plus size={13}/> Add Item</> : <><CheckCircle size={13}/> Save Changes</>}
               </button>
             </div>
           </div>
@@ -1327,8 +1405,7 @@ export default function InventoryFragment() {
                     {[
                       ['Category',     selected.category],
                       ['Type',         selected.subtype],
-                      ['Size',         selected.size],
-                      ['Color',        selected.color],
+                      ['Sizes',        Array.isArray(selected.sizes) && selected.sizes.length ? selected.sizes.join(', ') : (selected.size || null)],
                       ['Age Range',    selected.ageRange],
                       ['Rental Price', promo
                         ? <><span style={{textDecoration:'line-through',color:'#bbb',marginRight:'0.4rem'}}>₱{selected.price.toLocaleString()}</span><strong style={{color:'#15803d'}}>₱{Math.round(disc).toLocaleString()}</strong></>
