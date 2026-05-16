@@ -37,7 +37,7 @@ public class BookingController {
     // ── Fitting Booking (authenticated users) ─────────────────
 
     @PostMapping("/inventory/book-fitting")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasRole('CUSTOMER')")
     public ResponseEntity<FittingBookingResponse> bookFitting(
             @RequestBody FittingBookingRequest request,
             @AuthenticationPrincipal UserDetails userDetails) {
@@ -58,7 +58,7 @@ public class BookingController {
     }
 
     @GetMapping("/inventory/bookings/my")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasRole('CUSTOMER')")
     public ResponseEntity<List<BookingDetailResponse>> getMyBookings(
             @AuthenticationPrincipal UserDetails userDetails) {
         log.info("Fetching bookings for user: {}", userDetails.getUsername());
@@ -315,7 +315,7 @@ public class BookingController {
     }
 
     @PatchMapping("/inventory/bookings/{bookingId}/cancel")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasRole('CUSTOMER')")
     public ResponseEntity<?> cancelFittingBooking(
             @PathVariable String bookingId,
             @AuthenticationPrincipal UserDetails userDetails) {
