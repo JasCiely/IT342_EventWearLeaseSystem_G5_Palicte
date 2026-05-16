@@ -64,7 +64,7 @@ public class SecurityConfig {
                         // Direct bookings — customers can create/view their own; admins manage all
                         .requestMatchers(HttpMethod.POST, "/api/direct-bookings").hasRole("CUSTOMER")
                         .requestMatchers(HttpMethod.GET, "/api/direct-bookings/my-bookings").hasRole("CUSTOMER")
-                        .requestMatchers(HttpMethod.GET, "/api/direct-bookings/availability").hasRole("CUSTOMER")
+                        .requestMatchers(HttpMethod.GET, "/api/direct-bookings/availability").hasAnyRole("CUSTOMER", "ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/direct-bookings/**").hasAnyRole("ADMIN", "CUSTOMER")
                         .requestMatchers(HttpMethod.PUT, "/api/direct-bookings/**").hasRole("ADMIN")
                         .requestMatchers("/api/public/**").permitAll()

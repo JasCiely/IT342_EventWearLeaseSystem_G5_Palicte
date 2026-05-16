@@ -1130,6 +1130,7 @@ function EditRentalDatesModal({ booking, onSave, onClose, workingHours }) {
   const [error, setError]     = useState('');
   const [availability, setAvailability] = useState(null);
   const [checkingAvail, setCheckingAvail] = useState(false);
+  const [datesChanged, setDatesChanged] = useState(false);
 
   const today = calTodayStr();
 
@@ -1144,13 +1145,14 @@ function EditRentalDatesModal({ booking, onSave, onClose, workingHours }) {
   }, [booking.inventoryItemId, booking.id]);
 
   useEffect(() => {
+    if (!datesChanged) return;
     if (!startDate || !endDate) { setAvailability(null); return; }
     setCheckingAvail(true);
     checkDirectBookingAvailability(booking.inventoryItemId, startDate, endDate, booking.id)
       .then(setAvailability)
       .catch(() => setAvailability(null))
       .finally(() => setCheckingAvail(false));
-  }, [booking.inventoryItemId, booking.id, startDate, endDate]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [booking.inventoryItemId, booking.id, startDate, endDate, datesChanged]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isRangeConflicting = (start, end) =>
     occupiedRanges.some(r => start <= r.endDate && end >= r.startDate);
@@ -1170,6 +1172,7 @@ function EditRentalDatesModal({ booking, onSave, onClose, workingHours }) {
     if (endDate && endDate < newStart) setEndDate('');
     setError('');
     setAvailability(null);
+    setDatesChanged(true);
   };
 
   const validate = () => {
@@ -1228,7 +1231,7 @@ function EditRentalDatesModal({ booking, onSave, onClose, workingHours }) {
               <label className="inv-field-label"><CalendarIcon size={11} /> New End Date</label>
               <DirectDatePicker
                 value={endDate}
-                onChange={d => { setEndDate(d); setError(''); }}
+                onChange={d => { setEndDate(d); setError(''); setDatesChanged(true); }}
                 minDate={startDate || today}
                 bookingSettings={workingHours}
                 occupiedRanges={occupiedRanges}
