@@ -3,10 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import {
     User, Mail, Phone, Calendar, Package,
     CheckCircle, XCircle, Clock, AlertCircle,
-    RefreshCw, ChevronRight, TrendingUp, Activity
+    ChevronRight, TrendingUp, Activity
 } from 'lucide-react';
 import '../styles/DashboardFragment.css';
 import { getProfile } from '../services/userService';
+import { sseService } from '../../../shared/services/sseService';
 
 const formatDate = (s) =>
     s ? new Date(s).toLocaleDateString('en-PH', {
@@ -70,9 +71,7 @@ const DashboardFragment = () => {
     const navigate = useNavigate();
     const [profile, setProfile] = useState(null);
     const [bookings, setBookings] = useState([]);
-    const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [refreshing, setRefreshing] = useState(false);
 
     const fetchAll = async () => {
         const token = localStorage.getItem('token');
@@ -104,18 +103,15 @@ const DashboardFragment = () => {
             await fetchAll();
         } catch (err) {
             setError(err.message);
-        } finally {
-            setLoading(false);
-            setRefreshing(false);
         }
     };
 
-    useEffect(() => { load(); }, []);
-
-    const handleRefresh = () => {
-        setRefreshing(true);
+    useEffect(() => {
         load();
-    };
+        sseService.connect();
+        const unsub = sseService.on('BOOKING_UPDATE', load);
+        return () => unsub();
+    }, []);
 
     const activeBookings = bookings.filter(isActive);
     const upcomingBookings = bookings.filter(isUpcoming);
@@ -127,21 +123,12 @@ const DashboardFragment = () => {
         ? ((profile.firstName?.charAt(0) || '') + (profile.lastName?.charAt(0) || '')).toUpperCase()
         : '?';
 
-    if (loading) {
-        return (
-            <div className="ds-loading">
-                <div className="ds-spinner" />
-                <p>Loading your dashboard...</p>
-            </div>
-        );
-    }
-
     if (error) {
         return (
             <div className="ds-error">
                 <AlertCircle size={40} strokeWidth={1.5} />
                 <p>{error}</p>
-                <button className="ds-btn-retry" onClick={handleRefresh}>Retry</button>
+                <button className="ds-btn-retry" onClick={load}>Retry</button>
             </div>
         );
     }
@@ -155,10 +142,6 @@ const DashboardFragment = () => {
                         Welcome back, {profile?.firstName || localStorage.getItem('firstName') || 'Customer'}
                     </p>
                 </div>
-                <button className="ds-refresh-btn" onClick={handleRefresh} disabled={refreshing}>
-                    <RefreshCw size={16} className={refreshing ? 'ds-spin' : ''} />
-                    Refresh
-                </button>
             </div>
 
             <div className="ds-stats-row">

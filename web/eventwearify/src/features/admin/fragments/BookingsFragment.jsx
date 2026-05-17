@@ -32,6 +32,7 @@ import {
 } from '../services/inventoryApi';
 import { fetchBookingSettings, saveBookingSettings, getDefaultSettings } from '../services/bookingSettingsApi';
 import { authFetch } from '../../../shared/services/apiClient.js';
+import { sseService } from '../../../shared/services/sseService';
 import FittingToLeaseModal from './FittingToLeaseModal';
 import CreateBookingModal from './CreateBookingModal';
 
@@ -2158,8 +2159,6 @@ function Toast({ toast, onClose }) {
 export default function BookingsManagement() {
   const [fittingBookings, setFittingBookings] = useState([]);
   const [directBookings, setDirectBookings] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
   const [filterStat, setFilterStat] = useState('All');
   const [bookingType, setBookingType] = useState('all');
@@ -2184,7 +2183,6 @@ export default function BookingsManagement() {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [dateRangeFilter, setDateRangeFilter] = useState({ start: '', end: '' });
   const [priceRangeFilter, setPriceRangeFilter] = useState({ min: '', max: '' });
-  const [autoRefresh, setAutoRefresh] = useState(true);
 
   const [workingHours, setWorkingHours] = useState(getDefaultSettings);
 
@@ -2197,11 +2195,7 @@ export default function BookingsManagement() {
     setToast({ show: true, type, message: msg });
   }, []);
 
-  // mode: 'loading' (initial full-screen), 'refresh' (spinner only), 'silent' (no indicator)
-  const loadData = useCallback(async (mode = 'loading') => {
-    if (mode === 'loading') setLoading(true);
-    else if (mode === 'refresh') setRefreshing(true);
-
+  const loadData = useCallback(async () => {
     try {
       const [fRes, dRes] = await Promise.all([
         getAllFittingBookings(0, 500),
@@ -2239,50 +2233,15 @@ export default function BookingsManagement() {
     } catch (e) {
       console.error(e);
       showToastMsg('error', 'Failed to load bookings');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
     }
   }, [showToastMsg]);
 
   useEffect(() => {
-    if (!autoRefresh) return;
-    const interval = setInterval(() => { loadData('silent'); }, 60000);
-    return () => clearInterval(interval);
-  }, [autoRefresh, loadData]);
-
-  // ── Working-hours expiry watcher ──────────────────────────────────────────
-  // Checks every 30 seconds whether any CONFIRMED fitting booking has crossed
-  // the working-hours end time. When one is detected the data is silently
-  // refreshed so the backend-cancelled status is reflected immediately
-  // without waiting for the 60-second general auto-refresh cycle.
-  useEffect(() => {
-    if (!workingHours) return;
-    const check = () => {
-      const hasExpired = fittingBookings.some(
-        b => b.status === 'CONFIRMED' && isFittingExpiredByWorkingHours(b, workingHours)
-      );
-      if (hasExpired) loadData('silent');
-    };
-    const interval = setInterval(check, 30000);
-    return () => clearInterval(interval);
-  }, [fittingBookings, workingHours, loadData]);
-
-  // ── Approved-rental pickup-deadline watcher ───────────────────────────────
-  // Mirrors the backend autoExpireApprovedBookings logic: silently refreshes
-  // when an Approved booking's startDate + working-hours end time has passed.
-  useEffect(() => {
-    const check = () => {
-      const hasExpired = directBookings.some(
-        b => b.bookingStatus === 'Approved' && isApprovedDirectBookingExpired(b, workingHours)
-      );
-      if (hasExpired) loadData('silent');
-    };
-    const interval = setInterval(check, 30000);
-    return () => clearInterval(interval);
-  }, [directBookings, workingHours, loadData]);
-
-  useEffect(() => { loadData(); }, [loadData]);
+    loadData();
+    sseService.connect();
+    const unsub = sseService.on('BOOKING_UPDATE', loadData);
+    return () => unsub();
+  }, [loadData]);
 
   const fetchItemForLease = useCallback(async (itemId) => {
     try {
@@ -2724,7 +2683,6 @@ export default function BookingsManagement() {
     }
   }, [cancelModal, drawer, showToastMsg]);
 
-  const handleRefresh = useCallback(() => { loadData('refresh'); }, [loadData]);
 
   const handleExport = useCallback((bookingsToExport, format) => {
     const exportData = bookingsToExport.map(b => ({
@@ -2776,15 +2734,6 @@ export default function BookingsManagement() {
     return workingHours.enabled ? `${f(workingHours.startHour)} – ${f(workingHours.endHour)}` : 'Always open';
   };
 
-  if (loading) {
-    return (
-      <div className="bk-root" style={{ alignItems: 'center', justifyContent: 'center', minHeight: 400 }}>
-        <Loader2 size={32} className="inv-spinner-inline" />
-        <p style={{ color: '#aaa', marginTop: 12 }}>Loading bookings…</p>
-      </div>
-    );
-  }
-
   const todayBookings = viewTab === 'active' ? allBookings.filter(b => isToday(b)) : [];
   const otherBookings = viewTab === 'active' ? allBookings.filter(b => !isToday(b)) : allBookings;
 
@@ -2801,9 +2750,6 @@ export default function BookingsManagement() {
             <Clock size={14} />
             <span>{fmtHours()}</span>
           </div>
-          <button className="inv-icon-btn" onClick={handleRefresh} disabled={refreshing} title="Refresh now">
-            <RefreshCw size={16} className={refreshing ? 'inv-spinner-inline' : ''} />
-          </button>
           <button className="inv-btn-primary" onClick={() => setShowCreateModal(true)}>
             <Plus size={14} /> New Booking
           </button>
@@ -3159,7 +3105,7 @@ export default function BookingsManagement() {
 
       {showCreateModal && (
         <CreateBookingModal
-          onSuccess={() => { loadData('refresh'); setShowCreateModal(false); }}
+          onSuccess={() => { loadData(); setShowCreateModal(false); }}
           onClose={() => setShowCreateModal(false)}
         />
       )}

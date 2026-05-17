@@ -7,6 +7,7 @@ import com.backend.features.booking.dto.response.DirectBookingResponse;
 import com.backend.features.booking.dto.response.FittingAvailabilityResponse;
 import com.backend.features.booking.dto.response.FittingBookingResponse;
 import com.backend.shared.entity.Booking;
+import com.backend.shared.sse.SseService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -33,6 +34,7 @@ public class BookingController {
 
     private final BookingService bookingService;
     private final DirectBookingService directBookingService;
+    private final SseService sseService;
 
     // ── Fitting Booking (authenticated users) ─────────────────
 
@@ -54,6 +56,7 @@ public class BookingController {
             return ResponseEntity.badRequest().body(response);
         }
 
+        sseService.broadcast("BOOKING_UPDATE");
         return ResponseEntity.ok(response);
     }
 
@@ -119,6 +122,7 @@ public class BookingController {
             Map<String, Object> response = new HashMap<>();
             response.put("id", dto.getId());
             response.put("status", dto.getStatus());
+            sseService.broadcast("BOOKING_UPDATE");
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
@@ -137,6 +141,7 @@ public class BookingController {
             response.put("id", booking.getId());
             response.put("status", booking.getStatus());
             response.put("leaseStarted", booking.isLeaseStarted());
+            sseService.broadcast("BOOKING_UPDATE");
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
@@ -154,6 +159,7 @@ public class BookingController {
             response.put("id", booking.getId());
             response.put("status", booking.getStatus());
             response.put("message", "Fitting marked as completed without lease");
+            sseService.broadcast("BOOKING_UPDATE");
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
@@ -184,6 +190,7 @@ public class BookingController {
             response.put("fittingDate", request.getFittingDate());
             response.put("fittingTime", request.getFittingTime());
             response.put("message", "Fitting rescheduled successfully");
+            sseService.broadcast("BOOKING_UPDATE");
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             // Distinguishes "not found" from validation errors by message content
@@ -260,6 +267,7 @@ public class BookingController {
             LocalDate startDate = LocalDate.parse(body.get("startDate"));
             LocalDate endDate   = LocalDate.parse(body.get("endDate"));
             DirectBookingResponse response = directBookingService.updateDirectBookingDates(bookingId, startDate, endDate);
+            sseService.broadcast("BOOKING_UPDATE");
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             String msg = e.getMessage();
@@ -280,6 +288,7 @@ public class BookingController {
             Map<String, Object> response = new HashMap<>();
             response.put("id", bookingId);
             response.put("status", status);
+            sseService.broadcast("BOOKING_UPDATE");
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
@@ -293,6 +302,7 @@ public class BookingController {
     public ResponseEntity<?> markDirectBookingPickedUp(@PathVariable String bookingId) {
         try {
             DirectBookingResponse response = directBookingService.markPickedUp(bookingId);
+            sseService.broadcast("BOOKING_UPDATE");
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
@@ -306,6 +316,7 @@ public class BookingController {
     public ResponseEntity<?> undoDirectBookingPickup(@PathVariable String bookingId) {
         try {
             DirectBookingResponse response = directBookingService.undoPickup(bookingId);
+            sseService.broadcast("BOOKING_UPDATE");
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
@@ -322,6 +333,7 @@ public class BookingController {
 
         try {
             bookingService.cancelFittingBooking(bookingId, userDetails.getUsername());
+            sseService.broadcast("BOOKING_UPDATE");
             return ResponseEntity.ok(Map.of("message", "Booking cancelled successfully"));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
@@ -346,6 +358,7 @@ public class BookingController {
             bookingService.rescheduleFittingByCustomer(
                     bookingId, userDetails.getUsername(),
                     request.getFittingDate(), request.getFittingTime());
+            sseService.broadcast("BOOKING_UPDATE");
             return ResponseEntity.ok(Map.of("message", "Fitting rescheduled successfully"));
         } catch (IllegalArgumentException e) {
             String msg = e.getMessage();

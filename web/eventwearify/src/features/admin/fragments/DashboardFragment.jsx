@@ -2,13 +2,14 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   CalendarCheck, Clock, CheckCircle,
-  Package, PackageCheck, RefreshCw, Loader2, AlertCircle,
+  Package, PackageCheck, AlertCircle,
   TrendingUp, Users, BarChart2, Bell, ArrowRight,
   Zap, ShoppingBag, Activity, Star,
 } from 'lucide-react';
 import { getAllFittingBookings, getAllDirectBookings, fetchItems } from '../services/inventoryApi';
 import { fetchCustomers } from '../services/customerService';
 import { fetchStaff } from '../services/staffApi';
+import { sseService } from '../../../shared/services/sseService';
 import '../styles/DashboardFragment.css';
 
 const STATUS_META = {
@@ -49,21 +50,16 @@ const getGreeting = () => {
 
 const DashboardFragment = () => {
   const navigate = useNavigate();
-  const [loading, setLoading]         = useState(true);
   const [error, setError]             = useState(null);
   const [fittings, setFittings]       = useState([]);
   const [directs, setDirects]         = useState([]);
   const [itemCount, setItemCount]     = useState(0);
   const [customerCount, setCustomerCount] = useState(0);
   const [staffCount, setStaffCount]   = useState(0);
-  const [lastRefresh, setLastRefresh] = useState(null);
-  const [refreshing, setRefreshing]   = useState(false);
 
   const adminName = localStorage.getItem('firstName') || 'Admin';
 
-  const load = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
-    else setRefreshing(true);
+  const load = useCallback(async () => {
     setError(null);
     try {
       const [f, d, items, customers, staff] = await Promise.all([
@@ -78,16 +74,18 @@ const DashboardFragment = () => {
       setItemCount(Array.isArray(items) ? items.length : 0);
       setCustomerCount(customers?.totalElements ?? 0);
       setStaffCount(Array.isArray(staff) ? staff.length : 0);
-      setLastRefresh(new Date());
     } catch (err) {
       setError(err.message || 'Failed to load dashboard data.');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    sseService.connect();
+    const unsubBooking   = sseService.on('BOOKING_UPDATE',   load);
+    const unsubInventory = sseService.on('INVENTORY_UPDATE', load);
+    return () => { unsubBooking(); unsubInventory(); };
+  }, [load]);
 
   const totalBookings    = fittings.length + directs.length;
   const activeBookings   = fittings.filter(b => b.status === 'CONFIRMED').length
@@ -146,15 +144,6 @@ const DashboardFragment = () => {
     { label: 'Customers',       value: customerCount,  icon: Users,         variant: 'customers' },
   ];
 
-  if (loading) {
-    return (
-      <div className="adf-state">
-        <Loader2 size={20} className="adf-spin" />
-        <span>Loading dashboard…</span>
-      </div>
-    );
-  }
-
   if (error) {
     return (
       <div className="adf-state adf-state-error">
@@ -177,15 +166,6 @@ const DashboardFragment = () => {
               weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
             })}
           </p>
-        </div>
-        <div className="adf-header-right">
-          {lastRefresh && (
-            <span className="adf-last-refresh">Updated {formatDateTime(lastRefresh)}</span>
-          )}
-          <button className="adf-refresh-btn" onClick={() => load(true)} disabled={refreshing}>
-            <RefreshCw size={14} className={refreshing ? 'adf-spin' : ''} />
-            {refreshing ? 'Refreshing…' : 'Refresh'}
-          </button>
         </div>
       </div>
 
@@ -296,9 +276,6 @@ const DashboardFragment = () => {
             <div className="adf-card-header">
               <TrendingUp size={15} className="adf-card-icon" />
               <h3 className="adf-card-title">Recent Activity</h3>
-              {lastRefresh && (
-                <span className="adf-card-sub">Updated {formatDateTime(lastRefresh)}</span>
-              )}
             </div>
             {recent.length === 0 ? (
               <div className="adf-empty">No booking activity yet.</div>

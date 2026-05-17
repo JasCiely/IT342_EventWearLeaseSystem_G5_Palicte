@@ -2,10 +2,11 @@ import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react'
 import ReactDOM from 'react-dom';
 import {
   X, Calendar, Clock, User, Mail, Phone, Tag, FileText, Package,
-  Image as ImageIcon, AlertCircle, Trash2, Loader2, RefreshCw,
+  Image as ImageIcon, AlertCircle, Trash2, Loader2,
   CheckCircle, ChevronLeft, ChevronRight, ChevronDown,
   AlertTriangle, Info, Edit2
 } from 'lucide-react';
+import { sseService } from '../../../shared/services/sseService';
 import '../styles/MyBookingsFragment.css';
 import '../styles/BrowseOutfitsFragment.css';
 import {
@@ -937,7 +938,6 @@ function CancelBookingConfirmModal({ booking, onClose, onConfirm, loading, error
 
 const BookingsView = () => {
   const [bookings, setBookings]             = useState([]);
-  const [loading, setLoading]               = useState(true);
   const [error, setError]                   = useState(null);
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [editingBooking, setEditingBooking]   = useState(null);
@@ -945,7 +945,6 @@ const BookingsView = () => {
   const [cancelError, setCancelError]         = useState('');
   const [cancelLoading, setCancelLoading]     = useState(false);
   const [cancellingId, setCancellingId]       = useState(null);
-  const [refreshing, setRefreshing]           = useState(false);
   const [activeTab, setActiveTab]             = useState('active');
 
   const { settings: bookingSettings } = useBookingSettings();
@@ -978,15 +977,15 @@ const BookingsView = () => {
       await fetchBookings();
     } catch (err) {
       setError(err.message);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
     }
   }, [fetchBookings]);
 
-  useEffect(() => { void loadData(); }, [loadData]);
-
-  const handleRefresh = () => { setRefreshing(true); loadData(); };
+  useEffect(() => {
+    void loadData();
+    sseService.connect();
+    const unsub = sseService.on('BOOKING_UPDATE', loadData);
+    return () => unsub();
+  }, [loadData]);
 
   const handleCancel = (booking) => {
     setCancelConfirmBooking(booking);
@@ -1085,9 +1084,6 @@ const BookingsView = () => {
     <div className="bookings-root">
       <div className="bookings-header">
         <h2 className="bookings-title">Your Bookings</h2>
-        <button className="btn-refresh" onClick={handleRefresh} disabled={refreshing}>
-          <RefreshCw size={16} className={refreshing ? 'spin' : ''} /> Refresh
-        </button>
       </div>
 
       <div className="bookings-tabs">
@@ -1100,22 +1096,11 @@ const BookingsView = () => {
       </div>
 
       <div className="bookings-card">
-        {loading ? (
-          <div className="loading-wrapper">
-            <div className="spinner"></div>
-            <div className="skeleton-table">
-              {[1,2,3].map(i => (
-                <div key={i} className="skeleton-row">
-                  {[1,2,3,4,5].map(j => <div key={j} className="skeleton-cell" />)}
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : error ? (
+        {error ? (
           <div className="error-state">
             <AlertCircle size={40} strokeWidth={1.5} />
             <p>Error: {error}</p>
-            <button className="btn-retry" onClick={handleRefresh}>Retry</button>
+            <button className="btn-retry" onClick={loadData}>Retry</button>
           </div>
         ) : displayedBookings.length === 0 ? (
           <div className="empty-state">

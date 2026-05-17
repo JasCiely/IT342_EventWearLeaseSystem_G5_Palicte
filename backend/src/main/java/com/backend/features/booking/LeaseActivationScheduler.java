@@ -1,5 +1,6 @@
 package com.backend.features.booking;
 
+import com.backend.shared.sse.SseService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -11,13 +12,12 @@ import org.springframework.stereotype.Component;
 public class LeaseActivationScheduler {
 
     private final DirectBookingService directBookingService;
+    private final SseService sseService;
 
-    // Runs every minute — auto-cancels Approved bookings whose pickup deadline has passed.
-    // Pickup deadline = working-hours close time on the booking's startDate.
-    // If time restrictions are disabled, expires at midnight of the day after startDate.
     @Scheduled(fixedRate = 60000)
     public void autoExpireApprovedBookings() {
         log.debug("Direct booking pickup-expiry check started");
         directBookingService.autoExpireApprovedBookings();
+        sseService.broadcast("BOOKING_UPDATE");
     }
 }
