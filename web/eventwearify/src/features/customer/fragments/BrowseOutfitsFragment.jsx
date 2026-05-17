@@ -176,11 +176,8 @@ function classifyDateRange(startDate, endDate, occupiedRanges) {
 // ────────────────────────────────────────────────────────────────────────────
 const ITEM_STATUS_META = {
   'Available':            { color: '#15803d', bg: 'rgba(21,128,61,0.1)',   dot: '#22c55e' },
-  'Leased':               { color: '#b45309', bg: 'rgba(180,83,9,0.1)',    dot: '#f59e0b' },
-  'Maintenance':          { color: '#991b1b', bg: 'rgba(153,27,27,0.1)',   dot: '#ef4444' },
   'Under Maintenance':    { color: '#9a3412', bg: 'rgba(154,52,18,0.1)',   dot: '#ea580c' },
   'Pending Availability': { color: '#b45309', bg: 'rgba(180,83,9,0.1)',    dot: '#f59e0b' },
-  'Reserved':             { color: '#1d4ed8', bg: 'rgba(29,78,216,0.1)',   dot: '#3b82f6' },
 };
 
 const CAT_COLORS = { Gown: '#c4717f', Suit: '#6b2d39', Traditional: '#b45309', Accessories: '#486581' };
@@ -1270,7 +1267,7 @@ export default function BrowseOutfitsFragment() {
     return Math.max(0, d);
   }, [activePromo]);
 
-  const availableItems = useMemo(() => items.filter(i => i.status === 'Available' || i.status === 'Reserved'), [items]);
+  const availableItems = useMemo(() => items.filter(i => i.status === 'Available'), [items]);
   
   const categories     = useMemo(() => [...new Set(availableItems.map(i => i.category))], [availableItems]);
   const subcategories  = useMemo(() => {

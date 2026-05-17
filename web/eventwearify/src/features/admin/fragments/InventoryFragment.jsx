@@ -842,8 +842,8 @@ export default function InventoryFragment() {
   const stats = {
     total:       items.length,
     available:   items.filter(i=>i.status==='Available').length,
-    leased:      items.filter(i=>i.status==='Leased').length,
-    maintenance: items.filter(i=>i.status==='Maintenance'||i.status==='Under Maintenance'||i.status==='Pending Availability').length,
+    maintenance: items.filter(i=>i.status==='Under Maintenance').length,
+    pending:     items.filter(i=>i.status==='Pending Availability').length,
   };
 
   const openEdit = item => {
@@ -910,10 +910,10 @@ export default function InventoryFragment() {
       {/* ── Stats ── */}
       <div className="inv-stats">
         {[
-          { label:'Total Items',  value:stats.total,       icon:Package,     color:'#6b2d39' },
-          { label:'Available',    value:stats.available,   icon:CheckCircle, color:'#15803d' },
-          { label:'Out on Lease', value:stats.leased,      icon:Tag,         color:'#b45309' },
-          { label:'Maintenance',  value:stats.maintenance, icon:Wrench,      color:'#9a3412' },
+          { label:'Total Items',    value:stats.total,       icon:Package,     color:'#6b2d39' },
+          { label:'Available',      value:stats.available,   icon:CheckCircle, color:'#15803d' },
+          { label:'In Maintenance', value:stats.maintenance, icon:Wrench,      color:'#9a3412' },
+          { label:'Pending Review', value:stats.pending,     icon:AlertCircle, color:'#b45309' },
         ].map(({ label,value,icon:Icon,color }) => (
           <div className="inv-stat-card" key={label}>
             <div className="inv-stat-icon" style={{ background:`${color}18`, color }}><Icon size={18}/></div>
@@ -1355,7 +1355,7 @@ export default function InventoryFragment() {
                     <select className="inv-input" value={form.status} onChange={e=>setF({status:e.target.value})} disabled={saving}>
                       {MANUAL_ITEM_STATUSES.map(s=><option key={s}>{s}</option>)}
                     </select>
-                    <span className="inv-field-hint">"Ready for Rental" is set automatically after inspection.</span>
+                    <span className="inv-field-hint">System automatically sets "Under Maintenance" after lease return, then "Pending Availability" when maintenance ends.</span>
                   </div>
 
                   <div className="inv-field inv-field-full">

@@ -190,19 +190,12 @@ export const CAT_COLORS = {
 
 // ── Item Status Metadata ──────────────────────────────────────
 export const ITEM_STATUS_META = {
-  'Available':           { color: '#15803d', bg: 'rgba(21,128,61,0.08)',   dot: '#15803d' },
-  'Reserved':            { color: '#1d4ed8', bg: 'rgba(29,78,216,0.08)',   dot: '#1d4ed8' },
-  'Leased':              { color: '#b45309', bg: 'rgba(180,83,9,0.08)',    dot: '#b45309' },
-  'Awaiting Return':     { color: '#dc2626', bg: 'rgba(220,38,38,0.08)',   dot: '#dc2626' },
-  'Under Inspection':    { color: '#7c3aed', bg: 'rgba(124,58,237,0.08)',  dot: '#7c3aed' },
-  'Maintenance':         { color: '#9a3412', bg: 'rgba(154,52,18,0.08)',   dot: '#9a3412' },
-  'Under Maintenance':   { color: '#9a3412', bg: 'rgba(154,52,18,0.1)',    dot: '#ea580c' },
-  'Pending Availability':{ color: '#b45309', bg: 'rgba(180,83,9,0.1)',     dot: '#f59e0b' },
+  'Available':            { color: '#15803d', bg: 'rgba(21,128,61,0.08)',  dot: '#15803d' },
+  'Under Maintenance':    { color: '#9a3412', bg: 'rgba(154,52,18,0.1)',  dot: '#ea580c' },
+  'Pending Availability': { color: '#b45309', bg: 'rgba(180,83,9,0.1)',   dot: '#f59e0b' },
 };
 
-export const MANUAL_ITEM_STATUSES = [
-  'Available', 'Reserved', 'Leased', 'Awaiting Return', 'Under Inspection', 'Maintenance',
-];
+export const MANUAL_ITEM_STATUSES = ['Available', 'Under Maintenance', 'Pending Availability'];
 
 // ── Booking Status Metadata ───────────────────────────────────
 export const BOOKING_STATUS_META = {
