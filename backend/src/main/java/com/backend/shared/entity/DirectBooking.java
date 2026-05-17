@@ -69,6 +69,9 @@ public class DirectBooking {
     @Column(name = "preferred_size")
     private String preferredSize;
 
+    @Column(name = "extended")
+    private boolean extended = false;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 

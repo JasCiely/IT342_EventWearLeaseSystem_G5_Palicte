@@ -20,6 +20,7 @@ import {
   deletePromotion as apiDeletePromotion,
   fetchInventorySettings,
   saveInventorySettings,
+  markItemAvailable as apiMarkItemAvailable,
 } from '../../../shared/services/inventoryApi.js';
 
 // ────────────────────────────────────────────────────────────
@@ -842,7 +843,7 @@ export default function InventoryFragment() {
     total:       items.length,
     available:   items.filter(i=>i.status==='Available').length,
     leased:      items.filter(i=>i.status==='Leased').length,
-    maintenance: items.filter(i=>i.status==='Maintenance').length,
+    maintenance: items.filter(i=>i.status==='Maintenance'||i.status==='Under Maintenance'||i.status==='Pending Availability').length,
   };
 
   const openEdit = item => {
@@ -1010,6 +1011,22 @@ export default function InventoryFragment() {
                       )}
                     </div>
                     <div className="inv-grid-actions">
+                      {(item.status === 'Under Maintenance' || item.status === 'Pending Availability') && (
+                        <button
+                          className="inv-icon-btn"
+                          title="Mark Item Available"
+                          onClick={async () => {
+                            try {
+                              const updated = await apiMarkItemAvailable(item.id);
+                              setItems(prev => prev.map(i => i.id === item.id ? { ...i, status: updated.status, maintenanceEndDate: null } : i));
+                            } catch (e) {
+                              console.error(e);
+                            }
+                          }}
+                        >
+                          <CheckCircle size={13} style={{ color: '#15803d' }}/>
+                        </button>
+                      )}
                       <button className="inv-icon-btn" title="View"   onClick={()=>{ setSelected(item); setModal('view'); }}><Eye size={13}/></button>
                       <button className="inv-icon-btn" title="Edit"   onClick={()=>openEdit(item)}><Edit2 size={13}/></button>
                       <button className="inv-icon-btn danger" title="Delete" onClick={()=>askDeleteItem(item)}><Trash2 size={13}/></button>
@@ -1074,9 +1091,32 @@ export default function InventoryFragment() {
                             <span className="inv-price">₱{item.price.toLocaleString()}</span>
                           )}
                         </td>
-                        <td><StatusBadge status={item.status}/></td>
+                        <td>
+                          <StatusBadge status={item.status}/>
+                          {item.maintenanceEndDate && item.status === 'Under Maintenance' && (
+                            <div style={{ fontSize: '0.7rem', color: '#9a3412', marginTop: '0.2rem' }}>
+                              until {item.maintenanceEndDate}
+                            </div>
+                          )}
+                        </td>
                         <td>
                           <div className="inv-row-actions">
+                            {(item.status === 'Under Maintenance' || item.status === 'Pending Availability') && (
+                              <button
+                                className="inv-icon-btn"
+                                title="Mark Item Available"
+                                onClick={async () => {
+                                  try {
+                                    const updated = await apiMarkItemAvailable(item.id);
+                                    setItems(prev => prev.map(i => i.id === item.id ? { ...i, status: updated.status, maintenanceEndDate: null } : i));
+                                  } catch (e) {
+                                    console.error(e);
+                                  }
+                                }}
+                              >
+                                <CheckCircle size={13} style={{ color: '#15803d' }}/>
+                              </button>
+                            )}
                             <button className="inv-icon-btn" onClick={()=>{ setSelected(item); setModal('view'); }}><Eye size={13}/></button>
                             <button className="inv-icon-btn" onClick={()=>openEdit(item)}><Edit2 size={13}/></button>
                             <button className="inv-icon-btn danger" onClick={()=>askDeleteItem(item)}><Trash2 size={13}/></button>

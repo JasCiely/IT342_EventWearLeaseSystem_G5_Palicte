@@ -65,6 +65,11 @@ public class InventoryServiceImpl implements InventoryService {
         Item item = itemRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Item not found: " + id));
 
+        String preservedStatus = item.getStatus();
+        LocalDate preservedMaintenanceEndDate = item.getMaintenanceEndDate();
+        boolean isSystemStatus = "Under Maintenance".equals(preservedStatus)
+                || "Pending Availability".equals(preservedStatus);
+
         // Delete removed files from Supabase
         List<String> oldUrls = parseList(item.getMediaUrls());
         oldUrls.stream()
@@ -89,6 +94,11 @@ public class InventoryServiceImpl implements InventoryService {
         applyRequest(item, request);
         item.setMediaUrls(String.join(",", urls));
         item.setMediaTypes(String.join(",", types));
+
+        if (isSystemStatus) {
+            item.setStatus(preservedStatus);
+            item.setMaintenanceEndDate(preservedMaintenanceEndDate);
+        }
 
         return toItemResponse(itemRepository.save(item));
     }
@@ -168,6 +178,15 @@ public class InventoryServiceImpl implements InventoryService {
         }
     }
 
+    @Override
+    public ItemResponse markItemAvailable(String itemId) {
+        Item item = itemRepository.findById(itemId)
+                .orElseThrow(() -> new RuntimeException("Item not found: " + itemId));
+        item.setStatus("Available");
+        item.setMaintenanceEndDate(null);
+        return toItemResponse(itemRepository.save(item));
+    }
+
     private ItemResponse toItemResponse(Item item) {
         ItemResponse r = new ItemResponse();
         r.setId(item.getId());
@@ -177,6 +196,7 @@ public class InventoryServiceImpl implements InventoryService {
         r.setSizes(parseList(item.getSize()));
         r.setPrice(item.getPrice());
         r.setStatus(item.getStatus());
+        r.setMaintenanceEndDate(item.getMaintenanceEndDate());
         r.setAgeRange(item.getAgeRange());
         r.setDescription(item.getDescription());
 

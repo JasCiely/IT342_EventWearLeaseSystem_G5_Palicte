@@ -31,4 +31,5 @@ public class DirectBookingResponse {
     private String customerEmail;
     private String customerPhone;
     private String preferredSize;
+    private boolean extended;
 }

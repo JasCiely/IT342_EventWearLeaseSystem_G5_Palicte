@@ -22,8 +22,10 @@ const MONTH_NAMES = ['January','February','March','April','May','June','July','A
 const DOW_LABELS  = ['Su','Mo','Tu','We','Th','Fr','Sa'];
 const DEFAULT_LEASING = { minLeaseDays: 2, weeklyDiscount: 100, monthlyDiscountCap: 300 };
 
-const todayStr = () => new Date().toISOString().split('T')[0];
-const fmtDate  = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-PH', { year:'numeric', month:'short', day:'numeric' }) : '';
+const todayStr       = () => new Date().toISOString().split('T')[0];
+const fmtDate        = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-PH', { year:'numeric', month:'short', day:'numeric' }) : '';
+// Leasing bookings must be placed at least 2 days before the pickup date.
+const minLeasingStart = () => { const d = new Date(); d.setDate(d.getDate() + 2); return d.toISOString().split('T')[0]; };
 
 const to24Hour = (time12) => {
   const [time, period] = time12.split(' ');
@@ -78,7 +80,7 @@ function classifyDateRange(startDate, endDate, occupiedRanges) {
   let hasPending = false;
   for (const r of occupiedRanges) {
     if (!datesOverlap(startDate, endDate, r.startDate, r.endDate)) continue;
-    if (r.status === 'Approved' || r.status === 'Active Lease') return 'blocked';
+    if (r.status === 'Approved' || r.status === 'Active Lease' || r.status === 'Under Maintenance') return 'blocked';
     if (r.status === 'Pending') hasPending = true;
   }
   return hasPending ? 'pending' : 'free';
@@ -402,10 +404,16 @@ function EditDirectBookingModal({ booking, onClose, onSuccess, bookingSettings, 
   };
 
   const pendingBlocking = overlapStatus === 'pending' && !pendingAcknowledged;
-  const canSubmit = pricing?.isValid && overlapStatus !== 'blocked' && availability !== false && !submitting && !checkingAvail && !pendingBlocking;
+  // For Pending/Approved bookings, start date must be at least 2 days away.
+  const startDateValid = isActiveLease || form.startDate >= minLeasingStart();
+  const canSubmit = pricing?.isValid && startDateValid && overlapStatus !== 'blocked' && availability !== false && !submitting && !checkingAvail && !pendingBlocking;
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
+    if (!isActiveLease && form.startDate < minLeasingStart()) {
+      alert(`Leasing bookings must be made at least 2 days in advance. Earliest start: ${fmtDate(minLeasingStart())}.`);
+      return;
+    }
     setSubmitting(true);
     try {
       await editCustomerBookingDates(booking.id, form.startDate, form.endDate);
@@ -446,7 +454,7 @@ function EditDirectBookingModal({ booking, onClose, onSuccess, bookingSettings, 
                 <DirectDatePicker
                   value={form.startDate}
                   onChange={handleStartChange}
-                  minDate={todayStr()}
+                  minDate={minLeasingStart()}
                   bookingSettings={bookingSettings}
                   occupiedRanges={occupiedRanges}
                   disabled={submitting || loadingOccupied}

@@ -53,4 +53,23 @@ public interface DirectBookingRepository extends JpaRepository<DirectBooking, St
             "(:excludeId IS NULL OR db.id <> :excludeId)")
     List<DirectBooking> findActiveBookingsForItem(@Param("itemId") String itemId,
             @Param("excludeId") String excludeId);
+
+    // Buffer-aware: checks [startDate, endDate] against each existing booking's effective range [existingStart, existingEnd+2].
+    // Pass adjustedStart = startDate.minusDays(2) to enforce the 2-day post-return maintenance block.
+    @Query("SELECT COUNT(db) > 0 FROM DirectBooking db WHERE db.inventoryItemId = :itemId AND " +
+            "(db.startDate <= :endDate AND db.endDate >= :adjustedStart) AND " +
+            "db.bookingStatus NOT IN ('Rejected', 'Cancelled', 'Completed', 'Returned')")
+    boolean hasOverlappingBookingsWithBuffer(@Param("itemId") String itemId,
+            @Param("adjustedStart") LocalDate adjustedStart,
+            @Param("endDate") LocalDate endDate);
+
+    // Buffer-aware version that excludes one booking (for edit/extend flows).
+    @Query("SELECT COUNT(db) > 0 FROM DirectBooking db WHERE db.inventoryItemId = :itemId AND " +
+            "db.id <> :excludeId AND " +
+            "(db.startDate <= :endDate AND db.endDate >= :adjustedStart) AND " +
+            "db.bookingStatus NOT IN ('Rejected', 'Cancelled', 'Completed', 'Returned')")
+    boolean hasOverlappingBookingsExcludingWithBuffer(@Param("itemId") String itemId,
+            @Param("adjustedStart") LocalDate adjustedStart,
+            @Param("endDate") LocalDate endDate,
+            @Param("excludeId") String excludeId);
 }

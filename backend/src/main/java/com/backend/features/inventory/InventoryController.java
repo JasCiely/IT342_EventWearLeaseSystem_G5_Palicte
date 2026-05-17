@@ -78,6 +78,17 @@ public class InventoryController {
         return ResponseEntity.noContent().build();
     }
 
+    @PutMapping("/items/{id}/mark-available")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ItemResponse> markItemAvailable(@PathVariable String id) {
+        try {
+            return ResponseEntity.ok(inventoryService.markItemAvailable(id));
+        } catch (RuntimeException e) {
+            log.error("Mark available error: {}", e.getMessage());
+            return ResponseEntity.notFound().build();
+        }
+    }
+
     // ── Promotions (public GET, ADMIN write) ─────────────────
 
     @GetMapping("/promotions")

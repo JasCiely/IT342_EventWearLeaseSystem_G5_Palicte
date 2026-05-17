@@ -438,6 +438,8 @@ function CreateBookingModal({ onSuccess, onClose }) {
     setFittingTime('');
     setStartDate('');
     setEndDate('');
+    const szArr = Array.isArray(item.sizes) ? item.sizes.filter(Boolean) : (item.size ? [item.size] : []);
+    setPreferredSize(szArr.length === 1 ? szArr[0] : '');
   };
 
   const clearItem = () => {
@@ -448,6 +450,7 @@ function CreateBookingModal({ onSuccess, onClose }) {
     setFittingTime('');
     setStartDate('');
     setEndDate('');
+    setPreferredSize('');
   };
 
   const selectedItem = items.find(i => i.id === selectedItemId) || null;
@@ -479,6 +482,10 @@ function CreateBookingModal({ onSuccess, onClose }) {
     if (!customerEmail.trim()) return 'Customer email is required';
     if (!customerPhone.trim()) return 'Customer phone is required';
     if (!selectedItemId)       return 'Please select an item';
+    if (selectedItem) {
+      const szArr = Array.isArray(selectedItem.sizes) ? selectedItem.sizes.filter(Boolean) : (selectedItem.size ? [selectedItem.size] : []);
+      if (szArr.length > 1 && !preferredSize) return 'Please select a size for this item';
+    }
     if (tab === 'fitting') {
       if (!fittingDate) return 'Please select a fitting date';
       if (!fittingTime) return 'Please select a time slot';
@@ -739,13 +746,26 @@ function CreateBookingModal({ onSuccess, onClose }) {
                 </div>
               )}
             </div>
-            <div className="inv-field">
-              <label style={labelStyle}>Preferred Size</label>
-              <select className="inv-select" style={{ width: '100%' }} value={preferredSize} onChange={e => setPreferredSize(e.target.value)}>
-                <option value="">None</option>
-                {SIZES.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
+            {(() => {
+              if (!selectedItem) return null;
+              const szArr = Array.isArray(selectedItem.sizes) ? selectedItem.sizes.filter(Boolean) : (selectedItem.size ? [selectedItem.size] : []);
+              if (szArr.length === 0) return null;
+              if (szArr.length === 1) return (
+                <div className="inv-field">
+                  <label style={labelStyle}>Size</label>
+                  <div style={{ padding: '9px 12px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 13, color: '#374151' }}>{szArr[0]}</div>
+                </div>
+              );
+              return (
+                <div className="inv-field">
+                  <label style={labelStyle}>Size *</label>
+                  <select className="inv-select" style={{ width: '100%' }} value={preferredSize} onChange={e => setPreferredSize(e.target.value)}>
+                    <option value="">Select size</option>
+                    {szArr.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+              );
+            })()}
           </div>
 
           {/* ── Fitting fields ── */}

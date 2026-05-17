@@ -28,6 +28,7 @@ import {
   updateDirectBookingDates,
   markDirectBookingPickedUp,
   checkDirectBookingAvailability,
+  markItemAvailable,
 } from '../services/inventoryApi';
 import { fetchBookingSettings, saveBookingSettings, getDefaultSettings } from '../services/bookingSettingsApi';
 import { authFetch } from '../../../shared/services/apiClient.js';
@@ -368,10 +369,13 @@ function ReturnLeaseModal({ booking, onConfirm, onClose }) {
             <div className="bk-action-item">{booking.itemName}</div>
             <div className="bk-action-dates">{booking.startDate} → {booking.endDate}</div>
           </div>
-          <div style={{ padding: '0.75rem', background: 'rgba(13,148,136,0.08)', borderRadius: 8, color: '#0d9488', fontSize: '0.82rem' }}>
+          <div style={{ padding: '0.75rem', background: 'rgba(13,148,136,0.08)', borderRadius: 8, color: '#0d9488', fontSize: '0.82rem', marginBottom: '0.5rem' }}>
             <PackageCheck size={13} style={{ display: 'inline', marginRight: 6 }} />
             This will mark the item as <strong>Returned</strong> then immediately <strong>Completed</strong>.
-            Inventory availability will be restored.
+          </div>
+          <div style={{ padding: '0.75rem', background: 'rgba(154,52,18,0.08)', borderRadius: 8, color: '#9a3412', fontSize: '0.82rem' }}>
+            <AlertTriangle size={13} style={{ display: 'inline', marginRight: 6 }} />
+            The item will automatically enter a <strong>2-day maintenance period</strong> before becoming available again. You can override this early from the inventory page.
           </div>
         </div>
         <div className="inv-modal-footer">
@@ -1319,11 +1323,12 @@ function MediaViewer({ file }) {
 
 // ─── BookingDrawer ────────────────────────────────────────────────────────────
 
-function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, onEditRentalDates, onCompleteNoLease, onProceedToLease, onReturn, onExtend, onPickedUp, isFitting, workingHours }) {
+function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, onEditRentalDates, onCompleteNoLease, onProceedToLease, onReturn, onExtend, onPickedUp, onMarkItemAvailable, isFitting, workingHours }) {
   const [itemDetails, setItemDetails] = useState(null);
   const [loadingItem, setLoadingItem] = useState(false);
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
   const [activeTab, setActiveTab] = useState('details');
+  const [markingAvailable, setMarkingAvailable] = useState(false);
   const [emailStatus, setEmailStatus] = useState(null);
   const [emailSending, setEmailSending] = useState(false);
   // Tracks current time so the Done button enables/disables automatically
@@ -1733,8 +1738,8 @@ function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, on
             </button>
           )}
 
-          {/* Approved rental: admin confirms physical pickup → transitions to Active Lease */}
-          {!isFitting && booking.status === 'Approved' && (
+          {/* Approved rental: admin confirms physical pickup — only available on the actual pickup date */}
+          {!isFitting && booking.status === 'Approved' && booking.startDate === new Date().toISOString().split('T')[0] && (
             <button
               className="inv-btn-primary"
               style={{ background: '#15803d' }}
@@ -1762,6 +1767,38 @@ function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, on
                 <CalendarIcon size={13} /> Extend <ChevronRight size={13} />
               </button>
             </>
+          )}
+
+          {/* Completed: show maintenance status and admin override */}
+          {!isFitting && booking.status === 'Completed' && itemDetails && (
+            (itemDetails.status === 'Under Maintenance' || itemDetails.status === 'Pending Availability') && (
+              <div style={{ padding: '0.75rem', background: 'rgba(154,52,18,0.08)', borderRadius: 8, color: '#9a3412', fontSize: '0.82rem', marginTop: '0.5rem' }}>
+                <AlertTriangle size={13} style={{ display: 'inline', marginRight: 6 }} />
+                <strong>Item Status: {itemDetails.status}</strong>
+                {itemDetails.status === 'Under Maintenance' && itemDetails.maintenanceEndDate && (
+                  <span> — until {itemDetails.maintenanceEndDate}</span>
+                )}
+                <div style={{ marginTop: '0.5rem' }}>
+                  <button
+                    className="inv-btn-primary"
+                    style={{ background: '#15803d', fontSize: '0.78rem', padding: '0.35rem 0.75rem' }}
+                    onClick={async () => {
+                      setMarkingAvailable(true);
+                      try {
+                        const updated = await onMarkItemAvailable(itemDetails.id);
+                        setItemDetails(prev => ({ ...prev, status: updated.status, maintenanceEndDate: null }));
+                      } finally {
+                        setMarkingAvailable(false);
+                      }
+                    }}
+                    disabled={markingAvailable}
+                  >
+                    {markingAvailable ? <Loader2 size={12} className="inv-spinner-inline" /> : <CheckCircle size={12} />}
+                    {' '}Mark Item Available Now
+                  </button>
+                </div>
+              </div>
+            )
           )}
 
           {actionDef && !isTerminal && !hasLeaseStarted && booking.status !== 'Active Lease' && booking.status !== 'Approved' && (
@@ -1859,13 +1896,15 @@ function BookingCard({ booking, isFitting, onOpen, onAction, onReturn, onExtend,
           </div>
         ) : !isFitting && booking.status === 'Approved' ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            <button
-              className="inv-btn-sm"
-              style={{ background: '#15803d', fontSize: '0.68rem' }}
-              onClick={e => { e.stopPropagation(); onPickedUp(booking); }}
-            >
-              <PackageCheck size={10} /> Picked Up
-            </button>
+            {booking.startDate === new Date().toISOString().split('T')[0] && (
+              <button
+                className="inv-btn-sm"
+                style={{ background: '#15803d', fontSize: '0.68rem' }}
+                onClick={e => { e.stopPropagation(); onPickedUp(booking); }}
+              >
+                <PackageCheck size={10} /> Picked Up
+              </button>
+            )}
             <button
               className="inv-btn-sm"
               style={{ background: '#991b1b', fontSize: '0.68rem' }}
@@ -2497,7 +2536,7 @@ export default function BookingsManagement() {
       setDirectBookings(prev => prev.map(b =>
         b.id === returnModal.id ? { ...b, bookingStatus: 'Completed' } : b
       ));
-      showToastMsg('success', 'Lease returned and completed');
+      showToastMsg('success', 'Lease returned and completed. Item is now Under Maintenance for 2 days.');
       setReturnModal(null);
       setDrawer(null);
     } catch (e) {
@@ -3002,6 +3041,11 @@ export default function BookingsManagement() {
           onReturn={handleReturnLease}
           onExtend={handleExtendLease}
           onPickedUp={handlePickedUp}
+          onMarkItemAvailable={async (itemId) => {
+            const updated = await markItemAvailable(itemId);
+            showToastMsg('success', 'Item marked as Available');
+            return updated;
+          }}
           onClose={() => setDrawer(null)}
           workingHours={workingHours}
         />

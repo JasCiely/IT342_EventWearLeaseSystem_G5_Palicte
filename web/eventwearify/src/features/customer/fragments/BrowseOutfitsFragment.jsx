@@ -165,7 +165,7 @@ function classifyDateRange(startDate, endDate, occupiedRanges) {
   let hasPending = false;
   for (const r of occupiedRanges) {
     if (!datesOverlap(startDate, endDate, r.startDate, r.endDate)) continue;
-    if (r.status === 'Approved' || r.status === 'Confirmed') return 'blocked';
+    if (r.status === 'Approved' || r.status === 'Confirmed' || r.status === 'Active Lease' || r.status === 'Under Maintenance') return 'blocked';
     if (r.status === 'Pending') hasPending = true;
   }
   return hasPending ? 'pending' : 'free';
@@ -175,17 +175,21 @@ function classifyDateRange(startDate, endDate, occupiedRanges) {
 // Shared Data
 // ────────────────────────────────────────────────────────────────────────────
 const ITEM_STATUS_META = {
-  'Available':   { color: '#15803d', bg: 'rgba(21,128,61,0.1)',   dot: '#22c55e' },
-  'Leased':      { color: '#b45309', bg: 'rgba(180,83,9,0.1)',    dot: '#f59e0b' },
-  'Maintenance': { color: '#991b1b', bg: 'rgba(153,27,27,0.1)',   dot: '#ef4444' },
-  'Reserved':    { color: '#1d4ed8', bg: 'rgba(29,78,216,0.1)',   dot: '#3b82f6' },
+  'Available':            { color: '#15803d', bg: 'rgba(21,128,61,0.1)',   dot: '#22c55e' },
+  'Leased':               { color: '#b45309', bg: 'rgba(180,83,9,0.1)',    dot: '#f59e0b' },
+  'Maintenance':          { color: '#991b1b', bg: 'rgba(153,27,27,0.1)',   dot: '#ef4444' },
+  'Under Maintenance':    { color: '#9a3412', bg: 'rgba(154,52,18,0.1)',   dot: '#ea580c' },
+  'Pending Availability': { color: '#b45309', bg: 'rgba(180,83,9,0.1)',    dot: '#f59e0b' },
+  'Reserved':             { color: '#1d4ed8', bg: 'rgba(29,78,216,0.1)',   dot: '#3b82f6' },
 };
 
 const CAT_COLORS = { Gown: '#c4717f', Suit: '#6b2d39', Traditional: '#b45309', Accessories: '#486581' };
 
-const todayStr    = () => new Date().toISOString().split('T')[0];
-const fmtDate     = d => d ? new Date(d).toLocaleDateString('en-PH', { year:'numeric', month:'short', day:'numeric' }) : '';
-const fmtDateTime = (d, t) => d ? `${fmtDate(d)} at ${t}` : '';
+const todayStr       = () => new Date().toISOString().split('T')[0];
+const fmtDate        = d => d ? new Date(d).toLocaleDateString('en-PH', { year:'numeric', month:'short', day:'numeric' }) : '';
+const fmtDateTime    = (d, t) => d ? `${fmtDate(d)} at ${t}` : '';
+// Leasing bookings must be placed at least 2 days before the pickup date.
+const minLeasingStart = () => { const d = new Date(); d.setDate(d.getDate() + 2); return d.toISOString().split('T')[0]; };
 
 // ────────────────────────────────────────────────────────────────────────────
 // UI Components (StatusBadge, MediaThumb, MediaGallery, Toast, Skeletons)
@@ -597,12 +601,13 @@ function DirectDatePicker({ value, onChange, minDate, bookingSettings, occupiedR
 // Direct Booking Modal (receives inventorySettings as a prop)
 // ────────────────────────────────────────────────────────────────────────────
 function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, currentUser, bookingSettings, userProfile, inventorySettings }) {
+  const _initSzArr = Array.isArray(item?.sizes) ? item.sizes.filter(Boolean) : (item?.size ? [item.size] : []);
   const [form, setForm] = useState({
     startDate: '', endDate: '', notes: '',
     name: currentUser?.name || '',
     email: currentUser?.email || '',
     phone: '',
-    preferredSize: '',
+    preferredSize: _initSzArr.length === 1 ? _initSzArr[0] : '',
   });
 
   useEffect(() => {
@@ -672,10 +677,16 @@ function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, c
   const handleSubmit = async () => {
     if (!isLoggedIn) { showToast('error', 'Please login first to make a booking.'); return; }
     if (!pricing?.isValid) return;
+    if (form.startDate < minLeasingStart()) {
+      showToast('error', `Leasing bookings must be made at least 2 days in advance. Earliest available start: ${fmtDate(minLeasingStart())}.`);
+      return;
+    }
     if (overlapStatus === 'blocked') { showToast('error', 'Selected dates are not available — another booking is confirmed for those dates.'); return; }
     if (availability === false) { showToast('error', 'Selected dates are no longer available. Please choose different dates.'); return; }
     if (!form.name || !form.email || !form.phone) { showToast('error', 'Please fill in your contact information.'); return; }
     if (!validatePhilippinePhone(form.phone)) { showToast('error', 'Invalid Philippine mobile number. Use +63 followed by 10 digits.'); return; }
+    const _dszArr = Array.isArray(item?.sizes) ? item.sizes.filter(Boolean) : (item?.size ? [item.size] : []);
+    if (_dszArr.length > 1 && !form.preferredSize) { showToast('error', 'Please select a size before booking.'); return; }
 
     setSubmitting(true);
     try {
@@ -692,7 +703,7 @@ function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, c
         customerName:   form.name,
         customerEmail:  form.email,
         customerPhone:  form.phone,
-        preferredSize:  form.preferredSize || (Array.isArray(item.sizes) ? item.sizes[0] : item.size) || '',
+        preferredSize:  form.preferredSize || '',
       });
       onSuccess({
         id:            result.id,
@@ -713,14 +724,17 @@ function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, c
   };
 
   const pendingBlocking = overlapStatus === 'pending' && !pendingAcknowledged;
+  const _canSubmitSzArr = Array.isArray(item?.sizes) ? item.sizes.filter(Boolean) : (item?.size ? [item.size] : []);
   const canSubmit = (
     pricing?.isValid &&
+    form.startDate >= minLeasingStart() &&
     overlapStatus !== 'blocked' &&
     availability !== false &&
     !submitting &&
     !checkingAvail &&
     !pendingBlocking &&
-    form.name && form.email && form.phone
+    form.name && form.email && form.phone &&
+    (_canSubmitSzArr.length <= 1 || !!form.preferredSize)
   );
 
   const handleStartChange = (newStart) => {
@@ -759,7 +773,7 @@ function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, c
               <DirectDatePicker
                 value={form.startDate}
                 onChange={handleStartChange}
-                minDate={todayStr()}
+                minDate={minLeasingStart()}
                 bookingSettings={bookingSettings}
                 occupiedRanges={occupiedRanges}
                 disabled={submitting}
@@ -910,13 +924,25 @@ function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, c
                 />
               </div>
             </div>
-            <div className="inv-field">
-              <label className="inv-field-label">Preferred Size</label>
-              <select className="inv-select" value={form.preferredSize} onChange={e => setForm(p => ({ ...p, preferredSize: e.target.value }))} disabled={submitting} style={{ width:'100%' }}>
-                <option value="">Select size (optional)</option>
-                {(Array.isArray(item.sizes) && item.sizes.length ? item.sizes : item.size ? [item.size] : ['XS','S','M','L','XL','XXL','3XL']).map(s => <option key={s}>{s}</option>)}
-              </select>
-            </div>
+            {(() => {
+              const szArr = Array.isArray(item?.sizes) ? item.sizes.filter(Boolean) : (item?.size ? [item.size] : []);
+              if (szArr.length === 0) return null;
+              if (szArr.length === 1) return (
+                <div className="inv-field">
+                  <label className="inv-field-label">Size</label>
+                  <div className="inv-input" style={{ cursor: 'not-allowed', background: '#f9fafb', color: '#374151' }}>{szArr[0]}</div>
+                </div>
+              );
+              return (
+                <div className="inv-field">
+                  <label className="inv-field-label">Size <span className="inv-required">*</span></label>
+                  <select className="inv-select" value={form.preferredSize} onChange={e => setForm(p => ({ ...p, preferredSize: e.target.value }))} disabled={submitting} style={{ width: '100%' }}>
+                    <option value="">Select size</option>
+                    {szArr.map(s => <option key={s}>{s}</option>)}
+                  </select>
+                </div>
+              );
+            })()}
           </div>
 
           <div className="inv-field">
@@ -1131,6 +1157,14 @@ export default function BrowseOutfitsFragment() {
     }));
   }, [modal, userProfile]);
 
+  useEffect(() => {
+    if (modal !== 'booking' || !selectedItem) return;
+    const szArr = Array.isArray(selectedItem.sizes) ? selectedItem.sizes.filter(Boolean) : (selectedItem.size ? [selectedItem.size] : []);
+    if (szArr.length === 1) {
+      setBooking(p => ({ ...p, preferredSize: szArr[0] }));
+    }
+  }, [modal, selectedItem?.id]);
+
   const showToast  = (type, message) => setToast({ show: true, type, message });
   const closeToast = () => setToast({ show: false, type: 'success', message: '' });
 
@@ -1269,6 +1303,8 @@ export default function BrowseOutfitsFragment() {
     if (!booking.fittingDate || !booking.fittingTime) { showToast('error', 'Please select a fitting date and time.'); return; }
     if (!booking.name || !booking.email || !booking.phone) { showToast('error', 'Please fill in your contact information.'); return; }
     if (!validatePhilippinePhone(booking.phone)) { showToast('error', 'Invalid Philippine mobile number. Use +63 followed by 10 digits.'); return; }
+    const _szArr = Array.isArray(selectedItem?.sizes) ? selectedItem.sizes.filter(Boolean) : (selectedItem?.size ? [selectedItem.size] : []);
+    if (_szArr.length > 1 && !booking.preferredSize) { showToast('error', 'Please select a size before booking.'); return; }
 
     if (bookingSettings.enableTimeRestrictions && !isWorkingDay(booking.fittingDate, bookingSettings)) {
       showToast('error', 'The selected date is not a working day. Please choose a different date.'); return;
@@ -1293,7 +1329,7 @@ export default function BrowseOutfitsFragment() {
         fittingDate: booking.fittingDate,
         fittingTime: to24Hour(booking.fittingTime),  
         customerName: booking.name, customerEmail: booking.email, customerPhone: booking.phone,
-        preferredSize: booking.preferredSize || (Array.isArray(selectedItem.sizes) ? selectedItem.sizes[0] : selectedItem.size) || '',
+        preferredSize: booking.preferredSize || '',
         notes: booking.notes, userId: currentUser.id || null,
       });
       const confirmation = {
@@ -1301,7 +1337,7 @@ export default function BrowseOutfitsFragment() {
         item: selectedItem,
         date: booking.fittingDate, time: booking.fittingTime,
         customerName: booking.name, customerEmail: booking.email, customerPhone: booking.phone,
-        preferredSize: booking.preferredSize || (Array.isArray(selectedItem.sizes) ? selectedItem.sizes[0] : selectedItem.size) || '',
+        preferredSize: booking.preferredSize || '',
         notes: booking.notes, status: 'confirmed', createdAt: new Date().toISOString(),
       };
       setBookingConfirmed(confirmation);
@@ -1912,13 +1948,25 @@ export default function BrowseOutfitsFragment() {
                     />
                   </div>
                 </div>
-                <div className="inv-field">
-                  <label className="inv-field-label">Preferred Size</label>
-                  <select className="inv-select" value={booking.preferredSize} onChange={e => setBooking(p => ({ ...p, preferredSize: e.target.value }))} disabled={submitting}>
-                    <option value="">Select size (optional)</option>
-                    {(Array.isArray(selectedItem?.sizes) && selectedItem.sizes.length ? selectedItem.sizes : selectedItem?.size ? [selectedItem.size] : ['XS','S','M','L','XL','XXL','3XL']).map(s => <option key={s}>{s}</option>)}
-                  </select>
-                </div>
+                {(() => {
+                  const szArr = Array.isArray(selectedItem?.sizes) ? selectedItem.sizes.filter(Boolean) : (selectedItem?.size ? [selectedItem.size] : []);
+                  if (szArr.length === 0) return null;
+                  if (szArr.length === 1) return (
+                    <div className="inv-field">
+                      <label className="inv-field-label">Size</label>
+                      <div className="inv-input" style={{ cursor: 'not-allowed', background: '#f9fafb', color: '#374151' }}>{szArr[0]}</div>
+                    </div>
+                  );
+                  return (
+                    <div className="inv-field">
+                      <label className="inv-field-label">Size <span className="inv-required">*</span></label>
+                      <select className="inv-select" value={booking.preferredSize} onChange={e => setBooking(p => ({ ...p, preferredSize: e.target.value }))} disabled={submitting}>
+                        <option value="">Select size</option>
+                        {szArr.map(s => <option key={s}>{s}</option>)}
+                      </select>
+                    </div>
+                  );
+                })()}
                 <div className="inv-field">
                   <label className="inv-field-label">Special Requests</label>
                   <textarea className="inv-textarea" rows={3} placeholder="Any special requests or questions?" value={booking.notes} onChange={e => setBooking(p => ({ ...p, notes: e.target.value }))} disabled={submitting} />

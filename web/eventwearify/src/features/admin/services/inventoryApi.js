@@ -1,9 +1,9 @@
 // Re-exports from shared — do not add feature-specific logic here.
 // Inventory-only functions:
-export { 
-  fetchItems, 
-  fetchItemById, 
-  fetchPromotions, 
+export {
+  fetchItems,
+  fetchItemById,
+  fetchPromotions,
   testBackendConnection,
   createItem,
   updateItem,
@@ -13,6 +13,7 @@ export {
   deletePromotion,
   fetchInventorySettings,
   saveInventorySettings,
+  markItemAvailable,
 } from '../../../shared/services/inventoryApi.js';
 
 // Booking functions:
