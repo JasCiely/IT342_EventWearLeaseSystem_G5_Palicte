@@ -207,8 +207,19 @@
   transition: margin-left var(--transition);
 }
 
-.admin-body:has(.admin-sidebar.collapsed) .admin-main {
+/* Support both :has() parent selector and adjacent-sibling fallback so browsers expand correctly */
+.admin-body:has(.admin-sidebar.collapsed) .admin-main,
+.admin-sidebar.collapsed + .admin-main {
   margin-left: var(--sidebar-collapsed-width);
+}
+
+/* When sidebar is collapsed, make fragment/root containers expand to full available width */
+.admin-body:has(.admin-sidebar.collapsed) .admin-main [class$="-root"],
+.admin-sidebar.collapsed + .admin-main [class$="-root"] {
+  max-width: none !important;
+  width: 100% !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
 }
 
 /* ─── Toast ──────────────────────────────────────────────── */

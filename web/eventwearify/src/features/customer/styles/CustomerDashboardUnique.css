@@ -262,6 +262,15 @@
   margin-left: var(--c-sidebar-collapsed);
 }
 
+/* Keep customer fragments full width when the sidebar collapses */
+.cust-sidebar.collapsed + .cust-main [class$="-root"],
+.cust-body:has(.cust-sidebar.collapsed) .cust-main [class$="-root"] {
+  max-width: none !important;
+  width: 100% !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
 @media (max-width: 768px) {
   .cust-header {
     padding: 0 1rem 0 0;

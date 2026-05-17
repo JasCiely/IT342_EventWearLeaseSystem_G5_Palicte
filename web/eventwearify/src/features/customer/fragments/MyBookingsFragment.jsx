@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useRef } from 'react';
+import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import ReactDOM from 'react-dom';
 import {
   X, Calendar, Clock, User, Mail, Phone, Tag, FileText, Package,
@@ -123,13 +123,6 @@ function DirectDatePicker({ value, onChange, minDate, bookingSettings, occupiedR
     return () => document.removeEventListener('mousedown', h);
   }, [open]);
 
-  useEffect(() => {
-    if (value) {
-      const d = new Date(value + 'T00:00:00');
-      setView({ year: d.getFullYear(), month: d.getMonth() });
-    }
-  }, [value]);
-
   const { year, month } = view;
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const firstDow    = new Date(year, month, 1).getDay();
@@ -225,27 +218,39 @@ function FittingDatePicker({ value, onChange, minDate, bookingSettings, itemId, 
     return () => document.removeEventListener('mousedown', h);
   }, [open]);
 
-  useEffect(() => {
-    if (value) { const d = new Date(value + 'T00:00:00'); setView({ year: d.getFullYear(), month: d.getMonth() }); }
-  }, [value]);
-
   const { year, month } = view;
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const firstDow    = new Date(year, month, 1).getDay();
 
   useEffect(() => {
     if (!itemId || !timeSlots.length) return;
+    const externalCache = slotCacheRef?.current || {};
+    const initialPatch = {};
     const toFetch = [];
     for (let d = 1; d <= daysInMonth; d++) {
       const ds = `${year}-${String(month + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
       if (ds < today) continue;
       if (!isWorkingDay(ds, bookingSettings)) continue;
       const cKey = `${itemId}__${ds}`;
-      if (localCache[ds] !== undefined || slotCacheRef?.current?.[cKey] !== undefined) continue;
+      if (localCache[ds] !== undefined || externalCache[cKey] !== undefined) {
+        if (externalCache[cKey] !== undefined && localCache[ds] === undefined) {
+          initialPatch[ds] = externalCache[cKey];
+        }
+        continue;
+      }
       toFetch.push(ds);
     }
+
+    if (Object.keys(initialPatch).length) {
+      queueMicrotask(() => {
+        setLocalCache(prev => ({ ...prev, ...initialPatch }));
+      });
+    }
     if (!toFetch.length) return;
-    setLoadingSet(prev => new Set([...prev, ...toFetch]));
+
+    queueMicrotask(() => {
+      setLoadingSet(prev => new Set([...prev, ...toFetch]));
+    });
     Promise.all(
       toFetch.map(ds => getBookedFittingSlots(itemId, ds).then(slots => ({ ds, slots })).catch(() => ({ ds, slots: [] })))
     ).then(results => {
@@ -257,12 +262,9 @@ function FittingDatePicker({ value, onChange, minDate, bookingSettings, itemId, 
       setLocalCache(prev => ({ ...prev, ...patch }));
       setLoadingSet(prev => { const next = new Set(prev); results.forEach(({ ds }) => next.delete(ds)); return next; });
     });
-  }, [year, month, itemId, timeSlots.length]);
+  }, [year, month, itemId, timeSlots.length, today, bookingSettings, localCache, slotCacheRef, daysInMonth]);
 
-  const getSlots = ds => {
-    if (localCache[ds] !== undefined) return localCache[ds];
-    return slotCacheRef?.current?.[`${itemId}__${ds}`];
-  };
+  const getSlots = ds => localCache[ds];
 
   const prevMonth = () => setView(v => { const d = new Date(v.year, v.month - 1, 1); return { year: d.getFullYear(), month: d.getMonth() }; });
   const nextMonth = () => setView(v => { const d = new Date(v.year, v.month + 1, 1); return { year: d.getFullYear(), month: d.getMonth() }; });
@@ -275,7 +277,14 @@ function FittingDatePicker({ value, onChange, minDate, bookingSettings, itemId, 
   return (
     <div className="fitting-cal-wrap" ref={wrapRef}>
       <button type="button" className={`fitting-cal-trigger${!value ? ' fct-empty' : ''}`}
-        onClick={() => !disabled && setOpen(o => !o)} disabled={disabled}>
+        onClick={() => {
+          if (disabled) return;
+          if (!open && value) {
+            const d = new Date(value + 'T00:00:00');
+            setView({ year: d.getFullYear(), month: d.getMonth() });
+          }
+          setOpen(o => !o);
+        }} disabled={disabled}>
         <Calendar size={13} style={{ color: value ? '#6b2d39' : '#bbb', flexShrink: 0 }} />
         <span style={{ flex: 1, textAlign: 'left' }}>{value ? fmtDate(value) : 'Select a date'}</span>
         <ChevronDown size={13} style={{ color: '#bbb', flexShrink: 0, transition: 'transform 0.15s', transform: open ? 'rotate(180deg)' : 'none' }} />
@@ -347,6 +356,7 @@ function EditDirectBookingModal({ booking, onClose, onSuccess, bookingSettings, 
   const [checkingAvail, setCheckingAvail]     = useState(false);
   const [overlapStatus, setOverlapStatus]     = useState(null);
   const [pendingAcknowledged, setPendingAcknowledged] = useState(false);
+  const [formError, setFormError]             = useState('');
   const [submitting, setSubmitting]           = useState(false);
   const debounceRef = useRef(null);
 
@@ -411,16 +421,17 @@ function EditDirectBookingModal({ booking, onClose, onSuccess, bookingSettings, 
   const handleSubmit = async () => {
     if (!canSubmit) return;
     if (!isActiveLease && form.startDate < minLeasingStart()) {
-      alert(`Leasing bookings must be made at least 2 days in advance. Earliest start: ${fmtDate(minLeasingStart())}.`);
+      setFormError(`Leasing bookings must be made at least 2 days in advance. Earliest start: ${fmtDate(minLeasingStart())}.`);
       return;
     }
     setSubmitting(true);
+    setFormError('');
     try {
       await editCustomerBookingDates(booking.id, form.startDate, form.endDate);
       onSuccess();
       onClose();
     } catch (err) {
-      alert(err.message || 'Failed to update booking dates. Please try again.');
+      setFormError(err.message || 'Failed to update booking dates. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -476,6 +487,12 @@ function EditDirectBookingModal({ booking, onClose, onSuccess, bookingSettings, 
             </div>
           </div>
 
+          {formError && (
+            <div className="inv-modal-error">
+              <AlertTriangle size={16} />
+              <span>{formError}</span>
+            </div>
+          )}
           {pricing && !pricing.isValid && (
             <div className="inv-warning-box">
               <AlertTriangle size={16} />
@@ -574,6 +591,7 @@ function RescheduleFittingModal({ booking, onClose, onSuccess, bookingSettings }
   });
   const [bookedSlots, setBookedSlots]   = useState([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
+  const [formError, setFormError]       = useState('');
   const [submitting, setSubmitting]     = useState(false);
 
   useEffect(() => {
@@ -618,18 +636,22 @@ function RescheduleFittingModal({ booking, onClose, onSuccess, bookingSettings }
     if (!canSubmit) return;
     if (!form.fittingDate || !form.fittingTime) return;
     if (bookingSettings?.enableTimeRestrictions && !isWorkingDay(form.fittingDate, bookingSettings)) {
-      alert('Selected date is not a working day.');
+      setFormError('Selected date is not a working day.');
       return;
     }
-    if (selectedTimeBooked) { alert('That time slot is already booked. Please select another.'); return; }
+    if (selectedTimeBooked) {
+      setFormError('That time slot is already booked. Please select another.');
+      return;
+    }
 
     setSubmitting(true);
+    setFormError('');
     try {
       await rescheduleCustomerFitting(booking.id, form.fittingDate, to24Hour(form.fittingTime));
       onSuccess();
       onClose();
     } catch (err) {
-      alert(err.message || 'Failed to reschedule. Please try again.');
+      setFormError(err.message || 'Failed to reschedule. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -670,6 +692,12 @@ function RescheduleFittingModal({ booking, onClose, onSuccess, bookingSettings }
             )}
           </div>
 
+          {formError && (
+            <div className="inv-modal-error" style={{ marginBottom: '1rem' }}>
+              <AlertTriangle size={16} />
+              <span>{formError}</span>
+            </div>
+          )}
           <div className="inv-field" style={{ marginTop: '1rem' }}>
             <label className="inv-field-label">New Time <span className="inv-required">*</span></label>
             {loadingSlots ? (
@@ -861,6 +889,50 @@ function BookingDetailModal({ booking, onClose }) {
   );
 }
 
+function CancelBookingConfirmModal({ booking, onClose, onConfirm, loading, error }) {
+  if (!booking) return null;
+  const actionLabel = booking.type === 'fitting' ? 'fitting appointment' : 'rental booking';
+  const infoLabel   = booking.type === 'fitting' ? booking.fittingDate : `${booking.startDate} → ${booking.endDate}`;
+  return ReactDOM.createPortal(
+    <div className="inv-overlay" onClick={onClose}>
+      <div className="inv-modal" style={{ maxWidth: '520px' }} onClick={e => e.stopPropagation()}>
+        <div className="inv-modal-header">
+          <h3>Cancel {actionLabel}?</h3>
+          <button className="inv-modal-close" onClick={onClose} disabled={loading}><X size={16} /></button>
+        </div>
+        <div className="inv-modal-body">
+          <p style={{ margin: 0, color: '#4b5563' }}>
+            This action cannot be undone. Confirming cancellation will remove this booking from your active reservations.
+          </p>
+          <div className="inv-modal-grid" style={{ marginTop: '1rem', gap: '0.75rem' }}>
+            <div className="inv-mini-card">
+              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#6b7280', marginBottom: '0.5rem' }}>Booking</label>
+              <p style={{ margin: 0, fontWeight: 700, color: '#111' }}>{booking.type === 'fitting' ? booking.bookingId : booking.id}</p>
+            </div>
+            <div className="inv-mini-card">
+              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#6b7280', marginBottom: '0.5rem' }}>Date / Period</label>
+              <p style={{ margin: 0, fontWeight: 700, color: '#111' }}>{infoLabel}</p>
+            </div>
+          </div>
+          {error && (
+            <div className="inv-modal-error" style={{ marginTop: '1rem' }}>
+              <AlertTriangle size={16} />
+              <span>{error}</span>
+            </div>
+          )}
+        </div>
+        <div className="inv-modal-footer">
+          <button className="inv-btn-ghost" onClick={onClose} disabled={loading}>Keep booking</button>
+          <button className="inv-btn-primary" onClick={onConfirm} disabled={loading}>
+            {loading ? <><Loader2 size={14} className="spinner-inline" /> Cancelling…</> : <><Trash2 size={14} /> Confirm cancellation</>}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 // ── BookingsView ──────────────────────────────────────────────────────────────
 
 const BookingsView = () => {
@@ -869,9 +941,12 @@ const BookingsView = () => {
   const [error, setError]                   = useState(null);
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [editingBooking, setEditingBooking]   = useState(null);
-  const [cancellingId, setCancellingId]     = useState(null);
-  const [refreshing, setRefreshing]         = useState(false);
-  const [activeTab, setActiveTab]           = useState('active');
+  const [cancelConfirmBooking, setCancelConfirmBooking] = useState(null);
+  const [cancelError, setCancelError]         = useState('');
+  const [cancelLoading, setCancelLoading]     = useState(false);
+  const [cancellingId, setCancellingId]       = useState(null);
+  const [refreshing, setRefreshing]           = useState(false);
+  const [activeTab, setActiveTab]             = useState('active');
 
   const { settings: bookingSettings } = useBookingSettings();
   const [inventorySettings, setInventorySettings] = useState(null);
@@ -882,7 +957,7 @@ const BookingsView = () => {
       .catch(() => {});
   }, []);
 
-  const fetchBookings = () => {
+  const fetchBookings = useCallback(() => {
     const token = localStorage.getItem('token');
     const fetchFitting = fetch('/api/inventory/bookings/my', { headers: { Authorization: `Bearer ${token}` } })
       .then(res => res.ok ? res.json() : []);
@@ -895,9 +970,9 @@ const BookingsView = () => {
       const all = [...fittingWithType, ...directWithType].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
       setBookings(all);
     });
-  };
+  }, []);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setError(null);
       await fetchBookings();
@@ -907,26 +982,33 @@ const BookingsView = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [fetchBookings]);
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => { void loadData(); }, [loadData]);
 
   const handleRefresh = () => { setRefreshing(true); loadData(); };
 
-  const handleCancel = async (booking) => {
-    const confirmMsg = booking.type === 'fitting'
-      ? 'Cancel this fitting appointment? This action cannot be undone.'
-      : 'Cancel this rental booking? Cancellation is permanent.';
-    if (!window.confirm(confirmMsg)) return;
+  const handleCancel = (booking) => {
+    setCancelConfirmBooking(booking);
+    setCancelError('');
+  };
 
-    setCancellingId(booking.type === 'fitting' ? booking.bookingId : booking.id);
+  const confirmCancel = async () => {
+    if (!cancelConfirmBooking) return;
+    const booking = cancelConfirmBooking;
+    const bookingKey = booking.type === 'fitting' ? booking.bookingId : booking.id;
+    setCancelLoading(true);
+    setCancellingId(bookingKey);
+    setCancelError('');
     try {
       if (booking.type === 'fitting') await cancelFittingBooking(booking.id);
       else await cancelDirectBooking(booking.id);
       await fetchBookings();
+      setCancelConfirmBooking(null);
     } catch (err) {
-      alert(err.message || 'Failed to cancel booking. Please try again.');
+      setCancelError(err.message || 'Failed to cancel booking. Please try again.');
     } finally {
+      setCancelLoading(false);
       setCancellingId(null);
     }
   };
@@ -1066,6 +1148,16 @@ const BookingsView = () => {
           onClose={() => setEditingBooking(null)}
           onSuccess={() => { setEditingBooking(null); loadData(); }}
           bookingSettings={bookingSettings}
+        />
+      )}
+
+      {cancelConfirmBooking && (
+        <CancelBookingConfirmModal
+          booking={cancelConfirmBooking}
+          onClose={() => { setCancelConfirmBooking(null); setCancelError(''); }}
+          onConfirm={confirmCancel}
+          loading={cancelLoading}
+          error={cancelError}
         />
       )}
     </div>
