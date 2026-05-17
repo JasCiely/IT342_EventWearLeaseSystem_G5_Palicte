@@ -89,7 +89,11 @@ const AdminDashboard = () => {
     <div className="admin-layout">
 
       {/* Fixed top header */}
-      <DashboardHeader userName={firstName} onLogout={handleLogout} />
+      <DashboardHeader
+        userName={firstName}
+        onLogout={handleLogout}
+        onBrowse={() => navigate('/admin/inventory')}
+      />
 
       <div className="admin-body">
 
