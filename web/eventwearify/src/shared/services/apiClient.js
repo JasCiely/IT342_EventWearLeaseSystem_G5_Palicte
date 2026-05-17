@@ -44,10 +44,12 @@
     try {
       const response = await fetch(url, { ...options, headers });
 
-      // Handle 401 Unauthorized - token is invalid or blacklisted
+      // Handle 401 Unauthorized - session expired
       if (response.status === 401) {
         console.warn('Received 401 Unauthorized - token invalid or blacklisted');
-        clearAuthAndRedirect();
+        localStorage.clear();
+        sessionStorage.clear();
+        window.dispatchEvent(new CustomEvent('sessionExpired'));
         throw new Error('Session expired. Please login again.');
       }
 

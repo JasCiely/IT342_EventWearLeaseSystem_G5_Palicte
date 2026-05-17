@@ -310,11 +310,7 @@ const ForgotPassword = () => {
               )}
             </div>
             <button className="fp-submit-btn" onClick={handleSendOtp} disabled={isLoading}>
-              {isLoading ? (
-                <><span className="fp-spinner" /><span>Sending OTP...</span></>
-              ) : (
-                <><span>Send OTP</span><ArrowRight size={18} /></>
-              )}
+              <><span>Send OTP</span><ArrowRight size={18} /></>
             </button>
           </div>
         )}
@@ -347,11 +343,7 @@ const ForgotPassword = () => {
               </div>
             )}
             <button className="fp-submit-btn" onClick={handleVerifyOtp} disabled={isLoading}>
-              {isLoading ? (
-                <><span className="fp-spinner" /><span>Verifying...</span></>
-              ) : (
-                <><span>Verify OTP</span><ArrowRight size={18} /></>
-              )}
+              <><span>Verify OTP</span><ArrowRight size={18} /></>
             </button>
             <button
               className="fp-resend-btn"
@@ -445,11 +437,7 @@ const ForgotPassword = () => {
             </div>
 
             <button className="fp-submit-btn" onClick={handleResetPassword} disabled={isLoading}>
-              {isLoading ? (
-                <><span className="fp-spinner" /><span>Resetting...</span></>
-              ) : (
-                <><span>Reset Password</span><ArrowRight size={18} /></>
-              )}
+              <><span>Reset Password</span><ArrowRight size={18} /></>
             </button>
           </div>
         )}

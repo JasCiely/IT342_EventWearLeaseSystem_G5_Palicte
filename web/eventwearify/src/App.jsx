@@ -47,27 +47,20 @@ const CustomerRoute = ({ children }) => {
 };
 
 function App() {
-  const [isValidatingToken, setIsValidatingToken] = useState(true);
+  const [sessionExpired, setSessionExpired] = useState(false);
 
   useEffect(() => {
     const validateToken = async () => {
       const token = localStorage.getItem('token');
       const isAuth = localStorage.getItem('isAuthenticated');
-      
-      // Skip validation if on auth pages or no token
-      const isAuthPage = window.location.pathname.includes('/auth') || 
+
+      const isAuthPage = window.location.pathname.includes('/auth') ||
                          window.location.pathname.includes('/oauth2/callback') ||
                          window.location.pathname === '/';
-      
-      if (!token || isAuth !== 'true' || isAuthPage) {
-        setIsValidatingToken(false);
-        return;
-      }
-      
+
+      if (!token || isAuth !== 'true' || isAuthPage) return;
+
       try {
-        console.log('Validating token...');
-        
-        // Try to validate token with a simple API call
         const response = await fetch(`${API_BASE_URL_ROOT}/auth/validate-token`, {
           method: 'POST',
           headers: {
@@ -75,62 +68,49 @@ function App() {
             'Content-Type': 'application/json'
           }
         });
-        
+
         if (!response.ok) {
           console.warn('Token validation failed - clearing session');
           localStorage.clear();
           sessionStorage.clear();
           window.location.href = '/auth';
-        } else {
-          console.log('Token is valid');
         }
       } catch (error) {
         console.error('Token validation error:', error);
-        // On network error, allow user to continue
-        // They'll get 401 on first API call if token is actually invalid
       }
-      
-      setIsValidatingToken(false);
     };
 
     validateToken();
   }, []);
 
-  if (isValidatingToken) {
-    return (
-      <div style={{ 
-        minHeight: '100vh', 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center',
-        backgroundColor: '#f9fafb'
-      }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{
-            width: '48px',
-            height: '48px',
-            border: '3px solid #e0e0e0',
-            borderTop: '3px solid #c4717f',
-            borderRadius: '50%',
-            margin: '0 auto 16px',
-            animation: 'spin 0.8s linear infinite'
-          }}></div>
-          <p style={{ color: '#6b7280', fontSize: '14px', fontFamily: 'sans-serif' }}>
-            Validating session...
-          </p>
-          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-        </div>
-      </div>
-    );
-  }
+  useEffect(() => {
+    const handleSessionExpired = () => setSessionExpired(true);
+    window.addEventListener('sessionExpired', handleSessionExpired);
+    return () => window.removeEventListener('sessionExpired', handleSessionExpired);
+  }, []);
 
-  const handleLogin = () => {
-    // Logic for post-login actions if needed
+  const handleSessionExpiredOkay = () => {
+    setSessionExpired(false);
+    window.location.href = '/auth';
   };
 
+  const handleLogin = () => {};
+
   return (
-    <Router>
-      <Routes>
+    <>
+      {sessionExpired && (
+        <div className="session-timeout-modal">
+          <div className="session-timeout-content">
+            <h3>Session Inactive</h3>
+            <p>Your session has become inactive. Please log in again.</p>
+            <button className="stay-logged-in-btn" onClick={handleSessionExpiredOkay}>
+              Okay
+            </button>
+          </div>
+        </div>
+      )}
+      <Router>
+        <Routes>
         <Route path="/" element={<Index />} />
         <Route path="/auth" element={<Auth onLogin={handleLogin} />} />
 
@@ -178,6 +158,7 @@ function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
+    </>
   );
 }
 
