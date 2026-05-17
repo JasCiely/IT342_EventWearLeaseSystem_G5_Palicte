@@ -56,6 +56,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
 
+                        // SSE stream — events contain no sensitive data; auth is on data endpoints
+                        .requestMatchers("/api/sse/events").permitAll()
+
                         // Public inventory reads
                         .requestMatchers(HttpMethod.GET, "/api/inventory/items", "/api/inventory/items/**",
                                 "/api/inventory/promotions", "/api/inventory/fitting/booked-slots")
@@ -64,8 +67,9 @@ public class SecurityConfig {
                         // Direct bookings — customers can create/view their own; admins manage all
                         .requestMatchers(HttpMethod.POST, "/api/direct-bookings").hasRole("CUSTOMER")
                         .requestMatchers(HttpMethod.GET, "/api/direct-bookings/my-bookings").hasRole("CUSTOMER")
-                        .requestMatchers(HttpMethod.GET, "/api/direct-bookings/availability").hasRole("CUSTOMER")
+                        .requestMatchers(HttpMethod.GET, "/api/direct-bookings/availability").hasAnyRole("CUSTOMER", "ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/direct-bookings/**").hasAnyRole("ADMIN", "CUSTOMER")
+                        .requestMatchers(HttpMethod.PUT, "/api/direct-bookings/*/edit-dates").hasRole("CUSTOMER")
                         .requestMatchers(HttpMethod.PUT, "/api/direct-bookings/**").hasRole("ADMIN")
                         .requestMatchers("/api/public/**").permitAll()
 
@@ -130,7 +134,7 @@ public class SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(List.of(corsOrigin));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Accept"));
+        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Accept", "Last-Event-ID", "Cache-Control"));
         configuration.setAllowCredentials(true);
         configuration.setExposedHeaders(List.of("Authorization"));
 

@@ -11,10 +11,10 @@ export const fetchItems = async () => {
       name: item.name,
       category: item.category,
       subtype: item.subtype || '',
-      size: item.size,
-      color: item.color,
+      sizes: Array.isArray(item.sizes) ? item.sizes : [],
       price: item.price,
       status: item.status,
+      maintenanceEndDate: item.maintenanceEndDate || null,
       ageRange: item.ageRange || '',
       description: item.description || '',
       mediaFiles: item.mediaFiles || [],
@@ -33,16 +33,26 @@ export const fetchItemById = async (id) => {
       name: response.name,
       category: response.category,
       subtype: response.subtype || '',
-      size: response.size,
-      color: response.color,
+      sizes: Array.isArray(response.sizes) ? response.sizes : [],
       price: response.price,
       status: response.status,
+      maintenanceEndDate: response.maintenanceEndDate || null,
       ageRange: response.ageRange || '',
       description: response.description || '',
       mediaFiles: response.mediaFiles || [],
     };
   } catch (error) {
     console.error('Error fetching item:', error);
+    throw error;
+  }
+};
+
+export const markItemAvailable = async (itemId) => {
+  try {
+    const response = await authFetch(`/inventory/items/${itemId}/mark-available`, { method: 'PUT' });
+    return response;
+  } catch (error) {
+    console.error('Error marking item available:', error);
     throw error;
   }
 };

@@ -1,5 +1,6 @@
 package com.backend.features.booking;
 
+import com.backend.features.booking.dto.request.AdminFittingBookingRequest;
 import com.backend.features.booking.dto.request.FittingBookingRequest;
 import com.backend.features.booking.dto.response.FittingBookingResponse;
 import com.backend.features.booking.settings.BookingTimeSettingsService;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -157,6 +159,32 @@ public class BookingServiceImpl implements BookingService {
         if (!"CONFIRMED".equals(booking.getStatus())) {
             throw new IllegalStateException("Only confirmed bookings can be completed");
         }
+
+        // Backend enforcement: Done is valid from fitting start until working-hours end time
+        BookingTimeSettingsDto settings = settingsService.getSettings();
+        try {
+            LocalDate fDate = LocalDate.parse(booking.getFittingDate(), DATE_FORMATTER);
+            LocalTime fTime = LocalTime.parse(booking.getFittingTime());
+            LocalDateTime fittingStart = LocalDateTime.of(fDate, fTime);
+            LocalDateTime now = LocalDateTime.now();
+            if (now.isBefore(fittingStart)) {
+                throw new IllegalStateException(
+                        "Fitting session has not started yet. Please wait until " + booking.getFittingTime());
+            }
+            if (settings.isEnableTimeRestrictions()) {
+                LocalTime closeTime = LocalTime.parse(settings.getShopCloseTime());
+                LocalDateTime workingEnd = LocalDateTime.of(fDate, closeTime);
+                if (!now.isBefore(workingEnd)) {
+                    throw new IllegalStateException(
+                            "Working hours have ended. The booking will be automatically cancelled.");
+                }
+            }
+        } catch (IllegalStateException e) {
+            throw e;
+        } catch (Exception e) {
+            log.warn("Could not validate fitting time window for {}: {}", bookingId, e.getMessage());
+        }
+
         booking.setStatus("COMPLETED");
         Booking saved = bookingRepository.save(booking);
         try {
@@ -174,8 +202,9 @@ public class BookingServiceImpl implements BookingService {
     public Booking markLeaseStartedFromFitting(String bookingId, String directBookingId) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new IllegalArgumentException("Booking not found"));
-        if (!"CONFIRMED".equals(booking.getStatus())) {
-            throw new IllegalStateException("Only confirmed bookings can be converted to lease");
+        String status = booking.getStatus();
+        if (!"CONFIRMED".equals(status) && !"COMPLETED".equals(status)) {
+            throw new IllegalStateException("Only confirmed or completed fittings can be converted to a lease");
         }
         booking.setLeaseStarted(true);
         booking.setLeaseBookingId(directBookingId);
@@ -278,6 +307,38 @@ public class BookingServiceImpl implements BookingService {
     public Booking rescheduleFitting(String bookingId, String fittingDate, String fittingTime) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new IllegalArgumentException("Booking not found"));
+
+        BookingTimeSettingsDto settings = settingsService.getSettings();
+
+        // Validate working day (same logic as createBooking)
+        if (settings.isEnableTimeRestrictions()) {
+            LocalDate date = LocalDate.parse(fittingDate, DATE_FORMATTER);
+            int dayOfWeek = date.getDayOfWeek().getValue() % 7;
+            if (!settings.getWorkingDays().contains(dayOfWeek)) {
+                throw new IllegalArgumentException("Fittings are not available on this day.");
+            }
+            LocalTime slotTime = LocalTime.parse(fittingTime);
+            LocalTime openTime = LocalTime.parse(settings.getShopOpenTime());
+            LocalTime closeTime = LocalTime.parse(settings.getShopCloseTime());
+            if (slotTime.isBefore(openTime) || slotTime.isAfter(closeTime.minusMinutes(1))) {
+                throw new IllegalArgumentException("Selected time is outside working hours (" +
+                        settings.getShopOpenTime() + " – " + settings.getShopCloseTime() + ").");
+            }
+        }
+
+        // Time slot alignment (same as createBooking)
+        if (!isValidTimeSlot(fittingTime, settings.getFittingDurationMinutes())) {
+            throw new IllegalArgumentException("Fitting slots are available every " +
+                    settings.getFittingDurationMinutes() + " minutes.");
+        }
+
+        // Per-item uniqueness: same item cannot have two CONFIRMED bookings at the same date+time
+        boolean itemSlotTaken = bookingRepository.existsByItemIdAndFittingDateAndFittingTimeAndStatusExcludingId(
+                booking.getItemId(), fittingDate, fittingTime, bookingId);
+        if (itemSlotTaken) {
+            throw new IllegalArgumentException("This item is already booked at the selected date and time.");
+        }
+
         booking.setStatus("CONFIRMED");
         booking.setFittingDate(fittingDate);
         booking.setFittingTime(fittingTime);
@@ -297,6 +358,62 @@ public class BookingServiceImpl implements BookingService {
     }
 
     // ── Internal helpers ──────────────────────────────────────────────────────
+
+    @Override
+    @Transactional
+    public FittingBookingResponse createFittingBookingForCustomer(AdminFittingBookingRequest req) {
+        FittingBookingRequest request = new FittingBookingRequest();
+        request.setItemId(req.getItemId());
+        request.setItemName(req.getItemName());
+        request.setFittingDate(req.getFittingDate());
+        request.setFittingTime(req.getFittingTime());
+        request.setCustomerName(req.getCustomerName());
+        request.setCustomerEmail(req.getCustomerEmail());
+        request.setCustomerPhone(req.getCustomerPhone());
+        request.setPreferredSize(req.getPreferredSize());
+        request.setNotes(req.getNotes());
+        request.setUserId(null);
+        return createBooking(request);
+    }
+
+    // ── Auto-cancel past fittings (called by scheduler) ──────────────────────
+
+    @Override
+    @Transactional
+    public void autoCancelPastFittings() {
+        BookingTimeSettingsDto settings = settingsService.getSettings();
+        int durationMinutes = settings.getFittingDurationMinutes() > 0 ? settings.getFittingDurationMinutes() : 30;
+
+        String today = LocalDate.now().format(DATE_FORMATTER);
+        LocalDateTime now = LocalDateTime.now();
+
+        List<Booking> candidates = bookingRepository.findConfirmedOnOrBeforeDate(today);
+
+        for (Booking booking : candidates) {
+            try {
+                LocalDate fDate = LocalDate.parse(booking.getFittingDate(), DATE_FORMATTER);
+                LocalTime fTime = LocalTime.parse(booking.getFittingTime());
+                LocalDateTime fittingEnd = LocalDateTime.of(fDate, fTime).plusMinutes(durationMinutes);
+
+                if (!now.isBefore(fittingEnd)) {
+                    booking.setStatus("CANCELLED");
+                    bookingRepository.save(booking);
+                    log.info("Auto-cancelled past fitting {} scheduled for {} {}",
+                            booking.getBookingId(), booking.getFittingDate(), booking.getFittingTime());
+                    try {
+                        emailService.sendFittingCancellation(
+                                booking.getCustomerEmail(), booking.getCustomerName(),
+                                booking.getBookingId(), booking.getItemName(),
+                                booking.getFittingDate(), booking.getFittingTime());
+                    } catch (Exception e) {
+                        log.error("Failed to send auto-cancel email for {}: {}", booking.getBookingId(), e.getMessage());
+                    }
+                }
+            } catch (Exception e) {
+                log.error("Error processing auto-cancel for booking {}: {}", booking.getId(), e.getMessage());
+            }
+        }
+    }
 
     private boolean isValidTimeSlot(String time, int durationMinutes) {
         if (time == null)
@@ -341,5 +458,22 @@ public class BookingServiceImpl implements BookingService {
         } catch (Exception e) {
             log.error("Failed to send cancellation email for booking {}: {}", bookingId, e.getMessage());
         }
+    }
+
+    @Override
+    @Transactional
+    public Booking rescheduleFittingByCustomer(String bookingId, String customerEmail, String fittingDate, String fittingTime) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new IllegalArgumentException("Booking not found"));
+
+        if (!booking.getCustomerEmail().equals(customerEmail)) {
+            throw new SecurityException("You are not allowed to reschedule this booking");
+        }
+
+        if (!"CONFIRMED".equals(booking.getStatus())) {
+            throw new IllegalStateException("Only confirmed bookings can be rescheduled");
+        }
+
+        return rescheduleFitting(bookingId, fittingDate, fittingTime);
     }
 }

@@ -35,6 +35,8 @@ export {
   getUnavailableDates,
   getBookedFittingSlots,
   getOccupiedDirectDates,
-  cancelFittingBooking,    
-  cancelDirectBooking,     
+  cancelFittingBooking,
+  cancelDirectBooking,
+  editCustomerBookingDates,
+  rescheduleCustomerFitting,
 } from '../../../shared/services/bookingApi.js';

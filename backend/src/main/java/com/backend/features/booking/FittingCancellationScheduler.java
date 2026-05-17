@@ -9,15 +9,15 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class LeaseActivationScheduler {
+public class FittingCancellationScheduler {
 
-    private final DirectBookingService directBookingService;
+    private final BookingService bookingService;
     private final SseService sseService;
 
     @Scheduled(fixedRate = 60000)
-    public void autoExpireApprovedBookings() {
-        log.debug("Direct booking pickup-expiry check started");
-        directBookingService.autoExpireApprovedBookings();
+    public void autoCancelPastFittings() {
+        log.debug("Fitting auto-cancellation check started");
+        bookingService.autoCancelPastFittings();
         sseService.broadcast("BOOKING_UPDATE");
     }
 }

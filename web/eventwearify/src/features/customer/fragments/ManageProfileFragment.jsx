@@ -1,171 +1,583 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  UserCircle,
+  Mail,
+  Phone,
+  Lock,
+  Eye,
+  EyeOff,
+  Save,
+  CheckCircle,
+  AlertCircle,
+  Edit2,
+  X,
+  Loader2,
+  Camera,
+  Trash2,
+} from 'lucide-react';
 import '../styles/ManageProfileFragment.css';
-import { getProfile, updateProfile } from '../services/userService';
 
-const normalizePhilippinePhone = (raw) => {
-  let digits = raw.replace(/\D/g, '');
-  if (digits.startsWith('639')) {
-    digits = '09' + digits.slice(3);
-  } else if (digits.startsWith('9')) {
-    digits = '0' + digits;
-  }
-  return digits.slice(0, 11);
+const API_BASE  = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+const AUTH_BASE = `${API_BASE}/api/auth`;
+const USER_BASE = `${API_BASE}/api/user`;
+
+const validatePhilippinePhone = (phone) => {
+  const stripped = (phone || '').replace(/\s/g, '');
+  return /^\+63\d{10}$/.test(stripped);
 };
 
-const validatePhilippinePhone = (phone) => /^09\d{9}$/.test(phone);
+const PhilippinePhoneInput = ({ value, onChange, disabled }) => {
+  const getRawDigits = (fullNumber) => {
+    if (!fullNumber || typeof fullNumber !== 'string') return '';
+    const matchPlus  = fullNumber.match(/^\+63(\d+)$/);
+    if (matchPlus) return matchPlus[1];
+    // convert legacy 09XXXXXXXXX → 9XXXXXXXXX
+    const matchLocal = fullNumber.match(/^09(\d{9})$/);
+    if (matchLocal) return '9' + matchLocal[1];
+    return '';
+  };
 
-const ManageProfileFragment = () => {
-  const [form, setForm] = useState({ firstName: '', lastName: '', email: '', phone: '' });
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [rawDigits, setRawDigits] = useState(() => getRawDigits(value));
 
-  useEffect(() => {
-    getProfile()
-      .then((data) => {
-        setForm({
-          firstName: data.firstName || '',
-          lastName: data.lastName || '',
-          email: data.email || '',
-          phone: data.phone || '',
-        });
-      })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
-  }, []);
+  useEffect(() => { setRawDigits(getRawDigits(value)); }, [value]);
+
+  const formatDisplay = (digits) => {
+    if (!digits) return '';
+    const c = digits.replace(/\D/g, '');
+    if (c.length <= 3) return c;
+    if (c.length <= 6) return `${c.slice(0, 3)} ${c.slice(3)}`;
+    return `${c.slice(0, 3)} ${c.slice(3, 6)} ${c.slice(6, 10)}`;
+  };
 
   const handleChange = (e) => {
-    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
-    if (error) setError('');
-    if (success) setSuccess('');
+    let digits = e.target.value.replace(/\D/g, '');
+    if (digits.length > 10) digits = digits.slice(0, 10);
+    setRawDigits(digits);
+    onChange(digits ? `+63${digits}` : '');
   };
 
-  const handlePhoneChange = (e) => {
-    const normalized = normalizePhilippinePhone(e.target.value);
-    setForm((prev) => ({ ...prev, phone: normalized }));
-    if (error) setError('');
-    if (success) setSuccess('');
+  const isValid = rawDigits.length === 10 && rawDigits.startsWith('9');
+
+  return (
+    <div className={`ph-phone-input-wrapper${!isValid && rawDigits.length > 0 ? ' ph-phone-invalid' : ''}`}>
+      <div className="ph-phone-prefix">
+        <span className="ph-flag">🇵🇭</span>
+        <span className="ph-country-code">+63</span>
+      </div>
+      <input
+        type="tel"
+        className="ph-phone-input"
+        value={formatDisplay(rawDigits)}
+        onChange={handleChange}
+        disabled={disabled}
+        placeholder="9XX XXX XXXX"
+        autoComplete="off"
+      />
+    </div>
+  );
+};
+
+const getLocalProfile = () => ({
+  firstName:       localStorage.getItem('firstName')       || '',
+  lastName:        localStorage.getItem('lastName')        || '',
+  email:           localStorage.getItem('email')           || '',
+  phone:           localStorage.getItem('phone')           || '',
+  role:            localStorage.getItem('role')            || 'CUSTOMER',
+  profilePhotoUrl: localStorage.getItem('profilePhotoUrl') || '',
+});
+
+const saveLocalProfile = (p) => {
+  localStorage.setItem('firstName',       p.firstName);
+  localStorage.setItem('lastName',        p.lastName);
+  localStorage.setItem('email',           p.email);
+  localStorage.setItem('phone',           p.phone           || '');
+  localStorage.setItem('role',            p.role);
+  localStorage.setItem('profilePhotoUrl', p.profilePhotoUrl || '');
+};
+
+const ManageProfileFragment = () => {
+  const token     = localStorage.getItem('token');
+  const hasSynced = useRef(false);
+  const fileInput = useRef(null);
+
+  const [profile,    setProfile]    = useState(getLocalProfile);
+  const [editMode,   setEditMode]   = useState(false);
+  const [editFields, setEditFields] = useState(getLocalProfile);
+  const [saving,     setSaving]     = useState(false);
+  const [syncing,    setSyncing]    = useState(false);
+
+  const [photoPreview,   setPhotoPreview]   = useState(null);
+  const [photoFile,      setPhotoFile]      = useState(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+  const [pwForm, setPwForm] = useState({
+    currentPassword: '',
+    newPassword:     '',
+    confirmPassword: '',
+  });
+  const [showPw,   setShowPw]   = useState({ current: false, next: false, confirm: false });
+  const [savingPw, setSavingPw] = useState(false);
+
+  const [toast, setToast] = useState({ show: false, type: 'success', message: '' });
+
+  const showToast = (type, message) => {
+    setToast({ show: true, type, message });
+    setTimeout(() => setToast({ show: false, type: 'success', message: '' }), 3500);
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (form.phone && !validatePhilippinePhone(form.phone)) {
-      setError('Invalid Philippine mobile number. Use 09XXXXXXXXX or +639XXXXXXXXX format.');
+  useEffect(() => {
+    if (hasSynced.current) return;
+    hasSynced.current = true;
+
+    const syncProfile = async () => {
+      setSyncing(true);
+      try {
+        const res = await fetch(`${USER_BASE}/profile`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+
+        const data = await res.json();
+        const fetched = {
+          firstName:       data.firstName       || '',
+          lastName:        data.lastName        || '',
+          email:           data.email           || '',
+          phone:           data.phone           || '',
+          role:            data.role            || 'CUSTOMER',
+          profilePhotoUrl: data.profilePhotoUrl || '',
+        };
+
+        setProfile(prev => {
+          const changed = Object.keys(fetched).some(k => prev[k] !== fetched[k]);
+          if (changed) { saveLocalProfile(fetched); return fetched; }
+          return prev;
+        });
+        setEditMode(em => { if (!em) setEditFields(fetched); return em; });
+      } catch {
+        // silent — localStorage values remain
+      } finally {
+        setSyncing(false);
+      }
+    };
+
+    syncProfile();
+  }, []);
+
+  const handlePhotoChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!allowed.includes(file.type)) {
+      showToast('error', 'Invalid file type. Use JPEG, PNG, WEBP, or GIF.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('error', 'File too large. Maximum size is 5 MB.');
+      return;
+    }
+
+    setPhotoFile(file);
+    setPhotoPreview(URL.createObjectURL(file));
+  };
+
+  const handleUploadPhoto = async () => {
+    if (!photoFile) return;
+    setUploadingPhoto(true);
+    try {
+      const fd = new FormData();
+      fd.append('photo', photoFile);
+
+      const res = await fetch(`${USER_BASE}/profile/photo`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: fd,
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || 'Failed to upload photo');
+      }
+
+      const updated = await res.json();
+      const serverUrl = updated.profilePhotoUrl || '';
+
+      const newProfile = { ...profile, profilePhotoUrl: serverUrl };
+      setProfile(newProfile);
+      saveLocalProfile(newProfile);
+
+      const blobUrl = photoPreview;
+      setPhotoPreview(null);
+      setPhotoFile(null);
+      if (fileInput.current) fileInput.current.value = '';
+      setTimeout(() => { if (blobUrl) URL.revokeObjectURL(blobUrl); }, 500);
+
+      showToast('success', 'Profile photo updated!');
+    } catch (err) {
+      showToast('error', err.message || 'Could not upload photo.');
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const handleDiscardPhoto = () => {
+    if (photoPreview) URL.revokeObjectURL(photoPreview);
+    setPhotoPreview(null);
+    setPhotoFile(null);
+    if (fileInput.current) fileInput.current.value = '';
+  };
+
+  const displayPhoto = photoPreview
+    || (profile.profilePhotoUrl
+        ? `${profile.profilePhotoUrl}?t=${encodeURIComponent(profile.profilePhotoUrl.split('/').pop())}`
+        : null);
+
+  const handleEditChange = (e) =>
+    setEditFields(prev => ({ ...prev, [e.target.name]: e.target.value }));
+
+  const handlePwChange = (e) =>
+    setPwForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
+
+  const handleSaveProfile = async () => {
+    if (editFields.phone && !validatePhilippinePhone(editFields.phone)) {
+      showToast('error', 'Invalid Philippine mobile number. Use +63 followed by 10 digits.');
       return;
     }
     setSaving(true);
-    setError('');
-    setSuccess('');
     try {
-      const data = await updateProfile(form);
-      if (data.emailChanged) {
-        setSuccess('Profile updated. Email changed — redirecting to login...');
+      const res = await fetch(`${USER_BASE}/profile`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type':  'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          firstName: editFields.firstName,
+          lastName:  editFields.lastName,
+          email:     editFields.email,
+          phone:     editFields.phone,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || 'Failed to update profile');
+      }
+
+      const updated = await res.json();
+      const newProfile = {
+        firstName:       updated.firstName       || '',
+        lastName:        updated.lastName        || '',
+        email:           updated.email           || '',
+        phone:           updated.phone           || '',
+        role:            updated.role            || profile.role,
+        profilePhotoUrl: updated.profilePhotoUrl || profile.profilePhotoUrl,
+      };
+
+      setProfile(newProfile);
+      setEditFields(newProfile);
+      saveLocalProfile(newProfile);
+      setEditMode(false);
+
+      if (updated.emailChanged) {
+        showToast('success', 'Email updated! Please log in again with your new email.');
         setTimeout(() => {
           localStorage.clear();
           window.location.href = '/auth';
         }, 2500);
       } else {
-        setSuccess('Profile updated successfully.');
+        showToast('success', 'Profile updated successfully!');
       }
     } catch (err) {
-      setError(err.message);
+      showToast('error', err.message || 'Could not save profile.');
     } finally {
       setSaving(false);
     }
   };
 
-  const initials =
-    (form.firstName.charAt(0) + form.lastName.charAt(0)).toUpperCase() || '?';
+  const handleCancelEdit = () => {
+    setEditFields({ ...profile });
+    setEditMode(false);
+  };
 
-  if (loading) {
-    return (
-      <div className="profile-section profile-loading-container">
-        <div className="spinner"></div>
-        <p className="profile-loading">Loading your profile...</p>
-      </div>
-    );
-  }
+  const handleChangePassword = async () => {
+    if (pwForm.newPassword !== pwForm.confirmPassword) {
+      showToast('error', 'New passwords do not match.');
+      return;
+    }
+    if (pwForm.newPassword.length < 8) {
+      showToast('error', 'Password must be at least 8 characters.');
+      return;
+    }
+    setSavingPw(true);
+    try {
+      const res = await fetch(`${AUTH_BASE}/change-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type':  'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          currentPassword: pwForm.currentPassword,
+          newPassword:     pwForm.newPassword,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || 'Failed to change password');
+      }
+
+      setPwForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      showToast('success', 'Password changed successfully!');
+    } catch (err) {
+      showToast('error', err.message || 'Could not change password.');
+    } finally {
+      setSavingPw(false);
+    }
+  };
+
+  const initials =
+    `${profile.firstName.charAt(0)}${profile.lastName.charAt(0)}`.toUpperCase() || 'C';
+
+  const pwStrength = (() => {
+    const p = pwForm.newPassword;
+    if (!p) return null;
+    let score = 0;
+    if (p.length >= 8)           score++;
+    if (/[A-Z]/.test(p))         score++;
+    if (/[0-9]/.test(p))         score++;
+    if (/[^A-Za-z0-9]/.test(p)) score++;
+    if (score <= 1) return { label: 'Weak',   color: '#b45309', width: '25%'  };
+    if (score === 2) return { label: 'Fair',   color: '#d97706', width: '50%'  };
+    if (score === 3) return { label: 'Good',   color: '#c4717f', width: '75%'  };
+    return                { label: 'Strong', color: '#15803d', width: '100%' };
+  })();
 
   return (
-    <div className="profile-section">
-      <div className="profile-card-header">
-        <h2 className="card-title">Account Settings</h2>
-        <p className="card-subtitle">Manage your public profile and account details</p>
+    <div className="pf-root">
+
+      <div className="pf-top">
+        <div className="pf-header">
+          <div>
+            <h2 className="pf-title">My Profile</h2>
+            <p className="pf-subtitle">Manage your account information and security settings</p>
+          </div>
+          {syncing && (
+            <div className="pf-sync-indicator">
+              <Loader2 size={13} className="pf-spin" />
+              <span>Syncing…</span>
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="profile-header">
-        <div className="avatar-container">
-          <div className="avatar-circle">{initials}</div>
-          <div className="avatar-badge">✓</div>
+      <div className="pf-grid">
+
+        {/* LEFT — avatar card */}
+        <div className="pf-card pf-card--avatar">
+
+          <div className="pf-avatar-wrapper">
+            <div className="pf-avatar-circle">
+              {displayPhoto
+                ? <img src={displayPhoto} alt="Profile" className="pf-avatar-img" />
+                : <span className="pf-avatar-initials">{initials}</span>}
+            </div>
+
+            <label className="pf-avatar-upload-btn" title="Change photo">
+              <Camera size={13} />
+              <input
+                ref={fileInput}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                style={{ display: 'none' }}
+                onChange={handlePhotoChange}
+              />
+            </label>
+          </div>
+
+          <h3 className="pf-avatar-name">{profile.firstName} {profile.lastName}</h3>
+          <span className="pf-avatar-role-badge">{profile.role}</span>
+          <p className="pf-avatar-email">{profile.email}</p>
+
+          {photoFile && (
+            <div className="pf-photo-actions">
+              <button
+                className="pf-btn-upload-photo"
+                onClick={handleUploadPhoto}
+                disabled={uploadingPhoto}
+              >
+                {uploadingPhoto
+                  ? <><Loader2 size={13} className="pf-spin" /> Uploading…</>
+                  : <><Save size={13} /> Save Photo</>}
+              </button>
+              <button
+                className="pf-btn-discard-photo"
+                onClick={handleDiscardPhoto}
+                disabled={uploadingPhoto}
+                title="Discard"
+              >
+                <Trash2 size={13} />
+              </button>
+            </div>
+          )}
+
+          {!editMode ? (
+            <button className="pf-btn-edit" onClick={() => setEditMode(true)}>
+              <Edit2 size={14} /> Edit Profile
+            </button>
+          ) : (
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+              <button className="pf-btn-save" onClick={handleSaveProfile} disabled={saving}>
+                {saving
+                  ? <><Loader2 size={14} className="pf-spin" /> Saving…</>
+                  : <><Save size={14} /> Save</>}
+              </button>
+              <button className="pf-btn-cancel" onClick={handleCancelEdit}>
+                <X size={14} /> Cancel
+              </button>
+            </div>
+          )}
         </div>
-        <div className="profile-info">
-          <h3>{form.firstName} {form.lastName}</h3>
-          <p>{form.email}</p>
+
+        {/* RIGHT — detail cards */}
+        <div className="pf-detail-col">
+
+          {/* Personal information */}
+          <div className="pf-card">
+            <h4 className="pf-card-title">
+              <UserCircle size={14} /> Personal Information
+            </h4>
+            <div className="pf-form-grid">
+              {[
+                { label: 'First Name', name: 'firstName', icon: UserCircle, type: 'text'  },
+                { label: 'Last Name',  name: 'lastName',  icon: UserCircle, type: 'text'  },
+                { label: 'Email',      name: 'email',     icon: Mail,       type: 'email' },
+              ].map(({ label, name, icon: Icon, type }) => (
+                <div className="pf-field" key={name}>
+                  <label className="pf-field-label">{label}</label>
+                  {editMode ? (
+                    <div className="pf-input-wrap">
+                      <Icon size={14} className="pf-input-icon" />
+                      <input
+                        className="pf-input"
+                        type={type}
+                        name={name}
+                        value={editFields[name]}
+                        onChange={handleEditChange}
+                        placeholder={label}
+                      />
+                    </div>
+                  ) : (
+                    <div className="pf-field-value">
+                      <Icon size={14} className="pf-field-value-icon" />
+                      <span>
+                        {profile[name] || <em style={{ color: '#c0bdb9' }}>Not set</em>}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {/* Phone — Philippine format (+63XXXXXXXXXX) */}
+              <div className="pf-field">
+                <label className="pf-field-label">Phone</label>
+                {editMode ? (
+                  <PhilippinePhoneInput
+                    value={editFields.phone}
+                    onChange={(val) => setEditFields(prev => ({ ...prev, phone: val }))}
+                  />
+                ) : (
+                  <div className="pf-field-value">
+                    <Phone size={14} className="pf-field-value-icon" />
+                    <span>
+                      {profile.phone || <em style={{ color: '#c0bdb9' }}>Not set</em>}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Change password */}
+          <div className="pf-card">
+            <h4 className="pf-card-title">
+              <Lock size={14} /> Change Password
+            </h4>
+            <div className="pf-form-grid">
+              {[
+                { label: 'Current Password', name: 'currentPassword', key: 'current' },
+                { label: 'New Password',     name: 'newPassword',     key: 'next'    },
+                { label: 'Confirm Password', name: 'confirmPassword', key: 'confirm' },
+              ].map(({ label, name, key }) => (
+                <div className="pf-field pf-field--full" key={name}>
+                  <label className="pf-field-label">{label}</label>
+                  <div className="pf-input-wrap">
+                    <input
+                      className="pf-input pf-input--no-icon"
+                      type={showPw[key] ? 'text' : 'password'}
+                      name={name}
+                      value={pwForm[name]}
+                      onChange={handlePwChange}
+                      placeholder={label}
+                      autoComplete="new-password"
+                    />
+                    <button
+                      type="button"
+                      className="pf-pw-toggle"
+                      onClick={() => setShowPw(p => ({ ...p, [key]: !p[key] }))}
+                      tabIndex={-1}
+                    >
+                      {showPw[key] ? <EyeOff size={14} /> : <Eye size={14} />}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {pwStrength && (
+              <div className="pf-pw-strength-wrap">
+                <div className="pf-pw-strength-bg">
+                  <div
+                    className="pf-pw-strength-fill"
+                    style={{ width: pwStrength.width, background: pwStrength.color }}
+                  />
+                </div>
+                <span className="pf-pw-strength-label" style={{ color: pwStrength.color }}>
+                  {pwStrength.label}
+                </span>
+              </div>
+            )}
+
+            <div style={{ marginTop: '1.25rem' }}>
+              <button
+                className="pf-btn-password"
+                onClick={handleChangePassword}
+                disabled={
+                  savingPw ||
+                  !pwForm.currentPassword ||
+                  !pwForm.newPassword ||
+                  !pwForm.confirmPassword
+                }
+              >
+                {savingPw
+                  ? <><Loader2 size={14} className="pf-spin" /> Updating…</>
+                  : <><Lock size={14} /> Update Password</>}
+              </button>
+            </div>
+          </div>
+
         </div>
       </div>
 
-      {error && <div className="profile-message profile-message--error">{error}</div>}
-      {success && <div className="profile-message profile-message--success">{success}</div>}
-
-      <form className="profile-form" onSubmit={handleSubmit}>
-        <div className="profile-grid">
-          <div className="profile-field">
-            <label className="profile-label">First Name</label>
-            <input
-              className="profile-input"
-              type="text"
-              name="firstName"
-              placeholder="Enter first name"
-              value={form.firstName}
-              onChange={handleChange}
-              required
-            />
-          </div>
-          <div className="profile-field">
-            <label className="profile-label">Last Name</label>
-            <input
-              className="profile-input"
-              type="text"
-              name="lastName"
-              placeholder="Enter last name"
-              value={form.lastName}
-              onChange={handleChange}
-              required
-            />
-          </div>
-          <div className="profile-field">
-            <label className="profile-label">Email Address</label>
-            <input
-              className="profile-input"
-              type="email"
-              name="email"
-              placeholder="email@example.com"
-              value={form.email}
-              onChange={handleChange}
-              required
-            />
-          </div>
-          <div className="profile-field">
-            <label className="profile-label">Phone Number</label>
-            <input
-              className="profile-input"
-              type="tel"
-              name="phone"
-              placeholder="09XXXXXXXXX"
-              maxLength={11}
-              value={form.phone}
-              onChange={handlePhoneChange}
-            />
-          </div>
+      {toast.show && (
+        <div className={`dashboard-toast ${toast.type}`}>
+          {toast.type === 'success'
+            ? <CheckCircle size={16} />
+            : <AlertCircle size={16} />}
+          <span>{toast.message}</span>
         </div>
-
-        <div className="form-footer">
-          <button className="update-btn" type="submit" disabled={saving}>
-            {saving ? 'Saving changes...' : 'Save Profile'}
-          </button>
-        </div>
-      </form>
+      )}
     </div>
   );
 };

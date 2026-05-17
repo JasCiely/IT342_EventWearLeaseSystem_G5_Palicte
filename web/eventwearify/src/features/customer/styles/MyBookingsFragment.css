@@ -22,8 +22,9 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 1rem;
+    padding-bottom: 0.6rem;
 }
 
 .bookings-title {
@@ -38,19 +39,21 @@
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.5rem 1rem;
-    background: white;
-    border: 1px solid var(--border-color);
-    border-radius: 40px;
-    font-size: 0.8rem;
-    font-weight: 500;
+    padding: 0.6rem 0.9rem;
+    background: var(--burgundy);
+    color: white;
+    border: 1px solid rgba(107,45,57,0.9);
+    border-radius: 10px;
+    font-size: 0.9rem;
+    font-weight: 600;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+    box-shadow: 0 6px 18px rgba(107,45,57,0.08);
 }
 
 .btn-refresh:hover:not(:disabled) {
-    background: var(--bg-warm);
-    border-color: var(--rose);
+    transform: translateY(-1px);
+    box-shadow: 0 10px 28px rgba(107,45,57,0.12);
 }
 
 .btn-refresh:disabled {
@@ -68,6 +71,7 @@
     border-radius: 16px;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
     overflow: hidden;
+    padding: 1rem;
 }
 
 .bookings-table-wrap {
@@ -97,6 +101,22 @@
     border-bottom: 1px solid #f9f8f7;
     color: #444;
     vertical-align: middle;
+}
+
+/* Align the action column to the right and cap its width */
+.bookings-table th:last-child,
+.bookings-table td:last-child {
+    width: 260px;
+    text-align: right;
+    padding-right: 1.25rem;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
 }
 
 .cancellable-row {
@@ -210,38 +230,40 @@
 }
 
 .btn-details {
-    background: #6b2d39;
-    color: white;
-    border: none;
-    padding: 0.4rem 0.8rem;
-    border-radius: 6px;
-    font-size: 0.75rem;
-    font-weight: 500;
+    background: transparent;
+    color: var(--burgundy);
+    border: 1px solid rgba(107,45,57,0.12);
+    padding: 0.45rem 0.9rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
     cursor: pointer;
-    transition: background 0.2s;
+    transition: background 0.12s, transform 0.12s;
 }
 
 .btn-details:hover {
-    background: #5a2530;
+    background: rgba(107,45,57,0.06);
+    transform: translateY(-1px);
 }
 
 .btn-cancel {
-    background: #dc2626;
-    color: white;
-    border: none;
-    padding: 0.4rem 0.8rem;
-    border-radius: 6px;
-    font-size: 0.75rem;
-    font-weight: 600;
+    background: rgba(220,38,38,0.1);
+    color: #b91c1c;
+    border: 1px solid rgba(220,38,38,0.12);
+    padding: 0.45rem 0.9rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 700;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
-    gap: 0.3rem;
-    transition: background 0.2s;
+    gap: 0.45rem;
+    transition: background 0.12s, transform 0.12s;
 }
 
 .btn-cancel:hover:not(:disabled) {
-    background: #b91c1c;
+    background: rgba(185,28,28,0.12);
+    transform: translateY(-1px);
 }
 
 .btn-cancel:disabled {
@@ -250,21 +272,29 @@
 }
 
 .btn-cancel-disabled {
-    background: #e5e7eb;
+    background: #f3f4f6;
     color: #9ca3af;
-    border: none;
-    padding: 0.4rem 0.8rem;
-    border-radius: 6px;
-    font-size: 0.75rem;
-    font-weight: 600;
+    border: 1px solid #f0efef;
+    padding: 0.45rem 0.9rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 700;
     cursor: not-allowed;
     display: inline-flex;
     align-items: center;
-    gap: 0.3rem;
+    gap: 0.45rem;
 }
 
 .spinner-inline {
     animation: spin 0.7s linear infinite;
+}
+
+/* Make action buttons visually balanced */
+.btn-details, .btn-edit, .btn-cancel, .btn-cancel-disabled {
+    min-height: 38px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
 @keyframes spin {
@@ -771,6 +801,252 @@
 .tab-btn.active .tab-count {
     background: var(--burgundy);
     color: white;
+}
+
+/* Edit button */
+.btn-edit {
+    background: #0e7490;
+    color: white;
+    border: none;
+    padding: 0.4rem 0.8rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    transition: background 0.2s;
+}
+
+.btn-edit:hover:not(:disabled) {
+    background: #0c6480;
+}
+
+.btn-edit:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Edit modals — overlay and container */
+.edit-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    backdrop-filter: blur(8px);
+    padding: 20px;
+}
+
+.edit-modal {
+    background: #fff;
+    width: 100%;
+    max-width: 480px;
+    border-radius: 20px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    display: flex;
+    flex-direction: column;
+    animation: bdmPop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    overflow: hidden;
+}
+
+.edit-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.5rem 1.75rem 1rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.edit-modal-header h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin: 0;
+}
+
+.edit-modal-close {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    padding: 4px;
+    border-radius: 50%;
+    transition: all 0.2s;
+}
+
+.edit-modal-close:hover {
+    color: var(--burgundy);
+    background: var(--bg-warm);
+}
+
+.edit-modal-body {
+    padding: 1.5rem 1.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+.edit-modal-body::-webkit-scrollbar {
+    width: 4px;
+}
+
+.edit-modal-body::-webkit-scrollbar-thumb {
+    background: #eee;
+    border-radius: 10px;
+}
+
+.edit-modal-footer {
+    padding: 1rem 1.75rem 1.5rem;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+}
+
+.edit-modal-error {
+    background: #fee2e2;
+    color: #991b1b;
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+}
+
+.edit-modal-info {
+    background: #eff6ff;
+    color: #1d4ed8;
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+}
+
+.edit-price-summary {
+    background: var(--bg-warm);
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--border-color);
+}
+
+.edit-price-summary h4 {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin: 0 0 0.75rem;
+}
+
+.edit-price-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.85rem;
+    color: #555;
+    margin-bottom: 0.35rem;
+}
+
+.edit-price-row.total {
+    font-weight: 700;
+    color: var(--text-dark);
+    font-size: 0.95rem;
+    border-top: 1px solid var(--border-color);
+    padding-top: 0.5rem;
+    margin-top: 0.25rem;
+}
+
+.edit-field-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    display: block;
+    margin-bottom: 0.4rem;
+}
+
+.edit-locked-date {
+    background: var(--bg-warm);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.6rem 0.8rem;
+    font-size: 0.9rem;
+    color: #555;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.edit-locked-date svg {
+    color: var(--text-muted);
+}
+
+.edit-time-select {
+    width: 100%;
+    padding: 0.6rem 0.8rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 0.9rem;
+    background: white;
+    cursor: pointer;
+}
+
+.edit-time-select:focus {
+    outline: 2px solid var(--burgundy);
+    outline-offset: 1px;
+}
+
+.btn-save-edit {
+    background: var(--burgundy);
+    color: white;
+    border: none;
+    padding: 0.55rem 1.4rem;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    transition: background 0.2s;
+}
+
+.btn-save-edit:hover:not(:disabled) {
+    background: #5a2530;
+}
+
+.btn-save-edit:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.btn-cancel-edit {
+    background: transparent;
+    color: var(--text-muted);
+    border: 1px solid var(--border-color);
+    padding: 0.55rem 1.2rem;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-cancel-edit:hover {
+    border-color: #aaa;
+    color: var(--text-dark);
 }
 
 /* Keep existing responsive styles */

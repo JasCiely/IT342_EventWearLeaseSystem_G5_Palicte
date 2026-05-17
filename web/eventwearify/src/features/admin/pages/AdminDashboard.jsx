@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import DashboardHeader from '../components/AdminDashboardHeader';
+import DashboardFragment from '../fragments/DashboardFragment';
 import CustomersFragment from '../fragments/CustomersFragment';
 import InventoryFragment from '../fragments/InventoryFragment';
 import ProfileFragment from '../fragments/ProfileFragment';
@@ -40,12 +41,8 @@ const renderFragment = (key) => {
     case 'profile':   return <ProfileFragment />;
     case 'bookings':  return <BookingsFragment />;
     case 'staff':     return <StaffFragment />;
-    default:
-      return (
-        <p style={{ color: '#bbb', fontSize: '0.95rem', marginTop: '0.5rem' }}>
-          {key.charAt(0).toUpperCase() + key.slice(1)} — coming soon.
-        </p>
-      );
+    case 'dashboard': return <DashboardFragment />;
+    default:          return <DashboardFragment />;
   }
 };
 
@@ -92,7 +89,11 @@ const AdminDashboard = () => {
     <div className="admin-layout">
 
       {/* Fixed top header */}
-      <DashboardHeader userName={firstName} onLogout={handleLogout} />
+      <DashboardHeader
+        userName={firstName}
+        onLogout={handleLogout}
+        onBrowse={() => navigate('/admin/inventory')}
+      />
 
       <div className="admin-body">
 

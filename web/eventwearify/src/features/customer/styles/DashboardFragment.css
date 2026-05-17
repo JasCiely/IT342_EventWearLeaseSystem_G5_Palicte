@@ -1,62 +1,541 @@
-.dashboard-grid-layout {
-    display: grid;
-    grid-template-columns: 2fr 1fr;
-    gap: 25px;
+/* DashboardFragment.css */
+.ds-root {
+    font-family: 'Inter', -apple-system, sans-serif;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    max-width: 1200px;
+    padding: 0 0.25rem;
 }
 
-.customer-card {
-    background: white;
-    border-radius: 12px;
-    padding: 20px;
-    border: 1px solid #eee;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-}
-
-.card-heading {
-    font-size: 16px;
-    font-weight: 600;
-    color: #2b1017;
-    margin-bottom: 15px;
-}
-
-/* Featured Outfits Mini Grid */
-.featured-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 15px;
-}
-
-.outfit-card-mini {
+/* Loading / Error */
+.ds-loading,
+.ds-error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 300px;
+    gap: 1rem;
+    color: #888;
     text-align: center;
 }
 
-.outfit-img-placeholder {
-    height: 120px;
-    background: #f7f5f5;
-    border-radius: 8px;
-    margin-bottom: 10px;
+.ds-error svg { color: #c4717f; }
+
+.ds-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid #eee;
+    border-top: 3px solid #6b2d39;
+    border-radius: 50%;
+    animation: ds-spin 0.8s linear infinite;
 }
 
-.btn-card-action {
-    width: 100%;
-    padding: 8px;
-    background: #421a24;
+@keyframes ds-spin {
+    to { transform: rotate(360deg); }
+}
+
+.ds-spin { animation: ds-spin 0.8s linear infinite; }
+
+/* Page Header */
+.ds-page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.ds-page-title {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 1.85rem;
+    font-weight: 700;
+    color: #1a1a1a;
+    margin: 0 0 0.2rem;
+}
+
+.ds-page-sub {
+    font-size: 0.9rem;
+    color: #888;
+    margin: 0;
+}
+
+.ds-refresh-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.5rem 1rem;
+    background: white;
+    border: 1px solid #eeecea;
+    border-radius: 40px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: #555;
+}
+
+.ds-refresh-btn:hover:not(:disabled) {
+    border-color: #c4717f;
+    color: #6b2d39;
+}
+
+.ds-refresh-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Stats Row */
+.ds-stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+}
+
+.ds-stat-card {
+    background: white;
+    border-radius: 14px;
+    padding: 1.25rem 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    border: 1px solid #eeecea;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+    transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.ds-stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.07);
+}
+
+.ds-stat-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.ds-stat-active   .ds-stat-icon { background: #e0f2fe; color: #0369a1; }
+.ds-stat-upcoming .ds-stat-icon { background: #fff4e5; color: #b45309; }
+.ds-stat-completed .ds-stat-icon { background: #dcfce7; color: #166534; }
+.ds-stat-cancelled .ds-stat-icon { background: #fee2e2; color: #991b1b; }
+
+.ds-stat-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.ds-stat-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #1a1a1a;
+    line-height: 1;
+}
+
+.ds-stat-label {
+    font-size: 0.75rem;
+    color: #999;
+    font-weight: 500;
+}
+
+/* Main Grid */
+.ds-main-grid {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    gap: 1.25rem;
+    align-items: start;
+}
+
+.ds-col-left,
+.ds-col-right {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+/* Cards */
+.ds-card {
+    background: white;
+    border-radius: 16px;
+    padding: 1.5rem;
+    border: 1px solid #eeecea;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+}
+
+.ds-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.25rem;
+}
+
+.ds-card-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #1a1a1a;
+    margin: 0;
+}
+
+.ds-link-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: #6b2d39;
+    padding: 0.2rem 0.4rem;
+    border-radius: 6px;
+    transition: background 0.15s;
+}
+
+.ds-link-btn:hover { background: rgba(107, 45, 57, 0.07); }
+
+/* Booking List */
+.ds-booking-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.ds-booking-item {
+    display: flex;
+    align-items: center;
+    gap: 0.875rem;
+    padding: 0.875rem;
+    background: #faf9f7;
+    border-radius: 10px;
+    border: 1px solid #f0eeec;
+}
+
+.ds-booking-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: rgba(107, 45, 57, 0.08);
+    color: #6b2d39;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.ds-booking-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.ds-booking-name {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #1a1a1a;
+    margin: 0 0 0.2rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ds-booking-date {
+    font-size: 0.75rem;
+    color: #999;
+    margin: 0;
+}
+
+/* Empty States */
+.ds-empty-mini {
+    text-align: center;
+    padding: 2rem 1rem;
+    color: #bbb;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.ds-empty-mini p {
+    margin: 0;
+    font-size: 0.875rem;
+    color: #aaa;
+}
+
+.ds-btn-browse {
+    background: #6b2d39;
     color: white;
     border: none;
-    border-radius: 5px;
-    font-size: 12px;
+    padding: 0.5rem 1.2rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
     cursor: pointer;
+    transition: background 0.2s;
 }
 
-/* Browsing History */
-.history-circles {
+.ds-btn-browse:hover { background: #5a2530; }
+
+.ds-btn-retry {
+    background: #6b2d39;
+    color: white;
+    border: none;
+    padding: 0.5rem 1.2rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 0.5rem;
+}
+
+/* Transaction Table */
+.ds-txn-table-wrap { overflow-x: auto; }
+
+.ds-txn-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+}
+
+.ds-txn-table th {
+    text-align: left;
+    padding: 0.75rem 0.875rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: #aaa;
+    background: #faf9f7;
+    border-bottom: 1px solid #f0eeec;
+}
+
+.ds-txn-table td {
+    padding: 1rem 0.875rem;
+    border-bottom: 1px solid #f9f8f7;
+    color: #555;
+    vertical-align: middle;
+}
+
+.ds-txn-table tbody tr:last-child td { border-bottom: none; }
+.ds-txn-table tbody tr:hover { background: #faf9f7; }
+
+.ds-item-name {
+    font-weight: 600;
+    color: #1a1a1a;
+}
+
+.ds-date-cell {
+    white-space: nowrap;
+    font-size: 0.8rem;
+    color: #999;
+}
+
+/* Type Badges */
+.ds-type-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.55rem;
+    border-radius: 20px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.ds-type-badge.fitting { background: rgba(107, 45, 57, 0.1); color: #6b2d39; }
+.ds-type-badge.direct  { background: rgba(21, 128, 61, 0.1); color: #15803d; }
+
+/* Status Badges */
+.ds-status-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.3rem 0.7rem;
+    border-radius: 20px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.ds-badge-confirmed { background: #e0f2fe; color: #0369a1; }
+.ds-badge-completed { background: #dcfce7; color: #166534; }
+.ds-badge-cancelled { background: #f3f4f6; color: #4b5563; }
+.ds-badge-lease     { background: #f3e8ff; color: #6b21a5; }
+.ds-badge-pending   { background: #fff4e5; color: #b45309; }
+.ds-badge-approved  { background: #e0f2fe; color: #0369a1; }
+.ds-badge-active    { background: #fef9c3; color: #854d0e; }
+.ds-badge-returned  { background: #e2e3e5; color: #41464b; }
+.ds-badge-rejected  { background: #fee2e2; color: #991b1b; }
+.ds-badge-default   { background: #f3f4f6; color: #6b7280; }
+
+/* Profile Summary */
+.ds-profile-summary {
     display: flex;
-    gap: 10px;
+    align-items: center;
+    gap: 1rem;
 }
 
-.circle-item {
-    width: 45px;
-    height: 55px;
-    background: #ddd;
-    border-radius: 5px;
+.ds-avatar {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #6b2d39, #c4717f);
+    color: white;
+    font-size: 1.1rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.ds-profile-info { flex: 1; min-width: 0; }
+
+.ds-profile-name {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #1a1a1a;
+    margin: 0 0 0.4rem;
+}
+
+.ds-profile-detail {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.8rem;
+    color: #777;
+    margin-bottom: 0.25rem;
+}
+
+.ds-profile-detail svg { color: #c4717f; flex-shrink: 0; }
+
+/* Status Tracking */
+.ds-tracking-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.ds-tracking-item {
+    display: flex;
+    gap: 1rem;
+    padding-bottom: 1.25rem;
+}
+
+.ds-tracking-item:last-child { padding-bottom: 0; }
+
+.ds-tracking-dot-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 4px;
+}
+
+.ds-tracking-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.ds-dot-active {
+    background: #6b2d39;
+    box-shadow: 0 0 0 3px rgba(107, 45, 57, 0.15);
+}
+
+.ds-tracking-line {
+    width: 2px;
+    flex: 1;
+    background: #f0eeec;
+    margin-top: 6px;
+    min-height: 20px;
+}
+
+.ds-tracking-content { flex: 1; min-width: 0; }
+
+.ds-tracking-item-name {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #1a1a1a;
+    margin: 0 0 0.15rem;
+}
+
+.ds-tracking-type {
+    font-size: 0.75rem;
+    color: #aaa;
+    margin: 0 0 0.5rem;
+}
+
+.ds-tracking-date {
+    font-size: 0.72rem;
+    color: #bbb;
+    margin: 0.4rem 0 0;
+}
+
+/* Updates List */
+.ds-updates-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+}
+
+.ds-update-item {
+    display: flex;
+    gap: 0.875rem;
+    align-items: flex-start;
+}
+
+.ds-update-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #c4717f;
+    flex-shrink: 0;
+    margin-top: 5px;
+}
+
+.ds-update-text {
+    font-size: 0.85rem;
+    color: #444;
+    margin: 0 0 0.2rem;
+}
+
+.ds-update-time {
+    font-size: 0.72rem;
+    color: #bbb;
+    margin: 0;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+    .ds-main-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .ds-col-right {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    }
+}
+
+@media (max-width: 768px) {
+    .ds-stats-row {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .ds-col-right {
+        grid-template-columns: 1fr;
+    }
+
+    .ds-page-title {
+        font-size: 1.5rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .ds-stats-row {
+        grid-template-columns: 1fr 1fr;
+    }
 }

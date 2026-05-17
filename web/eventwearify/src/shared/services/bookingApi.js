@@ -148,11 +148,11 @@ export const getUserDirectBookings = async (page = 0, size = 10) => {
   }
 };
 
-export const checkDirectBookingAvailability = async (itemId, startDate, endDate) => {
+export const checkDirectBookingAvailability = async (itemId, startDate, endDate, excludeBookingId = null) => {
   try {
-    const response = await authFetch(
-      `/direct-bookings/availability?itemId=${itemId}&startDate=${startDate}&endDate=${endDate}`
-    );
+    const params = new URLSearchParams({ itemId, startDate, endDate });
+    if (excludeBookingId) params.append('excludeBookingId', excludeBookingId);
+    const response = await authFetch(`/direct-bookings/availability?${params.toString()}`);
     return response.available === true;
   } catch (error) {
     console.error('Error checking availability:', error);
@@ -247,16 +247,7 @@ export const getUnavailableDates = async (itemId, excludeBookingId = null) => {
 export const getBookedFittingSlots = async (itemId, date) => {
   try {
     const data = await publicFetch(`/inventory/fitting/booked-slots?itemId=${itemId}&date=${date}`);
-    const slots = Array.isArray(data) ? data : [];
-    // Backend stores times in 24-hour format ("09:00"); normalize to 12-hour ("9:00 AM")
-    return slots.map(t => {
-      if (!t || !t.includes(':')) return t;
-      const [h, m] = t.split(':').map(Number);
-      if (isNaN(h) || isNaN(m)) return t;
-      const period = h >= 12 ? 'PM' : 'AM';
-      const h12    = h % 12 || 12;
-      return `${h12}:${String(m).padStart(2, '0')} ${period}`;
-    });
+    return Array.isArray(data) ? data : [];
   } catch (err) {
     console.error('getBookedFittingSlots error:', err);
     return [];
@@ -288,6 +279,19 @@ export const cancelFittingBooking = async (bookingId) => {
   }
 };
 
+export const updateDirectBookingDates = async (bookingId, startDate, endDate) => {
+  try {
+    const response = await authFetch(`/admin/bookings/direct/${bookingId}/dates`, {
+      method: 'PUT',
+      body: JSON.stringify({ startDate, endDate }),
+    });
+    return response;
+  } catch (error) {
+    console.error('Error updating rental dates:', error);
+    throw error;
+  }
+};
+
 export const cancelDirectBooking = async (bookingId) => {
   try {
     // Endpoint: /direct-bookings/{bookingId}/cancel
@@ -297,6 +301,58 @@ export const cancelDirectBooking = async (bookingId) => {
     return response;
   } catch (error) {
     console.error('Error cancelling direct booking:', error);
+    throw error;
+  }
+};
+
+export const editCustomerBookingDates = async (bookingId, startDate, endDate) => {
+  try {
+    const response = await authFetch(`/direct-bookings/${bookingId}/edit-dates`, {
+      method: 'PUT',
+      body: JSON.stringify({ startDate, endDate }),
+    });
+    return response;
+  } catch (error) {
+    console.error('Error editing booking dates:', error);
+    throw error;
+  }
+};
+
+export const rescheduleCustomerFitting = async (bookingId, fittingDate, fittingTime) => {
+  try {
+    const response = await authFetch(`/inventory/bookings/${bookingId}/reschedule`, {
+      method: 'PATCH',
+      body: JSON.stringify({ fittingDate, fittingTime }),
+    });
+    return response;
+  } catch (error) {
+    console.error('Error rescheduling fitting:', error);
+    throw error;
+  }
+};
+
+// Transitions an Approved direct booking to Active Lease (item physically picked up).
+export const markDirectBookingPickedUp = async (bookingId) => {
+  try {
+    const response = await authFetch(`/admin/bookings/direct/${bookingId}/pickup`, {
+      method: 'PUT',
+    });
+    return response;
+  } catch (error) {
+    console.error('Error marking booking as picked up:', error);
+    throw error;
+  }
+};
+
+// Reverts an Active Lease booking back to Approved (admin correction for auto-activated records).
+export const undoDirectBookingPickup = async (bookingId) => {
+  try {
+    const response = await authFetch(`/admin/bookings/direct/${bookingId}/undo-pickup`, {
+      method: 'PUT',
+    });
+    return response;
+  } catch (error) {
+    console.error('Error undoing pickup:', error);
     throw error;
   }
 };

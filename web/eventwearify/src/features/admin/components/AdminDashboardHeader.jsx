@@ -1,16 +1,15 @@
 import React from 'react';
 import '../styles/AdminDashboardHeader.css';
+import logo from '../../../assets/logo.png';
 
-const DashboardHeader = ({ userName = "Admin", onLogout }) => {
+const DashboardHeader = ({ userName = "Admin", onLogout, onBrowse }) => {
   return (
     <header className="dashboard-header">
       <div className="dashboard-header-content">
 
         {/* Left — logo / brand */}
         <div className="header-brand">
-          <div className="header-brand-mark">
-            <span className="header-brand-mark-inner" />
-          </div>
+          <img src={logo} alt="EventWear Logo" className="header-brand-logo" />
           <div className="header-brand-text">
             <span className="header-brand-name">EventWear</span>
             <span className="header-brand-sub">Admin Dashboard</span>
@@ -26,7 +25,7 @@ const DashboardHeader = ({ userName = "Admin", onLogout }) => {
 
           <div className="header-divider" />
 
-          <button className="btn-browse-outfits" onClick={() => console.log('Browse')}>
+          <button className="btn-browse-outfits" onClick={onBrowse}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/>
               <path d="M3 6h18"/>

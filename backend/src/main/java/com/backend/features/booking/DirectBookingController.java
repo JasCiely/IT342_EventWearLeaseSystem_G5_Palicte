@@ -2,6 +2,7 @@ package com.backend.features.booking;
 
 import com.backend.features.booking.dto.request.DirectBookingRequest;
 import com.backend.features.booking.dto.response.DirectBookingResponse;
+import com.backend.shared.sse.SseService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -25,6 +26,7 @@ import java.util.Map;
 public class DirectBookingController {
 
     private final DirectBookingService directBookingService;
+    private final SseService sseService;
 
     @PostMapping
     @PreAuthorize("hasRole('CUSTOMER')")
@@ -35,6 +37,7 @@ public class DirectBookingController {
         try {
             String userId = authentication.getName();
             DirectBookingResponse response = directBookingService.createDirectBooking(userId, request);
+            sseService.broadcast("BOOKING_UPDATE");
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             log.error("Error creating direct booking: {}", e.getMessage());
@@ -99,9 +102,12 @@ public class DirectBookingController {
 
         try {
             DirectBookingResponse response = directBookingService.updateBookingStatus(bookingId, status);
+            sseService.broadcast("BOOKING_UPDATE");
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
+        } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
             log.error("Error updating booking status", e);
             Map<String, String> error = new HashMap<>();
@@ -116,6 +122,7 @@ public class DirectBookingController {
     public ResponseEntity<?> returnAndCompleteLease(@PathVariable String bookingId) {
         try {
             DirectBookingResponse response = directBookingService.returnAndCompleteLease(bookingId);
+            sseService.broadcast("BOOKING_UPDATE");
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             Map<String, String> error = new HashMap<>();
@@ -138,6 +145,7 @@ public class DirectBookingController {
         try {
             LocalDate newEndDate = LocalDate.parse(body.get("newEndDate"));
             DirectBookingResponse response = directBookingService.extendLease(bookingId, newEndDate);
+            sseService.broadcast("BOOKING_UPDATE");
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             Map<String, String> error = new HashMap<>();
@@ -163,16 +171,19 @@ public class DirectBookingController {
     }
 
     @GetMapping("/availability")
-    @PreAuthorize("hasRole('CUSTOMER')")
+    @PreAuthorize("hasRole('CUSTOMER') or hasRole('ADMIN')")
     public ResponseEntity<Map<String, Boolean>> checkAvailability(
             @RequestParam String itemId,
             @RequestParam String startDate,
-            @RequestParam String endDate) {
+            @RequestParam String endDate,
+            @RequestParam(required = false) String excludeBookingId) {
 
         try {
             LocalDate start = LocalDate.parse(startDate);
             LocalDate end = LocalDate.parse(endDate);
-            boolean available = directBookingService.isItemAvailable(itemId, start, end);
+            boolean available = (excludeBookingId != null && !excludeBookingId.isBlank())
+                    ? directBookingService.isItemAvailableExcluding(itemId, start, end, excludeBookingId)
+                    : directBookingService.isItemAvailable(itemId, start, end);
             Map<String, Boolean> response = new HashMap<>();
             response.put("available", available);
             return ResponseEntity.ok(response);
@@ -201,11 +212,40 @@ public class DirectBookingController {
         try {
             String userId = authentication.getName();
             directBookingService.cancelDirectBooking(bookingId, userId);
+            sseService.broadcast("BOOKING_UPDATE");
             return ResponseEntity.ok(Map.of("message", "Booking cancelled successfully"));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
         } catch (SecurityException | IllegalStateException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PutMapping("/{bookingId}/edit-dates")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public ResponseEntity<?> editCustomerBookingDates(
+            @PathVariable String bookingId,
+            @RequestBody Map<String, String> body,
+            Authentication authentication) {
+
+        try {
+            String userId = authentication.getName();
+            LocalDate startDate = LocalDate.parse(body.get("startDate"));
+            LocalDate endDate = LocalDate.parse(body.get("endDate"));
+            DirectBookingResponse response = directBookingService.editCustomerBookingDates(bookingId, userId, startDate, endDate);
+            sseService.broadcast("BOOKING_UPDATE");
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            String msg = e.getMessage();
+            if ("Booking not found".equals(msg)) return ResponseEntity.notFound().build();
+            return ResponseEntity.badRequest().body(Map.of("error", msg));
+        } catch (SecurityException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", e.getMessage()));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            log.error("Unexpected error editing booking dates for {}", bookingId, e);
+            return ResponseEntity.internalServerError().body(Map.of("error", "Failed to update booking dates"));
         }
     }
 }

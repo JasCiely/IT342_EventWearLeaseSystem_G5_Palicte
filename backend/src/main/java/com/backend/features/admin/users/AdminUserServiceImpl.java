@@ -39,8 +39,8 @@ public class AdminUserServiceImpl implements AdminUserService {
         String trimmedSearch = search != null ? search.trim() : null;
 
         Page<User> userPage = userRepository.findUsersFiltered(
-                null, // ← Fetch all users regardless of role
-                trimmedSearch, // ← Handle null search
+                Role.CUSTOMER.name(),
+                trimmedSearch,
                 activeFilter,
                 pageable);
 
@@ -61,6 +61,9 @@ public class AdminUserServiceImpl implements AdminUserService {
     public UserSummaryResponse updateStatus(String id, boolean active) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceAlreadyExistsException("User", "id", id));
+        if (user.getRole() == Role.ADMIN) {
+            throw new IllegalArgumentException("Admin accounts cannot be managed as customers");
+        }
         user.setActive(active);
         return UserSummaryResponse.from(userRepository.save(user));
     }

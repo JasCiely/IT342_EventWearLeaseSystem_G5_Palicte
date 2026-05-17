@@ -8,7 +8,6 @@
   display: flex; flex-direction: column; gap: 1.25rem;
   font-family: 'Inter', -apple-system, sans-serif;
   width: 100%; padding-bottom: 2rem;
-  background: #fefefe;
 }
 .inv-top {
   display: flex; align-items: flex-start;
@@ -292,6 +291,10 @@
   border-left: 3px solid #b45309;
   background: linear-gradient(to right, rgba(180,83,9,0.03), #fff 80px);
 }
+.bk-card--today {
+  border-left: 3px solid #15803d;
+  background: linear-gradient(to right, rgba(21,128,61,0.04), #fff 80px);
+}
 
 .bk-card-select {
   display: flex; align-items: center; justify-content: center;
@@ -336,6 +339,34 @@
   padding: 0.15rem 0.5rem; border-radius: 20px;
   background: rgba(180,83,9,0.1); color: #b45309;
   font-size: 0.65rem; font-weight: 700;
+}
+.bk-today-badge {
+  display: inline-flex; align-items: center; gap: 0.25rem;
+  padding: 0.15rem 0.5rem; border-radius: 20px;
+  background: rgba(21,128,61,0.12); color: #15803d;
+  font-size: 0.65rem; font-weight: 700;
+}
+
+.bk-section-divider {
+  display: flex; align-items: center; gap: 0.6rem;
+  font-size: 0.72rem; font-weight: 700; color: #aaa;
+  padding: 0.25rem 0;
+}
+.bk-section-divider::after {
+  content: ''; flex: 1; height: 1px; background: #eeecea;
+}
+.bk-section-divider--today { color: #15803d; }
+.bk-section-count {
+  background: rgba(21,128,61,0.12); color: #15803d;
+  border-radius: 20px; padding: 0.1rem 0.45rem;
+  font-size: 0.68rem; font-weight: 700;
+}
+
+.bk-tab-count {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 18px; height: 18px; border-radius: 9px;
+  background: rgba(153,27,27,0.12); color: #991b1b;
+  font-size: 0.65rem; font-weight: 700; padding: 0 4px;
 }
 
 /* ════════════════════════════════════════════════════════════

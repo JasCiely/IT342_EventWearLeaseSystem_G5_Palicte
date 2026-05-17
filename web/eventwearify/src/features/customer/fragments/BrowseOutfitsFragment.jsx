@@ -146,6 +146,12 @@ function isWorkingDay(dateStr, settings) {
   return (settings.workingDays || [1, 2, 3, 4, 5]).includes(dow);
 }
 
+function isWorkdayOver(settings) {
+  const now = new Date();
+  const closeMin = ((settings?.endHour ?? 17) * 60) + (settings?.endMinute ?? 0);
+  return (now.getHours() * 60 + now.getMinutes()) >= closeMin;
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // Direct booking date-range overlap helpers
 // ────────────────────────────────────────────────────────────────────────────
@@ -159,7 +165,7 @@ function classifyDateRange(startDate, endDate, occupiedRanges) {
   let hasPending = false;
   for (const r of occupiedRanges) {
     if (!datesOverlap(startDate, endDate, r.startDate, r.endDate)) continue;
-    if (r.status === 'Approved' || r.status === 'Confirmed') return 'blocked';
+    if (r.status === 'Approved' || r.status === 'Confirmed' || r.status === 'Active Lease' || r.status === 'Under Maintenance') return 'blocked';
     if (r.status === 'Pending') hasPending = true;
   }
   return hasPending ? 'pending' : 'free';
@@ -169,17 +175,18 @@ function classifyDateRange(startDate, endDate, occupiedRanges) {
 // Shared Data
 // ────────────────────────────────────────────────────────────────────────────
 const ITEM_STATUS_META = {
-  'Available':   { color: '#15803d', bg: 'rgba(21,128,61,0.1)',   dot: '#22c55e' },
-  'Leased':      { color: '#b45309', bg: 'rgba(180,83,9,0.1)',    dot: '#f59e0b' },
-  'Maintenance': { color: '#991b1b', bg: 'rgba(153,27,27,0.1)',   dot: '#ef4444' },
-  'Reserved':    { color: '#1d4ed8', bg: 'rgba(29,78,216,0.1)',   dot: '#3b82f6' },
+  'Available':            { color: '#15803d', bg: 'rgba(21,128,61,0.1)',   dot: '#22c55e' },
+  'Under Maintenance':    { color: '#9a3412', bg: 'rgba(154,52,18,0.1)',   dot: '#ea580c' },
+  'Pending Availability': { color: '#b45309', bg: 'rgba(180,83,9,0.1)',    dot: '#f59e0b' },
 };
 
 const CAT_COLORS = { Gown: '#c4717f', Suit: '#6b2d39', Traditional: '#b45309', Accessories: '#486581' };
 
-const todayStr    = () => new Date().toISOString().split('T')[0];
-const fmtDate     = d => d ? new Date(d).toLocaleDateString('en-PH', { year:'numeric', month:'short', day:'numeric' }) : '';
-const fmtDateTime = (d, t) => d ? `${fmtDate(d)} at ${t}` : '';
+const todayStr       = () => new Date().toISOString().split('T')[0];
+const fmtDate        = d => d ? new Date(d).toLocaleDateString('en-PH', { year:'numeric', month:'short', day:'numeric' }) : '';
+const fmtDateTime    = (d, t) => d ? `${fmtDate(d)} at ${t}` : '';
+// Leasing bookings must be placed at least 2 days before the pickup date.
+const minLeasingStart = () => { const d = new Date(); d.setDate(d.getDate() + 2); return d.toISOString().split('T')[0]; };
 
 // ────────────────────────────────────────────────────────────────────────────
 // UI Components (StatusBadge, MediaThumb, MediaGallery, Toast, Skeletons)
@@ -240,7 +247,7 @@ function MediaGallery({ item, startIndex = 0, onClose }) {
       <div className="inv-lightbox-inner" onClick={e => e.stopPropagation()}>
         <div className="inv-lightbox-topbar">
           <span className="inv-lightbox-itemname">{item.name}</span>
-          <span className="inv-lightbox-catnote">{item.category}{item.subtype ? ` · ${item.subtype}` : ''} · Size {item.size}</span>
+          <span className="inv-lightbox-catnote">{item.category}{item.subtype ? ` · ${item.subtype}` : ''}{(Array.isArray(item.sizes) && item.sizes.length ? ` · Size ${item.sizes.join(', ')}` : item.size ? ` · Size ${item.size}` : '')}</span>
         </div>
         <div className="inv-gallery-stage">
           {current.type === 'video'
@@ -428,11 +435,11 @@ function FittingDatePicker({ value, onChange, minDate, bookingSettings, itemId, 
             {cells.map((day, i) => {
               if (!day) return <div key={`e${i}`} />;
               const ds         = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-              const isPast     = ds < today;
+              const isPast     = ds < today || (ds === todayStr() && isWorkdayOver(bookingSettings));
               const isNonWork  = !isWorkingDay(ds, bookingSettings);
               const slots      = getSlots(ds);
               const isChecking = loadingSet.has(ds);
-              const isFullBook = !isPast && !isNonWork && timeSlots.length > 0 && slots !== undefined && timeSlots.every(t => slots.includes(t));
+              const isFullBook = !isPast && !isNonWork && timeSlots.length > 0 && slots !== undefined && timeSlots.every(t => slots.includes(to24Hour(t)));
               const isSelected = ds === value;
               const isToday    = ds === today;
               const clickable  = !isPast && !isNonWork && !isFullBook;
@@ -545,11 +552,11 @@ function DirectDatePicker({ value, onChange, minDate, bookingSettings, occupiedR
             {cells.map((day, i) => {
               if (!day) return <div key={`e${i}`} />;
               const ds = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-              const isPast = ds < today;
+              const isPast = ds < today || (ds === todayStr() && isWorkdayOver(bookingSettings));
               const isNonWork = !isWorkingDay(ds, bookingSettings);
               const isBlocked = isDateBlocked(ds);
               const isSelected = ds === value;
-              const isToday = ds === today;
+              const isToday = ds === todayStr();
               const clickable = !isPast && !isNonWork && !isBlocked;
 
               let cls = 'fitting-cal-day';
@@ -591,12 +598,13 @@ function DirectDatePicker({ value, onChange, minDate, bookingSettings, occupiedR
 // Direct Booking Modal (receives inventorySettings as a prop)
 // ────────────────────────────────────────────────────────────────────────────
 function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, currentUser, bookingSettings, userProfile, inventorySettings }) {
+  const _initSzArr = Array.isArray(item?.sizes) ? item.sizes.filter(Boolean) : (item?.size ? [item.size] : []);
   const [form, setForm] = useState({
     startDate: '', endDate: '', notes: '',
     name: currentUser?.name || '',
     email: currentUser?.email || '',
     phone: '',
-    preferredSize: '',
+    preferredSize: _initSzArr.length === 1 ? _initSzArr[0] : '',
   });
 
   useEffect(() => {
@@ -666,10 +674,16 @@ function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, c
   const handleSubmit = async () => {
     if (!isLoggedIn) { showToast('error', 'Please login first to make a booking.'); return; }
     if (!pricing?.isValid) return;
+    if (form.startDate < minLeasingStart()) {
+      showToast('error', `Leasing bookings must be made at least 2 days in advance. Earliest available start: ${fmtDate(minLeasingStart())}.`);
+      return;
+    }
     if (overlapStatus === 'blocked') { showToast('error', 'Selected dates are not available — another booking is confirmed for those dates.'); return; }
     if (availability === false) { showToast('error', 'Selected dates are no longer available. Please choose different dates.'); return; }
     if (!form.name || !form.email || !form.phone) { showToast('error', 'Please fill in your contact information.'); return; }
     if (!validatePhilippinePhone(form.phone)) { showToast('error', 'Invalid Philippine mobile number. Use +63 followed by 10 digits.'); return; }
+    const _dszArr = Array.isArray(item?.sizes) ? item.sizes.filter(Boolean) : (item?.size ? [item.size] : []);
+    if (_dszArr.length > 1 && !form.preferredSize) { showToast('error', 'Please select a size before booking.'); return; }
 
     setSubmitting(true);
     try {
@@ -686,7 +700,7 @@ function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, c
         customerName:   form.name,
         customerEmail:  form.email,
         customerPhone:  form.phone,
-        preferredSize:  form.preferredSize || item.size,
+        preferredSize:  form.preferredSize || '',
       });
       onSuccess({
         id:            result.id,
@@ -707,14 +721,17 @@ function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, c
   };
 
   const pendingBlocking = overlapStatus === 'pending' && !pendingAcknowledged;
+  const _canSubmitSzArr = Array.isArray(item?.sizes) ? item.sizes.filter(Boolean) : (item?.size ? [item.size] : []);
   const canSubmit = (
     pricing?.isValid &&
+    form.startDate >= minLeasingStart() &&
     overlapStatus !== 'blocked' &&
     availability !== false &&
     !submitting &&
     !checkingAvail &&
     !pendingBlocking &&
-    form.name && form.email && form.phone
+    form.name && form.email && form.phone &&
+    (_canSubmitSzArr.length <= 1 || !!form.preferredSize)
   );
 
   const handleStartChange = (newStart) => {
@@ -753,7 +770,7 @@ function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, c
               <DirectDatePicker
                 value={form.startDate}
                 onChange={handleStartChange}
-                minDate={todayStr()}
+                minDate={minLeasingStart()}
                 bookingSettings={bookingSettings}
                 occupiedRanges={occupiedRanges}
                 disabled={submitting}
@@ -904,13 +921,25 @@ function DirectBookingModal({ item, onClose, onSuccess, showToast, isLoggedIn, c
                 />
               </div>
             </div>
-            <div className="inv-field">
-              <label className="inv-field-label">Preferred Size</label>
-              <select className="inv-select" value={form.preferredSize} onChange={e => setForm(p => ({ ...p, preferredSize: e.target.value }))} disabled={submitting} style={{ width:'100%' }}>
-                <option value="">Select size (optional)</option>
-                {['XS','S','M','L','XL','XXL'].map(s => <option key={s}>{s}</option>)}
-              </select>
-            </div>
+            {(() => {
+              const szArr = Array.isArray(item?.sizes) ? item.sizes.filter(Boolean) : (item?.size ? [item.size] : []);
+              if (szArr.length === 0) return null;
+              if (szArr.length === 1) return (
+                <div className="inv-field">
+                  <label className="inv-field-label">Size</label>
+                  <div className="inv-input" style={{ cursor: 'not-allowed', background: '#f9fafb', color: '#374151' }}>{szArr[0]}</div>
+                </div>
+              );
+              return (
+                <div className="inv-field">
+                  <label className="inv-field-label">Size <span className="inv-required">*</span></label>
+                  <select className="inv-select" value={form.preferredSize} onChange={e => setForm(p => ({ ...p, preferredSize: e.target.value }))} disabled={submitting} style={{ width: '100%' }}>
+                    <option value="">Select size</option>
+                    {szArr.map(s => <option key={s}>{s}</option>)}
+                  </select>
+                </div>
+              );
+            })()}
           </div>
 
           <div className="inv-field">
@@ -1105,10 +1134,10 @@ export default function BrowseOutfitsFragment() {
   // Auto-select first available time slot when booked slots change
   useEffect(() => {
     if (!timeSlots.length) return;
-    const firstAvail = timeSlots.find(t => !bookedFittingSlots.includes(t));
+    const firstAvail = timeSlots.find(t => !bookedFittingSlots.includes(to24Hour(t)));
     setBooking(p => ({
       ...p,
-      fittingTime: bookedFittingSlots.includes(p.fittingTime)
+      fittingTime: bookedFittingSlots.includes(to24Hour(p.fittingTime))
         ? (firstAvail || '')
         : (p.fittingTime || firstAvail || ''),
     }));
@@ -1124,6 +1153,14 @@ export default function BrowseOutfitsFragment() {
       ...(userProfile.phone ? { phone: userProfile.phone } : {}),
     }));
   }, [modal, userProfile]);
+
+  useEffect(() => {
+    if (modal !== 'booking' || !selectedItem) return;
+    const szArr = Array.isArray(selectedItem.sizes) ? selectedItem.sizes.filter(Boolean) : (selectedItem.size ? [selectedItem.size] : []);
+    if (szArr.length === 1) {
+      setBooking(p => ({ ...p, preferredSize: szArr[0] }));
+    }
+  }, [modal, selectedItem?.id]);
 
   const showToast  = (type, message) => setToast({ show: true, type, message });
   const closeToast = () => setToast({ show: false, type: 'success', message: '' });
@@ -1230,7 +1267,7 @@ export default function BrowseOutfitsFragment() {
     return Math.max(0, d);
   }, [activePromo]);
 
-  const availableItems = useMemo(() => items.filter(i => i.status === 'Available' || i.status === 'Reserved'), [items]);
+  const availableItems = useMemo(() => items.filter(i => i.status === 'Available'), [items]);
   
   const categories     = useMemo(() => [...new Set(availableItems.map(i => i.category))], [availableItems]);
   const subcategories  = useMemo(() => {
@@ -1238,7 +1275,14 @@ export default function BrowseOutfitsFragment() {
     return [...new Set(availableItems.filter(i => i.category === filterCat).map(i => i.subtype).filter(Boolean))].sort();
   }, [availableItems, filterCat]);
   useEffect(() => { setFilterSubcat('All'); }, [filterCat]);
-  const sizes = useMemo(() => [...new Set(availableItems.map(i => i.size))].sort(), [availableItems]);
+  const sizes = useMemo(() => {
+    const all = new Set();
+    availableItems.forEach(i => {
+      if (Array.isArray(i.sizes)) i.sizes.forEach(s => all.add(s));
+      else if (i.size) all.add(i.size);
+    });
+    return [...all].sort();
+  }, [availableItems]);
 
   // Filter out items that the user has already booked
   const visibleItems = useMemo(() => availableItems.filter(i => {
@@ -1248,7 +1292,7 @@ export default function BrowseOutfitsFragment() {
     return (!q || i.name.toLowerCase().includes(q) || i.category.toLowerCase().includes(q) || (i.subtype||'').toLowerCase().includes(q))
       && (filterCat === 'All'    || i.category === filterCat)
       && (filterSubcat === 'All' || i.subtype  === filterSubcat)
-      && (filterSize === 'All'   || i.size     === filterSize);
+      && (filterSize === 'All'   || (Array.isArray(i.sizes) ? i.sizes.includes(filterSize) : i.size === filterSize));
   }), [availableItems, search, filterCat, filterSubcat, filterSize, bookedItemIds]);
 
   const handleBookingSubmit = async () => {
@@ -1256,6 +1300,8 @@ export default function BrowseOutfitsFragment() {
     if (!booking.fittingDate || !booking.fittingTime) { showToast('error', 'Please select a fitting date and time.'); return; }
     if (!booking.name || !booking.email || !booking.phone) { showToast('error', 'Please fill in your contact information.'); return; }
     if (!validatePhilippinePhone(booking.phone)) { showToast('error', 'Invalid Philippine mobile number. Use +63 followed by 10 digits.'); return; }
+    const _szArr = Array.isArray(selectedItem?.sizes) ? selectedItem.sizes.filter(Boolean) : (selectedItem?.size ? [selectedItem.size] : []);
+    if (_szArr.length > 1 && !booking.preferredSize) { showToast('error', 'Please select a size before booking.'); return; }
 
     if (bookingSettings.enableTimeRestrictions && !isWorkingDay(booking.fittingDate, bookingSettings)) {
       showToast('error', 'The selected date is not a working day. Please choose a different date.'); return;
@@ -1269,7 +1315,7 @@ export default function BrowseOutfitsFragment() {
       showToast('error', `You already have a booking for ${selectedItem.name}. You cannot book another.`); return;
     }
 
-    if (bookedFittingSlots.includes(booking.fittingTime)) {
+    if (bookedFittingSlots.includes(to24Hour(booking.fittingTime))) {
       showToast('error', `The time slot ${booking.fittingTime} is already booked. Please select another time.`); return;
     }
 
@@ -1280,7 +1326,7 @@ export default function BrowseOutfitsFragment() {
         fittingDate: booking.fittingDate,
         fittingTime: to24Hour(booking.fittingTime),  
         customerName: booking.name, customerEmail: booking.email, customerPhone: booking.phone,
-        preferredSize: booking.preferredSize || selectedItem.size,
+        preferredSize: booking.preferredSize || '',
         notes: booking.notes, userId: currentUser.id || null,
       });
       const confirmation = {
@@ -1288,7 +1334,7 @@ export default function BrowseOutfitsFragment() {
         item: selectedItem,
         date: booking.fittingDate, time: booking.fittingTime,
         customerName: booking.name, customerEmail: booking.email, customerPhone: booking.phone,
-        preferredSize: booking.preferredSize || selectedItem.size,
+        preferredSize: booking.preferredSize || '',
         notes: booking.notes, status: 'confirmed', createdAt: new Date().toISOString(),
       };
       setBookingConfirmed(confirmation);
@@ -1435,7 +1481,9 @@ export default function BrowseOutfitsFragment() {
                     <div className="inv-grid-meta">
                       <span className="inv-cat-tag">{item.category}</span>
                       {item.subtype && <span className="inv-subtype-tag">{item.subtype}</span>}
-                      <span className="inv-grid-size">{item.size}</span>
+                      {(Array.isArray(item.sizes) ? item.sizes : item.size ? [item.size] : []).length > 0 && (
+                        <span className="inv-grid-size">{(Array.isArray(item.sizes) ? item.sizes : [item.size]).join(', ')}</span>
+                      )}
                     </div>
                     <div className="inv-grid-price-row">
                       {promo
@@ -1558,7 +1606,7 @@ export default function BrowseOutfitsFragment() {
                       </td>
                       <td><span className="inv-cat-tag">{item.category}</span></td>
                       <td><span className="inv-subtype-tag">{item.subtype}</span></td>
-                      <td>{item.size}</td>
+                      <td>{Array.isArray(item.sizes) ? item.sizes.join(', ') : item.size || '—'}</td>
                       <td>
                         {promo
                           ? <div><div className="inv-price-old">₱{item.price.toLocaleString()}</div><div className="inv-price-new">₱{Math.round(price).toLocaleString()}</div></div>
@@ -1684,8 +1732,7 @@ export default function BrowseOutfitsFragment() {
                     {[
                       ['Category', selectedItem.category],
                       ['Type', selectedItem.subtype],
-                      ['Size', selectedItem.size],
-                      ['Color', selectedItem.color],
+                      ['Sizes', Array.isArray(selectedItem.sizes) && selectedItem.sizes.length ? selectedItem.sizes.join(', ') : (selectedItem.size || null)],
                       ['Age Range', selectedItem.ageRange],
                       ['Daily Rate', promo
                         ? <><span style={{ textDecoration:'line-through', color:'#bbb', marginRight:'0.4rem' }}>₱{selectedItem.price.toLocaleString()}</span><strong style={{ color:'#15803d' }}>₱{Math.round(price).toLocaleString()}</strong></>
@@ -1778,12 +1825,12 @@ export default function BrowseOutfitsFragment() {
 
         const promo = activePromo(selectedItem);
         const selectedDateNonWorking = booking.fittingDate && !isWorkingDay(booking.fittingDate, bookingSettings);
-        const dateIsFullyBooked = !!booking.fittingDate && !loadingFittingSlots && timeSlots.length > 0 && timeSlots.every(t => bookedFittingSlots.includes(t));
+        const dateIsFullyBooked = !!booking.fittingDate && !loadingFittingSlots && timeSlots.length > 0 && timeSlots.every(t => bookedFittingSlots.includes(to24Hour(t)));
 
         const timeOptions = timeSlots.map(slot => ({
           value: slot,
           label: slot,
-          disabled: bookedFittingSlots.includes(slot)
+          disabled: bookedFittingSlots.includes(to24Hour(slot))
         }));
 
         const handleTimeChange = (e) => {
@@ -1898,13 +1945,25 @@ export default function BrowseOutfitsFragment() {
                     />
                   </div>
                 </div>
-                <div className="inv-field">
-                  <label className="inv-field-label">Preferred Size</label>
-                  <select className="inv-select" value={booking.preferredSize} onChange={e => setBooking(p => ({ ...p, preferredSize: e.target.value }))} disabled={submitting}>
-                    <option value="">Select size (optional)</option>
-                    {['XS','S','M','L','XL','XXL'].map(s => <option key={s}>{s}</option>)}
-                  </select>
-                </div>
+                {(() => {
+                  const szArr = Array.isArray(selectedItem?.sizes) ? selectedItem.sizes.filter(Boolean) : (selectedItem?.size ? [selectedItem.size] : []);
+                  if (szArr.length === 0) return null;
+                  if (szArr.length === 1) return (
+                    <div className="inv-field">
+                      <label className="inv-field-label">Size</label>
+                      <div className="inv-input" style={{ cursor: 'not-allowed', background: '#f9fafb', color: '#374151' }}>{szArr[0]}</div>
+                    </div>
+                  );
+                  return (
+                    <div className="inv-field">
+                      <label className="inv-field-label">Size <span className="inv-required">*</span></label>
+                      <select className="inv-select" value={booking.preferredSize} onChange={e => setBooking(p => ({ ...p, preferredSize: e.target.value }))} disabled={submitting}>
+                        <option value="">Select size</option>
+                        {szArr.map(s => <option key={s}>{s}</option>)}
+                      </select>
+                    </div>
+                  );
+                })()}
                 <div className="inv-field">
                   <label className="inv-field-label">Special Requests</label>
                   <textarea className="inv-textarea" rows={3} placeholder="Any special requests or questions?" value={booking.notes} onChange={e => setBooking(p => ({ ...p, notes: e.target.value }))} disabled={submitting} />
@@ -1936,8 +1995,8 @@ export default function BrowseOutfitsFragment() {
                     !booking.email ||
                     !booking.phone ||
                     selectedDateNonWorking ||
-                    bookedFittingSlots.includes(booking.fittingTime) ||
-                    (timeSlots.length > 0 && timeSlots.every(t => bookedFittingSlots.includes(t)))
+                    bookedFittingSlots.includes(to24Hour(booking.fittingTime)) ||
+                    (timeSlots.length > 0 && timeSlots.every(t => bookedFittingSlots.includes(to24Hour(t))))
                   }
                 >
                   {submitting

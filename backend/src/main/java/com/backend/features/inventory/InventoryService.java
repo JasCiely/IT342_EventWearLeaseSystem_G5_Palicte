@@ -28,4 +28,6 @@ public interface InventoryService {
     void deletePromotion(String id);
 
     String getItemName(String itemId);
+
+    ItemResponse markItemAvailable(String itemId);
 }

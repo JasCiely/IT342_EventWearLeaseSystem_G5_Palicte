@@ -7,6 +7,7 @@ import com.backend.features.booking.dto.response.DirectBookingResponse;
 import com.backend.features.booking.dto.response.FittingAvailabilityResponse;
 import com.backend.features.booking.dto.response.FittingBookingResponse;
 import com.backend.shared.entity.Booking;
+import com.backend.shared.sse.SseService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -19,6 +20,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,11 +34,12 @@ public class BookingController {
 
     private final BookingService bookingService;
     private final DirectBookingService directBookingService;
+    private final SseService sseService;
 
     // ── Fitting Booking (authenticated users) ─────────────────
 
     @PostMapping("/inventory/book-fitting")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasRole('CUSTOMER')")
     public ResponseEntity<FittingBookingResponse> bookFitting(
             @RequestBody FittingBookingRequest request,
             @AuthenticationPrincipal UserDetails userDetails) {
@@ -53,11 +56,12 @@ public class BookingController {
             return ResponseEntity.badRequest().body(response);
         }
 
+        sseService.broadcast("BOOKING_UPDATE");
         return ResponseEntity.ok(response);
     }
 
     @GetMapping("/inventory/bookings/my")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasRole('CUSTOMER')")
     public ResponseEntity<List<BookingDetailResponse>> getMyBookings(
             @AuthenticationPrincipal UserDetails userDetails) {
         log.info("Fetching bookings for user: {}", userDetails.getUsername());
@@ -118,6 +122,7 @@ public class BookingController {
             Map<String, Object> response = new HashMap<>();
             response.put("id", dto.getId());
             response.put("status", dto.getStatus());
+            sseService.broadcast("BOOKING_UPDATE");
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
@@ -136,6 +141,7 @@ public class BookingController {
             response.put("id", booking.getId());
             response.put("status", booking.getStatus());
             response.put("leaseStarted", booking.isLeaseStarted());
+            sseService.broadcast("BOOKING_UPDATE");
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
@@ -153,6 +159,7 @@ public class BookingController {
             response.put("id", booking.getId());
             response.put("status", booking.getStatus());
             response.put("message", "Fitting marked as completed without lease");
+            sseService.broadcast("BOOKING_UPDATE");
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
@@ -167,13 +174,15 @@ public class BookingController {
             @PathVariable String bookingId,
             @RequestBody FittingRescheduleRequest request) {
         try {
-            // Check availability for new time slot
+            // Slot capacity check (max 5 per time slot, excluding this booking)
             boolean available = bookingService.checkAvailability(request.getFittingDate(), request.getFittingTime(),
                     bookingId);
             if (!available) {
                 return ResponseEntity.badRequest().body(Map.of("error", "This time slot is fully booked"));
             }
 
+            // Working-day, working-hours, slot-alignment, and per-item uniqueness
+            // are validated inside rescheduleFitting and throw IllegalArgumentException
             bookingService.rescheduleFitting(bookingId, request.getFittingDate(), request.getFittingTime());
 
             Map<String, Object> response = new HashMap<>();
@@ -181,9 +190,15 @@ public class BookingController {
             response.put("fittingDate", request.getFittingDate());
             response.put("fittingTime", request.getFittingTime());
             response.put("message", "Fitting rescheduled successfully");
+            sseService.broadcast("BOOKING_UPDATE");
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.notFound().build();
+            // Distinguishes "not found" from validation errors by message content
+            String msg = e.getMessage();
+            if (msg != null && msg.equals("Booking not found")) {
+                return ResponseEntity.notFound().build();
+            }
+            return ResponseEntity.badRequest().body(Map.of("error", msg));
         }
     }
 
@@ -243,6 +258,26 @@ public class BookingController {
         }
     }
 
+    @PutMapping("/admin/bookings/direct/{bookingId}/dates")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> updateDirectBookingDates(
+            @PathVariable String bookingId,
+            @RequestBody Map<String, String> body) {
+        try {
+            LocalDate startDate = LocalDate.parse(body.get("startDate"));
+            LocalDate endDate   = LocalDate.parse(body.get("endDate"));
+            DirectBookingResponse response = directBookingService.updateDirectBookingDates(bookingId, startDate, endDate);
+            sseService.broadcast("BOOKING_UPDATE");
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            String msg = e.getMessage();
+            if ("Booking not found".equals(msg)) return ResponseEntity.notFound().build();
+            return ResponseEntity.badRequest().body(Map.of("error", msg));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
     @PutMapping("/admin/bookings/direct/{bookingId}/status")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> updateDirectBookingStatus(
@@ -253,23 +288,82 @@ public class BookingController {
             Map<String, Object> response = new HashMap<>();
             response.put("id", bookingId);
             response.put("status", status);
+            sseService.broadcast("BOOKING_UPDATE");
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
+        } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PutMapping("/admin/bookings/direct/{bookingId}/pickup")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> markDirectBookingPickedUp(@PathVariable String bookingId) {
+        try {
+            DirectBookingResponse response = directBookingService.markPickedUp(bookingId);
+            sseService.broadcast("BOOKING_UPDATE");
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PutMapping("/admin/bookings/direct/{bookingId}/undo-pickup")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> undoDirectBookingPickup(@PathVariable String bookingId) {
+        try {
+            DirectBookingResponse response = directBookingService.undoPickup(bookingId);
+            sseService.broadcast("BOOKING_UPDATE");
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
 
     @PatchMapping("/inventory/bookings/{bookingId}/cancel")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasRole('CUSTOMER')")
     public ResponseEntity<?> cancelFittingBooking(
             @PathVariable String bookingId,
             @AuthenticationPrincipal UserDetails userDetails) {
 
         try {
             bookingService.cancelFittingBooking(bookingId, userDetails.getUsername());
+            sseService.broadcast("BOOKING_UPDATE");
             return ResponseEntity.ok(Map.of("message", "Booking cancelled successfully"));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
+        } catch (SecurityException | IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PatchMapping("/inventory/bookings/{bookingId}/reschedule")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public ResponseEntity<?> rescheduleCustomerFitting(
+            @PathVariable String bookingId,
+            @RequestBody FittingRescheduleRequest request,
+            @AuthenticationPrincipal UserDetails userDetails) {
+
+        try {
+            boolean slotAvailable = bookingService.checkAvailability(
+                    request.getFittingDate(), request.getFittingTime(), bookingId);
+            if (!slotAvailable) {
+                return ResponseEntity.badRequest().body(Map.of("error", "This time slot is fully booked"));
+            }
+            bookingService.rescheduleFittingByCustomer(
+                    bookingId, userDetails.getUsername(),
+                    request.getFittingDate(), request.getFittingTime());
+            sseService.broadcast("BOOKING_UPDATE");
+            return ResponseEntity.ok(Map.of("message", "Fitting rescheduled successfully"));
+        } catch (IllegalArgumentException e) {
+            String msg = e.getMessage();
+            if ("Booking not found".equals(msg)) return ResponseEntity.notFound().build();
+            return ResponseEntity.badRequest().body(Map.of("error", msg));
         } catch (SecurityException | IllegalStateException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }

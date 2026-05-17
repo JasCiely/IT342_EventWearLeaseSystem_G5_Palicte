@@ -440,17 +440,10 @@ const Auth = ({ onLogin }) => {
           onClick={handleGoogleLogin}
           disabled={isLoading || isGoogleLoading}
         >
-          {isGoogleLoading ? (
             <>
-              <span className="loading-spinner"></span>
-              <span>Connecting to Google...</span>
-            </>
-          ) : (
-            <>
-              <GoogleIcon />
-              <span>{isLogin ? 'Sign in with Google' : 'Sign up with Google'}</span>
-            </>
-          )}
+            <GoogleIcon />
+            <span>{isLogin ? 'Sign in with Google' : 'Sign up with Google'}</span>
+          </>
         </button>
 
         <div className="separator"><span>or</span></div>
@@ -631,17 +624,10 @@ const Auth = ({ onLogin }) => {
           )}
 
           <button type="submit" className="submit-btn" disabled={isLoading}>
-            {isLoading ? (
               <>
-                <span className="loading-spinner"></span>
-                <span>Processing...</span>
-              </>
-            ) : (
-              <>
-                {isLogin ? 'Sign In' : 'Create Account'} 
-                <ArrowRight size={18} />
-              </>
-            )}
+              {isLogin ? 'Sign In' : 'Create Account'}
+              <ArrowRight size={18} />
+            </>
           </button>
           
           <button 

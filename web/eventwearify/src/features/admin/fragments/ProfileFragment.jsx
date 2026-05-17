@@ -20,7 +20,62 @@ import '../styles/ProfileFragment.css';
 const API_BASE  = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
 const AUTH_BASE = `${API_BASE}/api/auth`;
 const USER_BASE = `${API_BASE}/api/user`;
-// No SERVER prefix needed — Supabase Storage returns full CDN URLs
+
+const validatePhilippinePhone = (phone) => {
+  const stripped = (phone || '').replace(/\s/g, '');
+  return /^\+63\d{10}$/.test(stripped);
+};
+
+const PhilippinePhoneInput = ({ value, onChange, disabled }) => {
+  const getRawDigits = (fullNumber) => {
+    if (!fullNumber || typeof fullNumber !== 'string') return '';
+    const matchPlus  = fullNumber.match(/^\+63(\d+)$/);
+    if (matchPlus) return matchPlus[1];
+    // convert legacy 09XXXXXXXXX → 9XXXXXXXXX
+    const matchLocal = fullNumber.match(/^09(\d{9})$/);
+    if (matchLocal) return '9' + matchLocal[1];
+    return '';
+  };
+
+  const [rawDigits, setRawDigits] = useState(() => getRawDigits(value));
+
+  useEffect(() => { setRawDigits(getRawDigits(value)); }, [value]);
+
+  const formatDisplay = (digits) => {
+    if (!digits) return '';
+    const c = digits.replace(/\D/g, '');
+    if (c.length <= 3) return c;
+    if (c.length <= 6) return `${c.slice(0, 3)} ${c.slice(3)}`;
+    return `${c.slice(0, 3)} ${c.slice(3, 6)} ${c.slice(6, 10)}`;
+  };
+
+  const handleChange = (e) => {
+    let digits = e.target.value.replace(/\D/g, '');
+    if (digits.length > 10) digits = digits.slice(0, 10);
+    setRawDigits(digits);
+    onChange(digits ? `+63${digits}` : '');
+  };
+
+  const isValid = rawDigits.length === 10 && rawDigits.startsWith('9');
+
+  return (
+    <div className={`ph-phone-input-wrapper${!isValid && rawDigits.length > 0 ? ' ph-phone-invalid' : ''}`}>
+      <div className="ph-phone-prefix">
+        <span className="ph-flag">🇵🇭</span>
+        <span className="ph-country-code">+63</span>
+      </div>
+      <input
+        type="tel"
+        className="ph-phone-input"
+        value={formatDisplay(rawDigits)}
+        onChange={handleChange}
+        disabled={disabled}
+        placeholder="9XX XXX XXXX"
+        autoComplete="off"
+      />
+    </div>
+  );
+};
 
 /* ── read profile from localStorage instantly ── */
 const getLocalProfile = () => ({
@@ -201,6 +256,10 @@ const ProfileFragment = () => {
 
   /* ── save profile — PUT /api/user/profile ── */
   const handleSaveProfile = async () => {
+    if (editFields.phone && !validatePhilippinePhone(editFields.phone)) {
+      showToast('error', 'Invalid Philippine mobile number. Use +63 followed by 10 digits.');
+      return;
+    }
     setSaving(true);
     try {
       const res = await fetch(`${USER_BASE}/profile`, {
@@ -422,7 +481,6 @@ const ProfileFragment = () => {
                 { label: 'First Name', name: 'firstName', icon: UserCircle, type: 'text'  },
                 { label: 'Last Name',  name: 'lastName',  icon: UserCircle, type: 'text'  },
                 { label: 'Email',      name: 'email',     icon: Mail,       type: 'email' },
-                { label: 'Phone',      name: 'phone',     icon: Phone,      type: 'tel'   },
               ].map(({ label, name, icon: Icon, type }) => (
                 <div className="pf-field" key={name}>
                   <label className="pf-field-label">{label}</label>
@@ -448,6 +506,24 @@ const ProfileFragment = () => {
                   )}
                 </div>
               ))}
+
+              {/* Phone — Philippine format (+63XXXXXXXXXX) */}
+              <div className="pf-field">
+                <label className="pf-field-label">Phone</label>
+                {editMode ? (
+                  <PhilippinePhoneInput
+                    value={editFields.phone}
+                    onChange={(val) => setEditFields(prev => ({ ...prev, phone: val }))}
+                  />
+                ) : (
+                  <div className="pf-field-value">
+                    <Phone size={14} className="pf-field-value-icon" />
+                    <span>
+                      {profile.phone || <em style={{ color: '#c0bdb9' }}>Not set</em>}
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
