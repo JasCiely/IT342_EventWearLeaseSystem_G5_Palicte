@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/nav_dashboard"
+        android:icon="@drawable/ic_nav_dashboard"
+        android:title="@string/nav_dashboard" />
+    <item
+        android:id="@+id/nav_bookings"
+        android:icon="@drawable/ic_nav_bookings"
+        android:title="@string/nav_bookings" />
+    <item
+        android:id="@+id/nav_inventory"
+        android:icon="@drawable/ic_nav_inventory"
+        android:title="@string/nav_inventory" />
+    <item
+        android:id="@+id/nav_staff"
+        android:icon="@drawable/ic_nav_staff"
+        android:title="@string/nav_staff" />
+    <item
+        android:id="@+id/nav_more"
+        android:icon="@drawable/ic_nav_more"
+        android:title="@string/nav_more" />
+</menu>

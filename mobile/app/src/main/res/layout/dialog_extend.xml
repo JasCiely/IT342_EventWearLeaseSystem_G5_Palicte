@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:text="New End Date (YYYY-MM-DD)" android:textSize="13sp"
+        android:textColor="#718096" android:layout_marginBottom="4dp" />
+    <EditText android:id="@+id/etNewEndDate" android:layout_width="match_parent" android:layout_height="52dp"
+        android:background="@drawable/bg_input" android:hint="2024-01-30" android:paddingHorizontal="12dp"
+        android:inputType="date" android:focusable="false" android:cursorVisible="false" />
+
+</LinearLayout>

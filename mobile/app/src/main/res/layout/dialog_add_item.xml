@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:padding="16dp">
+
+        <!-- Name -->
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="Name *" android:textSize="13sp" android:textColor="#718096"
+            android:layout_marginBottom="4dp" />
+        <EditText android:id="@+id/etItemName" android:layout_width="match_parent" android:layout_height="52dp"
+            android:background="@drawable/bg_input" android:paddingHorizontal="12dp"
+            android:inputType="text" android:layout_marginBottom="12dp" />
+
+        <!-- Category -->
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="Category *" android:textSize="13sp" android:textColor="#718096"
+            android:layout_marginBottom="4dp" />
+        <Spinner android:id="@+id/spinnerCategory" android:layout_width="match_parent"
+            android:layout_height="52dp" android:background="@drawable/bg_input"
+            android:paddingHorizontal="12dp" android:layout_marginBottom="12dp" />
+
+        <!-- Subtype -->
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="Subtype" android:textSize="13sp" android:textColor="#718096"
+            android:layout_marginBottom="4dp" />
+        <Spinner android:id="@+id/spinnerSubtype" android:layout_width="match_parent"
+            android:layout_height="52dp" android:background="@drawable/bg_input"
+            android:paddingHorizontal="12dp" android:layout_marginBottom="12dp" />
+
+        <!-- Custom Subtype (shown when 'Other' is selected) -->
+        <EditText android:id="@+id/etCustomSubtype" android:layout_width="match_parent" android:layout_height="52dp"
+            android:background="@drawable/bg_input" android:hint="Enter custom subtype…"
+            android:paddingHorizontal="12dp" android:inputType="text"
+            android:layout_marginBottom="12dp" android:visibility="gone" />
+
+        <!-- Sizes -->
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="Sizes (tap to select)" android:textSize="13sp" android:textColor="#718096"
+            android:layout_marginBottom="6dp" />
+        <LinearLayout android:id="@+id/sizeChipsRow" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:orientation="horizontal"
+            android:layout_marginBottom="12dp" />
+
+        <!-- Price -->
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="Price per Day (₱) *" android:textSize="13sp" android:textColor="#718096"
+            android:layout_marginBottom="4dp" />
+        <EditText android:id="@+id/etPrice" android:layout_width="match_parent" android:layout_height="52dp"
+            android:background="@drawable/bg_input" android:paddingHorizontal="12dp"
+            android:inputType="numberDecimal" android:layout_marginBottom="12dp" />
+
+        <!-- Status -->
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="Status *" android:textSize="13sp" android:textColor="#718096"
+            android:layout_marginBottom="4dp" />
+        <Spinner android:id="@+id/spinnerStatus" android:layout_width="match_parent"
+            android:layout_height="52dp" android:background="@drawable/bg_input"
+            android:paddingHorizontal="12dp" android:layout_marginBottom="12dp" />
+
+        <!-- Age Range -->
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="Age Range (Optional)" android:textSize="13sp" android:textColor="#718096"
+            android:layout_marginBottom="4dp" />
+        <EditText android:id="@+id/etAgeRange" android:layout_width="match_parent" android:layout_height="52dp"
+            android:background="@drawable/bg_input" android:hint="e.g. Adult, Kids, All Ages"
+            android:paddingHorizontal="12dp" android:inputType="text" android:layout_marginBottom="12dp" />
+
+        <!-- Description -->
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="Description (Optional)" android:textSize="13sp" android:textColor="#718096"
+            android:layout_marginBottom="4dp" />
+        <EditText android:id="@+id/etDescription" android:layout_width="match_parent" android:layout_height="96dp"
+            android:background="@drawable/bg_input" android:paddingHorizontal="12dp"
+            android:inputType="textMultiLine" android:gravity="top|start"
+            android:layout_marginBottom="12dp" />
+
+        <!-- Photo Upload -->
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="Photos (Optional)" android:textSize="13sp" android:textColor="#718096"
+            android:layout_marginBottom="6dp" />
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnSelectPhotos"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:text="Select Photos from Gallery"
+            android:textSize="13sp"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            app:strokeColor="@color/brand_burgundy"
+            android:textColor="@color/brand_burgundy"
+            xmlns:app="http://schemas.android.com/apk/res-auto" />
+        <TextView android:id="@+id/tvPhotoCount"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="No photos selected"
+            android:textSize="12sp" android:textColor="@color/brand_text_subtitle"
+            android:layout_marginTop="4dp" android:layout_marginBottom="4dp" />
+
+    </LinearLayout>
+</ScrollView>

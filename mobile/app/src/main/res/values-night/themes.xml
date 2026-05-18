@@ -1,0 +1,14 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Force light theme in dark mode to match web brand colors -->
+    <style name="Base.Theme.Mobile" parent="Theme.Material3.Light.NoActionBar">
+        <item name="colorPrimary">@color/brand_burgundy</item>
+        <item name="colorPrimaryVariant">@color/brand_burgundy_dark</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorSecondary">@color/brand_gold</item>
+        <item name="android:colorBackground">@color/brand_cream_bg</item>
+        <item name="colorSurface">@color/brand_surface</item>
+        <item name="colorOnSurface">@color/brand_text_dark</item>
+        <item name="colorError">@color/error_red</item>
+        <item name="android:windowBackground">@color/brand_cream_bg</item>
+    </style>
+</resources>

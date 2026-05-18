@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/brand_cream_bg">
+
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="@color/brand_burgundy"
+        android:title="My Profile"
+        android:titleTextColor="#FFFFFF"
+        app:navigationIcon="@drawable/ic_arrow_back"
+        app:navigationIconTint="#FFFFFF" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <!-- Avatar card -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@color/brand_burgundy"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:padding="24dp">
+
+                <FrameLayout
+                    android:layout_width="72dp"
+                    android:layout_height="72dp"
+                    android:background="@drawable/circle_white_36">
+                    <TextView
+                        android:id="@+id/tvInitials"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:textSize="26sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/brand_burgundy" />
+                </FrameLayout>
+
+                <TextView
+                    android:id="@+id/tvName"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Admin"
+                    android:textColor="#FFFFFF"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:layout_marginTop="10dp" />
+
+                <TextView
+                    android:id="@+id/tvRole"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="ADMIN"
+                    android:textColor="#FFFFFF"
+                    android:alpha="0.8"
+                    android:textSize="12sp"
+                    android:layout_marginTop="2dp" />
+            </LinearLayout>
+
+            <!-- Edit form -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_margin="16dp"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="Edit Profile" android:textSize="16sp" android:textStyle="bold"
+                        android:textColor="@color/brand_text_dark" android:layout_marginBottom="16dp" />
+
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="First Name" android:textSize="13sp" android:textColor="@color/brand_text_subtitle"
+                        android:layout_marginBottom="4dp" />
+                    <EditText android:id="@+id/etFirstName" android:layout_width="match_parent" android:layout_height="52dp"
+                        android:background="@drawable/bg_input" android:paddingHorizontal="12dp"
+                        android:textSize="15sp" android:inputType="textPersonName" android:layout_marginBottom="12dp" />
+
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="Last Name" android:textSize="13sp" android:textColor="@color/brand_text_subtitle"
+                        android:layout_marginBottom="4dp" />
+                    <EditText android:id="@+id/etLastName" android:layout_width="match_parent" android:layout_height="52dp"
+                        android:background="@drawable/bg_input" android:paddingHorizontal="12dp"
+                        android:textSize="15sp" android:inputType="textPersonName" android:layout_marginBottom="12dp" />
+
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="Email" android:textSize="13sp" android:textColor="@color/brand_text_subtitle"
+                        android:layout_marginBottom="4dp" />
+                    <EditText android:id="@+id/etEmail" android:layout_width="match_parent" android:layout_height="52dp"
+                        android:background="@drawable/bg_input" android:paddingHorizontal="12dp"
+                        android:textSize="15sp" android:inputType="textEmailAddress" android:layout_marginBottom="12dp" />
+
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="Phone" android:textSize="13sp" android:textColor="@color/brand_text_subtitle"
+                        android:layout_marginBottom="4dp" />
+                    <EditText android:id="@+id/etPhone" android:layout_width="match_parent" android:layout_height="52dp"
+                        android:background="@drawable/bg_input" android:paddingHorizontal="12dp"
+                        android:textSize="15sp" android:inputType="phone" android:layout_marginBottom="16dp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnSaveProfile"
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:text="Save Changes"
+                        android:layout_marginBottom="8dp"
+                        app:backgroundTint="@color/brand_burgundy" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnChangePassword"
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:text="Change Password"
+                        android:textColor="@color/brand_burgundy"
+                        app:strokeColor="@color/brand_burgundy"
+                        app:strokeWidth="1.5dp"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <View android:layout_width="match_parent" android:layout_height="24dp" />
+
+        </LinearLayout>
+    </ScrollView>
+
+</LinearLayout>

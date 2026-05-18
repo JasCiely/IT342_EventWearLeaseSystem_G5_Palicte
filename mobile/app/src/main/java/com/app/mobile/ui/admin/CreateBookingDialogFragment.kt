@@ -1,0 +1,488 @@
+package com.app.mobile.ui.admin
+
+import android.app.DatePickerDialog
+import android.app.Dialog
+import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.text.Editable
+import android.text.TextWatcher
+import android.view.*
+import android.widget.*
+import androidx.core.content.ContextCompat
+import androidx.fragment.app.DialogFragment
+import androidx.lifecycle.lifecycleScope
+import com.app.mobile.ApiClient
+import com.app.mobile.R
+import com.app.mobile.databinding.DialogCreateBookingBinding
+import com.app.mobile.models.*
+import kotlinx.coroutines.launch
+import retrofit2.HttpException
+import java.util.*
+
+class CreateBookingDialogFragment : DialogFragment() {
+
+    var onSuccess: (() -> Unit)? = null
+
+    private var _binding: DialogCreateBookingBinding? = null
+    private val binding get() = _binding!!
+
+    private var currentTab = "fitting"
+
+    // Customer state
+    private var selectedCustomer: AdminUser? = null
+    private val customerHandler = Handler(Looper.getMainLooper())
+    private var customerRunnable: Runnable? = null
+
+    // Item state
+    private var allItems         = listOf<InventoryItem>()
+    private var selectedItem: InventoryItem? = null
+    private var selectedSize     = ""
+
+    // Fitting state
+    private var fittingDate      = ""
+    private var fittingTime      = ""
+    private var bookedSlots      = listOf<String>()
+    private val timeSlots        = listOf(
+        "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
+        "12:00", "12:30", "13:00", "13:30", "14:00", "14:30",
+        "15:00", "15:30", "16:00", "16:30"
+    )
+
+    // Direct state
+    private var startDate        = ""
+    private var endDate          = ""
+    private var availResult: Boolean? = null
+    private val availHandler     = Handler(Looper.getMainLooper())
+
+    override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
+        val dialog = Dialog(requireContext(), R.style.FullScreenDialogStyle)
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
+        return dialog
+    }
+
+    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
+        _binding = DialogCreateBookingBinding.inflate(inflater, container, false)
+        return binding.root
+    }
+
+    override fun onStart() {
+        super.onStart()
+        dialog?.window?.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+
+        binding.cbBtnClose.setOnClickListener { dismiss() }
+        binding.cbBtnCancel.setOnClickListener { dismiss() }
+        binding.cbBtnSubmit.setOnClickListener { submit() }
+
+        // Tab switching
+        binding.tabFitting.setOnClickListener { switchTab("fitting") }
+        binding.tabDirect.setOnClickListener  { switchTab("direct") }
+        switchTab("fitting")
+
+        // Customer search with debounce
+        binding.etCustomerSearch.addTextChangedListener(object : TextWatcher {
+            override fun afterTextChanged(s: Editable?) {
+                customerRunnable?.let { customerHandler.removeCallbacks(it) }
+                val q = s.toString().trim()
+                if (q.length < 2) { binding.customerSuggestions.visibility = View.GONE; return }
+                val r = Runnable { searchCustomers(q) }
+                customerRunnable = r
+                customerHandler.postDelayed(r, 300)
+            }
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+        })
+
+        binding.btnChangeCustomer.setOnClickListener {
+            selectedCustomer = null
+            binding.selectedCustomerChip.visibility = View.GONE
+            binding.etCustomerSearch.text.clear()
+            binding.etCbName.text.clear()
+            binding.etCbEmail.text.clear()
+            binding.etCbPhone.text.clear()
+        }
+
+        // Item search
+        binding.etItemSearch.addTextChangedListener(object : TextWatcher {
+            override fun afterTextChanged(s: Editable?) { filterItems(s.toString()) }
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+        })
+
+        // Date pickers
+        binding.etFittingDate.setOnClickListener { pickDate { date ->
+            fittingDate = date; binding.etFittingDate.setText(date)
+            fittingTime = ""; refreshTimeSpinner()
+            if (selectedItem != null) loadBookedSlots()
+        }}
+        binding.etStartDate.setOnClickListener { pickDate { date ->
+            startDate = date; binding.etStartDate.setText(date)
+            if (endDate.isNotEmpty() && endDate < startDate) { endDate = ""; binding.etEndDate.setText("") }
+            recalcDirect(); triggerAvailCheck()
+        }}
+        binding.etEndDate.setOnClickListener { pickDate { date ->
+            endDate = date; binding.etEndDate.setText(date)
+            recalcDirect(); triggerAvailCheck()
+        }}
+
+        loadItems()
+    }
+
+    private fun switchTab(tab: String) {
+        currentTab = tab
+        val burgundy = ContextCompat.getColor(requireContext(), R.color.brand_burgundy)
+        val subtitle = ContextCompat.getColor(requireContext(), R.color.brand_text_subtitle)
+
+        if (tab == "fitting") {
+            binding.tabFitting.setTextColor(burgundy)
+            binding.tabFitting.setTypeface(null, android.graphics.Typeface.BOLD)
+            binding.tabDirect.setTextColor(subtitle)
+            binding.tabDirect.setTypeface(null, android.graphics.Typeface.NORMAL)
+            binding.cbTabIndicatorLeft.layoutParams =
+                (binding.cbTabIndicatorLeft.layoutParams as LinearLayout.LayoutParams).also {
+                    it.weight = 1f
+                    (binding.cbTabIndicatorLeft.parent as? LinearLayout)?.also { row ->
+                        // set left half highlight
+                    }
+                }
+            binding.sectionFitting.visibility = View.VISIBLE
+            binding.sectionDirect.visibility  = View.GONE
+            binding.cbBtnSubmit.text = "Create Fitting Booking"
+        } else {
+            binding.tabFitting.setTextColor(subtitle)
+            binding.tabFitting.setTypeface(null, android.graphics.Typeface.NORMAL)
+            binding.tabDirect.setTextColor(burgundy)
+            binding.tabDirect.setTypeface(null, android.graphics.Typeface.BOLD)
+            binding.sectionFitting.visibility = View.GONE
+            binding.sectionDirect.visibility  = View.VISIBLE
+            binding.cbBtnSubmit.text = "Create Rental Booking"
+        }
+        clearError()
+    }
+
+    // ── Item loading ──────────────────────────────────────────────────────────
+    private fun loadItems() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                allItems = ApiClient.adminApi.getInventoryItems()
+                    .filter { it.status.equals("Available", ignoreCase = true) }
+            } catch (_: Exception) {}
+        }
+    }
+
+    private fun filterItems(query: String) {
+        val suggestions = binding.itemSuggestions
+        suggestions.removeAllViews()
+        if (query.length < 2) { suggestions.visibility = View.GONE; return }
+        val matches = allItems.filter { it.name.contains(query, ignoreCase = true) }.take(6)
+        if (matches.isEmpty()) { suggestions.visibility = View.GONE; return }
+        matches.forEach { item ->
+            val row = createSuggestionRow(
+                primary   = item.name,
+                secondary = "₱${String.format("%.2f", item.price)}/day · ${item.category}"
+            ) {
+                selectItem(item)
+                suggestions.visibility = View.GONE
+            }
+            suggestions.addView(row)
+        }
+        suggestions.visibility = View.VISIBLE
+    }
+
+    private fun selectItem(item: InventoryItem) {
+        selectedItem = item
+        binding.etItemSearch.setText(item.name)
+        binding.etItemSearch.setSelection(item.name.length)
+
+        // Size selection
+        val sizes = item.size?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() } ?: emptyList()
+        if (sizes.size > 1) {
+            val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, listOf("Select size…") + sizes)
+            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+            binding.cbSizeSpinner.adapter = adapter
+            binding.cbSizeSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+                override fun onItemSelected(p: AdapterView<*>?, v: View?, pos: Int, id: Long) {
+                    selectedSize = if (pos == 0) "" else sizes[pos - 1]
+                }
+                override fun onNothingSelected(p: AdapterView<*>?) {}
+            }
+            binding.cbSizeLabel.visibility   = View.VISIBLE
+            binding.cbSizeSpinner.visibility = View.VISIBLE
+        } else if (sizes.size == 1) {
+            selectedSize = sizes[0]
+            binding.cbSizeLabel.visibility   = View.GONE
+            binding.cbSizeSpinner.visibility = View.GONE
+        } else {
+            selectedSize = ""
+            binding.cbSizeLabel.visibility   = View.GONE
+            binding.cbSizeSpinner.visibility = View.GONE
+        }
+
+        // Reset dates when item changes
+        fittingDate = ""; fittingTime = ""
+        binding.etFittingDate.setText("")
+        startDate = ""; endDate = ""
+        binding.etStartDate.setText(""); binding.etEndDate.setText("")
+        binding.cbAvailability.visibility = View.GONE
+        binding.cbPriceSummary.visibility = View.GONE
+
+        if (currentTab == "direct") triggerAvailCheck()
+    }
+
+    // ── Customer search ───────────────────────────────────────────────────────
+    private fun searchCustomers(query: String) {
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                val resp = ApiClient.adminApi.getUsers(ApiClient.bearerToken(), page = 0, size = 5, search = query, status = "active")
+                val suggestions = binding.customerSuggestions
+                suggestions.removeAllViews()
+                if (resp.content.isEmpty()) { suggestions.visibility = View.GONE; return@launch }
+                resp.content.forEach { cust ->
+                    val row = createSuggestionRow(
+                        primary   = cust.fullName,
+                        secondary = "${cust.email}${if (!cust.phone.isNullOrBlank()) " · ${cust.phone}" else ""}"
+                    ) {
+                        selectedCustomer = cust
+                        binding.etCbName.setText(cust.fullName)
+                        binding.etCbEmail.setText(cust.email)
+                        binding.etCbPhone.setText(cust.phone ?: "")
+                        binding.tvSelectedCustomer.text      = cust.fullName
+                        binding.tvSelectedCustomerEmail.text = cust.email
+                        binding.selectedCustomerChip.visibility = View.VISIBLE
+                        binding.etCustomerSearch.text.clear()
+                        suggestions.visibility = View.GONE
+                    }
+                    suggestions.addView(row)
+                }
+                suggestions.visibility = View.VISIBLE
+            } catch (_: Exception) {}
+        }
+    }
+
+    private fun createSuggestionRow(primary: String, secondary: String, onClick: () -> Unit): View {
+        val row = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(36, 24, 36, 24)
+            setBackgroundResource(android.R.drawable.list_selector_background)
+            setOnClickListener { onClick() }
+        }
+        val tvPrimary = TextView(requireContext()).apply {
+            text      = primary
+            textSize  = 14f
+            setTextColor(ContextCompat.getColor(requireContext(), R.color.brand_text_dark))
+            setTypeface(null, android.graphics.Typeface.BOLD)
+        }
+        val tvSecondary = TextView(requireContext()).apply {
+            text      = secondary
+            textSize  = 12f
+            setTextColor(ContextCompat.getColor(requireContext(), R.color.brand_text_subtitle))
+        }
+        row.addView(tvPrimary)
+        row.addView(tvSecondary)
+        val divider = View(requireContext()).apply {
+            setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.input_stroke))
+        }
+        row.addView(divider, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 1))
+        return row
+    }
+
+    // ── Fitting slots ─────────────────────────────────────────────────────────
+    private fun loadBookedSlots() {
+        val itemId = selectedItem?.id ?: return
+        val date   = fittingDate.ifEmpty { return }
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                bookedSlots = ApiClient.adminApi.getBookedFittingSlots(itemId, date)
+                refreshTimeSpinner()
+            } catch (_: Exception) { bookedSlots = emptyList(); refreshTimeSpinner() }
+        }
+    }
+
+    private fun refreshTimeSpinner() {
+        val available = timeSlots.filter { it !in bookedSlots }
+        val labels    = listOf("Select time slot…") + available.map { slot ->
+            val (h, m)  = slot.split(":").map { it.toInt() }
+            val period  = if (h >= 12) "PM" else "AM"
+            val h12     = if (h % 12 == 0) 12 else h % 12
+            "$h12:${m.toString().padStart(2, '0')} $period"
+        }
+        val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, labels)
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        binding.cbTimeSpinner.adapter = adapter
+        binding.cbTimeSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(p: AdapterView<*>?, v: View?, pos: Int, id: Long) {
+                fittingTime = if (pos == 0) "" else available[pos - 1]
+            }
+            override fun onNothingSelected(p: AdapterView<*>?) {}
+        }
+    }
+
+    // ── Direct availability + price ───────────────────────────────────────────
+    private fun recalcDirect() {
+        if (startDate.isEmpty() || endDate.isEmpty()) {
+            binding.cbPriceSummary.visibility = View.GONE; return
+        }
+        try {
+            val s    = parseDate(startDate)
+            val e    = parseDate(endDate)
+            if (e.before(s)) { binding.cbPriceSummary.visibility = View.GONE; return }
+            val days = ((e.time - s.time) / 86_400_000L + 1).toInt()
+            val price = selectedItem?.price ?: 0.0
+            val total = price * days
+            binding.cbDaysCalc.text  = "$days day${if (days != 1) "s" else ""} × ₱${String.format("%.2f", price)}"
+            binding.cbPriceVal.text  = "₱${String.format("%.2f", total)}"
+            binding.cbTotal.text     = "₱${String.format("%.2f", total)}"
+            binding.cbPriceSummary.visibility = View.VISIBLE
+        } catch (_: Exception) { binding.cbPriceSummary.visibility = View.GONE }
+    }
+
+    private fun triggerAvailCheck() {
+        val itemId = selectedItem?.id ?: return
+        if (startDate.isEmpty() || endDate.isEmpty()) {
+            binding.cbAvailability.visibility = View.GONE; return
+        }
+        availHandler.removeCallbacksAndMessages(null)
+        availHandler.postDelayed({
+            viewLifecycleOwner.lifecycleScope.launch {
+                try {
+                    binding.cbAvailability.text = "Checking availability…"
+                    binding.cbAvailability.visibility = View.VISIBLE
+                    binding.cbAvailability.setBackgroundColor(
+                        ContextCompat.getColor(requireContext(), R.color.gray_100))
+                    binding.cbAvailability.setTextColor(
+                        ContextCompat.getColor(requireContext(), R.color.brand_text_subtitle))
+                    val resp = ApiClient.adminApi.checkDirectAvailability(
+                        ApiClient.bearerToken(), itemId, startDate, endDate)
+                    availResult = resp.available
+                    binding.cbAvailability.text = if (resp.available)
+                        "✓ Item is available for these dates"
+                    else
+                        "✗ Item is not available for the selected dates"
+                    binding.cbAvailability.setBackgroundColor(ContextCompat.getColor(requireContext(),
+                        if (resp.available) R.color.status_confirmed_bg else R.color.status_cancelled_bg))
+                    binding.cbAvailability.setTextColor(ContextCompat.getColor(requireContext(),
+                        if (resp.available) R.color.status_confirmed_text else R.color.status_cancelled_text))
+                } catch (_: Exception) { binding.cbAvailability.visibility = View.GONE }
+            }
+        }, 500)
+    }
+
+    // ── Validation + Submit ───────────────────────────────────────────────────
+    private fun validate(): String? {
+        val name  = binding.etCbName.text.toString().trim()
+        val email = binding.etCbEmail.text.toString().trim()
+        val phone = binding.etCbPhone.text.toString().trim()
+        val item  = selectedItem
+        if (name.isEmpty())  return "Customer name is required"
+        if (email.isEmpty()) return "Customer email is required"
+        if (phone.isEmpty()) return "Customer phone is required"
+        if (item == null)    return "Please select an item"
+        val sizes = item.size?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() } ?: emptyList()
+        if (sizes.size > 1 && selectedSize.isEmpty()) return "Please select a size for this item"
+        if (currentTab == "fitting") {
+            if (fittingDate.isEmpty()) return "Please select a fitting date"
+            if (fittingTime.isEmpty()) return "Please select a time slot"
+            if (fittingTime in bookedSlots) return "Selected time slot is already booked"
+        } else {
+            if (startDate.isEmpty() || endDate.isEmpty()) return "Please select rental start and end dates"
+            if (parseDate(endDate).before(parseDate(startDate))) return "End date must be on or after start date"
+            if (availResult == false) return "Item is not available for the selected dates"
+        }
+        return null
+    }
+
+    private fun submit() {
+        val err = validate()
+        if (err != null) { showError(err); return }
+        clearError()
+        binding.cbBtnSubmit.isEnabled = false
+        binding.cbBtnSubmit.text      = "Creating…"
+        val item  = selectedItem!!
+        val name  = binding.etCbName.text.toString().trim()
+        val email = binding.etCbEmail.text.toString().trim()
+        val phone = binding.etCbPhone.text.toString().trim()
+        val notes = binding.etCbNotes.text.toString().trim().ifEmpty { null }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                if (currentTab == "fitting") {
+                    val req = CreateFittingBookingRequest(
+                        customerEmail  = email,
+                        customerName   = name,
+                        customerPhone  = phone,
+                        itemId         = item.id,
+                        itemName       = item.name,
+                        fittingDate    = fittingDate,
+                        fittingTime    = fittingTime,
+                        preferredSize  = selectedSize.ifEmpty { null },
+                        notes          = notes
+                    )
+                    ApiClient.adminApi.createFittingBooking(ApiClient.bearerToken(), req)
+                } else {
+                    val days  = ((parseDate(endDate).time - parseDate(startDate).time) / 86_400_000L + 1).toInt().coerceAtLeast(1)
+                    val total = (item.price ?: 0.0) * days
+                    val req   = CreateDirectBookingRequest(
+                        customerEmail  = email,
+                        customerName   = name,
+                        customerPhone  = phone,
+                        itemId         = item.id,
+                        itemName       = item.name,
+                        startDate      = startDate,
+                        endDate        = endDate,
+                        basePrice      = total,
+                        discountAmount = 0.0,
+                        finalPrice     = total,
+                        notes          = notes,
+                        preferredSize  = selectedSize.ifEmpty { null }
+                    )
+                    ApiClient.adminApi.createDirectBooking(ApiClient.bearerToken(), req)
+                }
+                onSuccess?.invoke()
+                dismiss()
+            } catch (e: HttpException) {
+                showError("Error ${e.code()}: ${e.message()}")
+                resetSubmitButton()
+            } catch (_: Exception) {
+                showError("Network error. Please try again.")
+                resetSubmitButton()
+            }
+        }
+    }
+
+    private fun resetSubmitButton() {
+        binding.cbBtnSubmit.isEnabled = true
+        binding.cbBtnSubmit.text = if (currentTab == "fitting") "Create Fitting Booking" else "Create Rental Booking"
+    }
+
+    private fun showError(msg: String) {
+        binding.tvCbError.text       = msg
+        binding.tvCbError.visibility = View.VISIBLE
+    }
+    private fun clearError() { binding.tvCbError.visibility = View.GONE }
+
+    private fun pickDate(onPick: (String) -> Unit) {
+        val cal = Calendar.getInstance()
+        DatePickerDialog(requireContext(), { _, y, m, d ->
+            onPick("$y-${"%02d".format(m + 1)}-${"%02d".format(d)}")
+        }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show()
+    }
+
+    private fun parseDate(s: String): Date {
+        val p   = s.split("-")
+        val cal = Calendar.getInstance()
+        cal.set(p[0].toInt(), p[1].toInt() - 1, p[2].toInt(), 0, 0, 0)
+        cal.set(Calendar.MILLISECOND, 0)
+        return cal.time
+    }
+
+    override fun onDestroyView() {
+        customerHandler.removeCallbacksAndMessages(null)
+        availHandler.removeCallbacksAndMessages(null)
+        super.onDestroyView()
+        _binding = null
+    }
+}
