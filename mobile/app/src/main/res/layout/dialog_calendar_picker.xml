@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <com.google.android.material.card.MaterialCardView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:cardCornerRadius="12dp"
+        app:cardElevation="8dp"
+        app:cardBackgroundColor="@color/brand_surface">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <!-- Header: prev | Month Year | next -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp"
+                android:background="#FAF8F7">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnCalPrev"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:text="‹"
+                    android:textSize="20sp"
+                    android:textColor="#6B2D39"
+                    android:paddingStart="0dp"
+                    android:paddingEnd="0dp"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    app:strokeColor="#E4DEDA"
+                    app:strokeWidth="1dp"
+                    app:cornerRadius="8dp" />
+
+                <TextView
+                    android:id="@+id/tvCalMonthYear"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:textColor="#3D1A24" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnCalNext"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:text="›"
+                    android:textSize="20sp"
+                    android:textColor="#6B2D39"
+                    android:paddingStart="0dp"
+                    android:paddingEnd="0dp"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    app:strokeColor="#E4DEDA"
+                    app:strokeWidth="1dp"
+                    app:cornerRadius="8dp" />
+
+            </LinearLayout>
+
+            <!-- Header bottom border -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#EEECEA" />
+
+            <!-- Calendar grid (DOW labels + day cells, built programmatically) -->
+            <LinearLayout
+                android:id="@+id/llCalGrid"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp"
+                android:paddingTop="8dp"
+                android:paddingBottom="4dp" />
+
+            <!-- Legend bottom border -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#F0ECE9" />
+
+            <!-- Legend (built programmatically) -->
+            <LinearLayout
+                android:id="@+id/llCalLegend"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:paddingTop="8dp"
+                android:paddingBottom="10dp"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp" />
+
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+</LinearLayout>

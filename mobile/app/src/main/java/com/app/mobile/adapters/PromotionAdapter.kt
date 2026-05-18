@@ -17,7 +17,7 @@ class PromotionAdapter(
         fun bind(item: Promotion) {
             b.tvCode.text  = item.code
             b.tvValue.text = if (item.type == "percentage") "${item.value}% off" else "₱${item.value} off"
-            b.tvDates.text = "${item.startDate} → ${item.endDate}"
+            b.tvDates.text = "${item.start} → ${item.end}"
             b.tvActive.text = if (item.active) "Active" else "Inactive"
 
             val (bg, txt) = if (item.active)

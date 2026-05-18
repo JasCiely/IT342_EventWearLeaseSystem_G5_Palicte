@@ -20,8 +20,16 @@ class StaffAdapter(
             b.tvEmail.text       = item.email
             b.tvRole.text        = item.role
             b.tvStatus.text      = item.status
-            b.tvDaysWorked.text  = "Days: ${item.daysWorked}"
-            item.customRate?.let { b.tvRate.text = "₱${String.format("%.2f", it)}/day" } ?: run { b.tvRate.text = "" }
+            b.tvDaysWorked.text  = "${item.daysWorked} days"
+            val rate = item.customRate
+            if (rate != null) {
+                b.tvRate.text           = "₱${String.format("%.2f", rate)}/day"
+                val salaryEstimate      = rate * item.daysWorked
+                b.tvSalaryEstimate.text = "≈ ₱${String.format("%.2f", salaryEstimate)}"
+            } else {
+                b.tvRate.text           = ""
+                b.tvSalaryEstimate.text = ""
+            }
 
             val (bg, txt) = if (item.status == "On Duty")
                 Color.parseColor("#D1FAE5") to Color.parseColor("#065F46")

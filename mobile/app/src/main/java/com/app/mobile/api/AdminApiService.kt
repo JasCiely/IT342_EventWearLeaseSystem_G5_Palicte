@@ -80,7 +80,8 @@ interface AdminApiService {
     suspend fun getFittingBookings(
         @Header("Authorization") token: String,
         @Query("page") page: Int = 0,
-        @Query("size") size: Int = 50
+        @Query("size") size: Int = 50,
+        @Query("status") status: String = ""
     ): PageResponse<FittingBooking>
 
     @PUT("api/admin/bookings/fitting/{bookingId}/status")
@@ -108,7 +109,8 @@ interface AdminApiService {
     suspend fun getDirectBookings(
         @Header("Authorization") token: String,
         @Query("page") page: Int = 0,
-        @Query("size") size: Int = 50
+        @Query("size") size: Int = 50,
+        @Query("status") status: String = ""
     ): PageResponse<DirectBooking>
 
     @PUT("api/admin/bookings/direct/{bookingId}/status")

@@ -89,7 +89,7 @@
                     android:text="Record Today"
                     android:textAllCaps="false"
                     android:layout_marginEnd="@dimen/spacing_sm"
-                    style="@style/Widget.Material3.Button.FilledButton"
+                    style="@style/Widget.Material3.Button"
                     app:backgroundTint="@color/brand_burgundy" />
 
                 <com.google.android.material.button.MaterialButton
@@ -113,8 +113,7 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        app:swipeRefreshColors="@color/brand_burgundy"
-        app:swipeRefreshColorSchemeColors="@color/brand_burgundy">
+>
 
         <RelativeLayout
             android:layout_width="match_parent"

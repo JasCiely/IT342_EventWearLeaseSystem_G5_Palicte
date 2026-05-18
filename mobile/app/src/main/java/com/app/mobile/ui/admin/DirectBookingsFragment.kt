@@ -1,6 +1,5 @@
 package com.app.mobile.ui.admin
 
-import android.app.DatePickerDialog
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
@@ -142,11 +141,15 @@ class DirectBookingsFragment : Fragment(), SseClient.SseListener {
         val view = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_extend, null)
         val etDate = view.findViewById<EditText>(R.id.etNewEndDate)
         etDate.setText(booking.endDate)
+        // Use the same custom calendar as the web DirectDatePicker
         etDate.setOnClickListener {
-            val cal = Calendar.getInstance()
-            DatePickerDialog(requireContext(), { _, y, m, d ->
-                etDate.setText("$y-${"%02d".format(m + 1)}-${"%02d".format(d)}")
-            }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show()
+            val minD = if (booking.endDate.isNotEmpty()) booking.endDate else CalendarPickerDialog.todayStr()
+            CalendarPickerDialog().apply {
+                mode         = CalendarPickerDialog.Mode.DIRECT
+                minDate      = minD
+                currentValue = etDate.text.toString().ifEmpty { minD }
+                onDateSelected = { date -> etDate.setText(date) }
+            }.show(childFragmentManager, "extend_cal")
         }
         AlertDialog.Builder(requireContext())
             .setTitle("Extend Lease")

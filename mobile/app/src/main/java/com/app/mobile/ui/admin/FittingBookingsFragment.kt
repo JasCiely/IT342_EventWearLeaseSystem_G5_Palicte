@@ -234,25 +234,40 @@ class FittingBookingsFragment : Fragment(), SseClient.SseListener {
             }, 500)
         }
 
+        // Pickup date — custom calendar matching web DirectDatePicker
         etPickup.setOnClickListener {
-            val cal = Calendar.getInstance()
-            DatePickerDialog(requireContext(), { _, y, m, d ->
-                pickupDate = "$y-${"%02d".format(m + 1)}-${"%02d".format(d)}"
-                etPickup.setText(pickupDate)
-                if (returnDate.isNotEmpty() && returnDate < pickupDate) {
-                    returnDate = ""; etReturn.setText("")
+            val today = CalendarPickerDialog.todayStr()
+            CalendarPickerDialog().apply {
+                mode                 = CalendarPickerDialog.Mode.DIRECT
+                this.itemId          = itemId
+                minDate              = today
+                currentValue         = pickupDate
+                onDateSelected       = { date ->
+                    pickupDate = date
+                    etPickup.setText(date)
+                    if (returnDate.isNotEmpty() && returnDate < pickupDate) {
+                        returnDate = ""; etReturn.setText("")
+                    }
+                    recalcPrice(); checkAvailability()
                 }
-                recalcPrice(); checkAvailability()
-            }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show()
+            }.show(childFragmentManager, "ftl_pickup_cal")
         }
 
+        // Return date — custom calendar matching web DirectDatePicker
         etReturn.setOnClickListener {
-            val cal = Calendar.getInstance()
-            DatePickerDialog(requireContext(), { _, y, m, d ->
-                returnDate = "$y-${"%02d".format(m + 1)}-${"%02d".format(d)}"
-                etReturn.setText(returnDate)
-                recalcPrice(); checkAvailability()
-            }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show()
+            val today = CalendarPickerDialog.todayStr()
+            val minD = pickupDate.ifEmpty { today }
+            CalendarPickerDialog().apply {
+                mode                 = CalendarPickerDialog.Mode.DIRECT
+                this.itemId          = itemId
+                minDate              = minD
+                currentValue         = returnDate
+                onDateSelected       = { date ->
+                    returnDate = date
+                    etReturn.setText(date)
+                    recalcPrice(); checkAvailability()
+                }
+            }.show(childFragmentManager, "ftl_return_cal")
         }
 
         AlertDialog.Builder(requireContext())

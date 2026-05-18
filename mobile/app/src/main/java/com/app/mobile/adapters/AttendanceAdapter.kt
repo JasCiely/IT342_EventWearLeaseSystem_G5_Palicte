@@ -19,14 +19,15 @@ class AttendanceAdapter(
             b.tvStatus.text    = item.status
             b.tvLate.text      = if (item.isLate) "Late${item.lateMinutes?.let { " (${it}m)" } ?: ""}" else ""
 
-            val (bg, txt) = when (item.status) {
-                "Present" -> Color.parseColor("#D1FAE5") to Color.parseColor("#065F46")
-                "Absent"  -> Color.parseColor("#FEE2E2") to Color.parseColor("#991B1B")
-                "Leave"   -> Color.parseColor("#FEF3C7") to Color.parseColor("#92400E")
-                else      -> Color.parseColor("#F3F4F6") to Color.parseColor("#374151")
+            val (bg, txt, accent) = when (item.status) {
+                "Present" -> Triple(Color.parseColor("#D1FAE5"), Color.parseColor("#065F46"), Color.parseColor("#10B981"))
+                "Absent"  -> Triple(Color.parseColor("#FEE2E2"), Color.parseColor("#991B1B"), Color.parseColor("#EF4444"))
+                "Leave"   -> Triple(Color.parseColor("#FEF3C7"), Color.parseColor("#92400E"), Color.parseColor("#F59E0B"))
+                else      -> Triple(Color.parseColor("#F3F4F6"), Color.parseColor("#374151"), Color.parseColor("#9E9E9E"))
             }
             b.tvStatus.setBackgroundColor(bg)
             b.tvStatus.setTextColor(txt)
+            b.statusAccent.setBackgroundColor(accent)
 
             b.root.setOnClickListener { onClick(item) }
         }

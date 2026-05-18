@@ -1,6 +1,5 @@
 package com.app.mobile.ui.admin
 
-import android.app.DatePickerDialog
 import android.app.Dialog
 import android.os.Bundle
 import android.os.Handler
@@ -39,21 +38,23 @@ class CreateBookingDialogFragment : DialogFragment() {
     private var selectedItem: InventoryItem? = null
     private var selectedSize     = ""
 
+    // Settings
+    private var bookingSettings: BookingSettings? = null
+    private var inventorySettings: InventorySettings? = null
+
     // Fitting state
     private var fittingDate      = ""
     private var fittingTime      = ""
     private var bookedSlots      = listOf<String>()
-    private val timeSlots        = listOf(
-        "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
-        "12:00", "12:30", "13:00", "13:30", "14:00", "14:30",
-        "15:00", "15:30", "16:00", "16:30"
-    )
+    // Time slots built dynamically from BookingSettings (default matches web)
+    private var timeSlots        = CalendarPickerDialog.buildTimeSlots(null)
 
     // Direct state
     private var startDate        = ""
     private var endDate          = ""
     private var availResult: Boolean? = null
     private val availHandler     = Handler(Looper.getMainLooper())
+    private var occupiedRanges   = listOf<OccupiedDateRange>()
 
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
         val dialog = Dialog(requireContext(), R.style.FullScreenDialogStyle)
@@ -113,23 +114,69 @@ class CreateBookingDialogFragment : DialogFragment() {
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
         })
 
-        // Date pickers
-        binding.etFittingDate.setOnClickListener { pickDate { date ->
-            fittingDate = date; binding.etFittingDate.setText(date)
-            fittingTime = ""; refreshTimeSpinner()
-            if (selectedItem != null) loadBookedSlots()
-        }}
-        binding.etStartDate.setOnClickListener { pickDate { date ->
-            startDate = date; binding.etStartDate.setText(date)
-            if (endDate.isNotEmpty() && endDate < startDate) { endDate = ""; binding.etEndDate.setText("") }
-            recalcDirect(); triggerAvailCheck()
-        }}
-        binding.etEndDate.setOnClickListener { pickDate { date ->
-            endDate = date; binding.etEndDate.setText(date)
-            recalcDirect(); triggerAvailCheck()
-        }}
+        // ── Calendar date pickers ──────────────────────────────────────────────
+
+        binding.etFittingDate.setOnClickListener {
+            if (selectedItem == null) return@setOnClickListener
+            CalendarPickerDialog().apply {
+                mode            = CalendarPickerDialog.Mode.FITTING
+                itemId          = selectedItem?.id ?: ""
+                passedSettings  = bookingSettings
+                passedTimeSlots = timeSlots
+                minDate         = CalendarPickerDialog.todayStr()
+                currentValue    = fittingDate
+                onDateSelected  = { date ->
+                    fittingDate = date
+                    binding.etFittingDate.setText(date)
+                    fittingTime = ""
+                    refreshTimeSpinner()
+                    if (selectedItem != null) loadBookedSlots()
+                }
+            }.show(childFragmentManager, "fitting_cal")
+        }
+
+        binding.etStartDate.setOnClickListener {
+            if (selectedItem == null) return@setOnClickListener
+            CalendarPickerDialog().apply {
+                mode                 = CalendarPickerDialog.Mode.DIRECT
+                itemId               = selectedItem?.id ?: ""
+                passedSettings       = bookingSettings
+                passedOccupiedRanges = occupiedRanges
+                minDate              = CalendarPickerDialog.todayStr()
+                currentValue         = startDate
+                onDateSelected       = { date ->
+                    startDate = date
+                    binding.etStartDate.setText(date)
+                    if (endDate.isNotEmpty() && endDate < startDate) {
+                        endDate = ""
+                        binding.etEndDate.setText("")
+                    }
+                    recalcDirect()
+                    triggerAvailCheck()
+                }
+            }.show(childFragmentManager, "start_cal")
+        }
+
+        binding.etEndDate.setOnClickListener {
+            if (selectedItem == null || startDate.isEmpty()) return@setOnClickListener
+            CalendarPickerDialog().apply {
+                mode                 = CalendarPickerDialog.Mode.DIRECT
+                itemId               = selectedItem?.id ?: ""
+                passedSettings       = bookingSettings
+                passedOccupiedRanges = occupiedRanges
+                minDate              = startDate.ifEmpty { CalendarPickerDialog.todayStr() }
+                currentValue         = endDate
+                onDateSelected       = { date ->
+                    endDate = date
+                    binding.etEndDate.setText(date)
+                    recalcDirect()
+                    triggerAvailCheck()
+                }
+            }.show(childFragmentManager, "end_cal")
+        }
 
         loadItems()
+        loadSettings()
     }
 
     private fun switchTab(tab: String) {
@@ -164,7 +211,25 @@ class CreateBookingDialogFragment : DialogFragment() {
         clearError()
     }
 
+    // ── Settings loading ──────────────────────────────────────────────────────
+
+    private fun loadSettings() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                bookingSettings = ApiClient.adminApi.getBookingSettings(ApiClient.bearerToken())
+                timeSlots = CalendarPickerDialog.buildTimeSlots(bookingSettings)
+                // Refresh spinner if fitting date was already picked
+                if (fittingDate.isNotEmpty()) refreshTimeSpinner()
+            } catch (_: Exception) {}
+            try {
+                inventorySettings = ApiClient.adminApi.getInventorySettings()
+                if (startDate.isNotEmpty() && endDate.isNotEmpty()) recalcDirect()
+            } catch (_: Exception) {}
+        }
+    }
+
     // ── Item loading ──────────────────────────────────────────────────────────
+
     private fun loadItems() {
         viewLifecycleOwner.lifecycleScope.launch {
             try {
@@ -198,8 +263,7 @@ class CreateBookingDialogFragment : DialogFragment() {
         binding.etItemSearch.setText(item.name)
         binding.etItemSearch.setSelection(item.name.length)
 
-        // Size selection
-        val sizes = item.size?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() } ?: emptyList()
+        val sizes = item.sizes?.filter { it.isNotEmpty() } ?: emptyList()
         if (sizes.size > 1) {
             val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, listOf("Select size…") + sizes)
             adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
@@ -222,18 +286,34 @@ class CreateBookingDialogFragment : DialogFragment() {
             binding.cbSizeSpinner.visibility = View.GONE
         }
 
-        // Reset dates when item changes
+        // Reset dates and availability when item changes
         fittingDate = ""; fittingTime = ""
         binding.etFittingDate.setText("")
         startDate = ""; endDate = ""
         binding.etStartDate.setText(""); binding.etEndDate.setText("")
         binding.cbAvailability.visibility = View.GONE
         binding.cbPriceSummary.visibility = View.GONE
+        occupiedRanges = listOf()
 
-        if (currentTab == "direct") triggerAvailCheck()
+        if (currentTab == "direct") {
+            triggerAvailCheck()
+            loadOccupiedRanges()
+        }
+    }
+
+    // ── Occupied ranges (Direct mode) ─────────────────────────────────────────
+
+    private fun loadOccupiedRanges() {
+        val id = selectedItem?.id ?: return
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                occupiedRanges = ApiClient.adminApi.getOccupiedDates(ApiClient.bearerToken(), id)
+            } catch (_: Exception) {}
+        }
     }
 
     // ── Customer search ───────────────────────────────────────────────────────
+
     private fun searchCustomers(query: String) {
         viewLifecycleOwner.lifecycleScope.launch {
             try {
@@ -291,6 +371,7 @@ class CreateBookingDialogFragment : DialogFragment() {
     }
 
     // ── Fitting slots ─────────────────────────────────────────────────────────
+
     private fun loadBookedSlots() {
         val itemId = selectedItem?.id ?: return
         val date   = fittingDate.ifEmpty { return }
@@ -304,12 +385,7 @@ class CreateBookingDialogFragment : DialogFragment() {
 
     private fun refreshTimeSpinner() {
         val available = timeSlots.filter { it !in bookedSlots }
-        val labels    = listOf("Select time slot…") + available.map { slot ->
-            val (h, m)  = slot.split(":").map { it.toInt() }
-            val period  = if (h >= 12) "PM" else "AM"
-            val h12     = if (h % 12 == 0) 12 else h % 12
-            "$h12:${m.toString().padStart(2, '0')} $period"
-        }
+        val labels    = listOf("Select time slot…") + available.map { CalendarPickerDialog.slotLabel(it) }
         val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, labels)
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         binding.cbTimeSpinner.adapter = adapter
@@ -322,6 +398,7 @@ class CreateBookingDialogFragment : DialogFragment() {
     }
 
     // ── Direct availability + price ───────────────────────────────────────────
+
     private fun recalcDirect() {
         if (startDate.isEmpty() || endDate.isEmpty()) {
             binding.cbPriceSummary.visibility = View.GONE; return
@@ -330,12 +407,25 @@ class CreateBookingDialogFragment : DialogFragment() {
             val s    = parseDate(startDate)
             val e    = parseDate(endDate)
             if (e.before(s)) { binding.cbPriceSummary.visibility = View.GONE; return }
-            val days = ((e.time - s.time) / 86_400_000L + 1).toInt()
+            val days  = ((e.time - s.time) / 86_400_000L + 1).toInt()
             val price = selectedItem?.price ?: 0.0
-            val total = price * days
-            binding.cbDaysCalc.text  = "$days day${if (days != 1) "s" else ""} × ₱${String.format("%.2f", price)}"
-            binding.cbPriceVal.text  = "₱${String.format("%.2f", total)}"
-            binding.cbTotal.text     = "₱${String.format("%.2f", total)}"
+            val base  = price * days
+
+            val inv    = inventorySettings
+            val weeks  = days / 7
+            val rawDisc  = weeks * (inv?.weeklyDiscount ?: 0.0)
+            val discount = minOf(rawDisc, inv?.monthlyDiscountCap ?: rawDisc)
+            val finalPrice = maxOf(0.0, base - discount)
+
+            binding.cbDaysCalc.text = "$days day${if (days != 1) "s" else ""} × ₱${String.format("%.2f", price)}"
+            binding.cbPriceVal.text = "₱${String.format("%.2f", base)}"
+            if (discount > 0) {
+                binding.cbDiscountRow.visibility = View.VISIBLE
+                binding.cbDiscountVal.text       = "-₱${String.format("%.2f", discount)}"
+            } else {
+                binding.cbDiscountRow.visibility = View.GONE
+            }
+            binding.cbTotal.text = "₱${String.format("%.2f", finalPrice)}"
             binding.cbPriceSummary.visibility = View.VISIBLE
         } catch (_: Exception) { binding.cbPriceSummary.visibility = View.GONE }
     }
@@ -372,6 +462,7 @@ class CreateBookingDialogFragment : DialogFragment() {
     }
 
     // ── Validation + Submit ───────────────────────────────────────────────────
+
     private fun validate(): String? {
         val name  = binding.etCbName.text.toString().trim()
         val email = binding.etCbEmail.text.toString().trim()
@@ -381,7 +472,7 @@ class CreateBookingDialogFragment : DialogFragment() {
         if (email.isEmpty()) return "Customer email is required"
         if (phone.isEmpty()) return "Customer phone is required"
         if (item == null)    return "Please select an item"
-        val sizes = item.size?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() } ?: emptyList()
+        val sizes = item.sizes?.filter { it.isNotEmpty() } ?: emptyList()
         if (sizes.size > 1 && selectedSize.isEmpty()) return "Please select a size for this item"
         if (currentTab == "fitting") {
             if (fittingDate.isEmpty()) return "Please select a fitting date"
@@ -423,9 +514,14 @@ class CreateBookingDialogFragment : DialogFragment() {
                     )
                     ApiClient.adminApi.createFittingBooking(ApiClient.bearerToken(), req)
                 } else {
-                    val days  = ((parseDate(endDate).time - parseDate(startDate).time) / 86_400_000L + 1).toInt().coerceAtLeast(1)
-                    val total = (item.price ?: 0.0) * days
-                    val req   = CreateDirectBookingRequest(
+                    val days      = ((parseDate(endDate).time - parseDate(startDate).time) / 86_400_000L + 1).toInt().coerceAtLeast(1)
+                    val base      = (item.price) * days
+                    val inv       = inventorySettings
+                    val weeks     = days / 7
+                    val rawDisc   = weeks * (inv?.weeklyDiscount ?: 0.0)
+                    val discount  = minOf(rawDisc, inv?.monthlyDiscountCap ?: rawDisc)
+                    val finalAmt  = maxOf(0.0, base - discount)
+                    val req       = CreateDirectBookingRequest(
                         customerEmail  = email,
                         customerName   = name,
                         customerPhone  = phone,
@@ -433,9 +529,9 @@ class CreateBookingDialogFragment : DialogFragment() {
                         itemName       = item.name,
                         startDate      = startDate,
                         endDate        = endDate,
-                        basePrice      = total,
-                        discountAmount = 0.0,
-                        finalPrice     = total,
+                        basePrice      = base,
+                        discountAmount = discount,
+                        finalPrice     = finalAmt,
                         notes          = notes,
                         preferredSize  = selectedSize.ifEmpty { null }
                     )
@@ -464,14 +560,7 @@ class CreateBookingDialogFragment : DialogFragment() {
     }
     private fun clearError() { binding.tvCbError.visibility = View.GONE }
 
-    private fun pickDate(onPick: (String) -> Unit) {
-        val cal = Calendar.getInstance()
-        DatePickerDialog(requireContext(), { _, y, m, d ->
-            onPick("$y-${"%02d".format(m + 1)}-${"%02d".format(d)}")
-        }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show()
-    }
-
-    private fun parseDate(s: String): Date {
+    private fun parseDate(s: String): java.util.Date {
         val p   = s.split("-")
         val cal = Calendar.getInstance()
         cal.set(p[0].toInt(), p[1].toInt() - 1, p[2].toInt(), 0, 0, 0)

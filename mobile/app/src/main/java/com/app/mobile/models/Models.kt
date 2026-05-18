@@ -76,27 +76,20 @@ data class InventoryItem(
     val name: String,
     val category: String,
     val subtype: String?,
-    val size: String?,
+    val sizes: List<String>?,
     val price: Double,
     val status: String,
     val ageRange: String?,
     val description: String?,
-    val mediaUrls: String?,
-    val mediaTypes: String?,
+    val mediaFiles: List<MediaFile>?,
     val maintenanceEndDate: String?,
     val createdAt: String?
 ) {
+    data class MediaFile(val url: String, val type: String)
+
     val firstImageUrl: String?
-        get() {
-            val urls = mediaUrls?.split(",")?.map { it.trim() } ?: return null
-            val types = mediaTypes?.split(",")?.map { it.trim() }
-            if (types != null) {
-                for (i in urls.indices) {
-                    if (i < types.size && types[i] == "image") return urls[i]
-                }
-            }
-            return urls.firstOrNull()
-        }
+        get() = mediaFiles?.firstOrNull { it.type == "image" }?.url ?: mediaFiles?.firstOrNull()?.url
+
     val isAvailable get() = status.equals("Available", ignoreCase = true)
 }
 
@@ -105,10 +98,10 @@ data class Promotion(
     val code: String,
     val type: String,
     val value: Double,
-    val startDate: String,
-    val endDate: String,
+    val start: String,
+    val end: String,
     val active: Boolean,
-    val itemIds: String?
+    val items: List<String>?
 )
 
 data class AttendanceRecord(
@@ -132,7 +125,8 @@ data class TodayAttendanceItem(
 data class AttendanceSession(
     val id: String,
     val date: String,
-    val recordedBy: String
+    val recordedBy: String,
+    val locked: Boolean = true
 )
 
 data class TodayAttendanceResponse(
@@ -199,10 +193,10 @@ data class CreatePromotionRequest(
     val code: String,
     val type: String,
     val value: Double,
-    val startDate: String,
-    val endDate: String,
+    val start: String,
+    val end: String,
     val active: Boolean,
-    val itemIds: String?
+    val items: List<String>?
 )
 
 data class RescheduleRequest(val fittingDate: String, val fittingTime: String)
@@ -213,7 +207,7 @@ data class CreateItemRequest(
     val name: String,
     val category: String,
     val subtype: String?,
-    val size: String?,
+    val sizes: List<String>?,
     val price: Double,
     val status: String = "Available",
     val ageRange: String?,

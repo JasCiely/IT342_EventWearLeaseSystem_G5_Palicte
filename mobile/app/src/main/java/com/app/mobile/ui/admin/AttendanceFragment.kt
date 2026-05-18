@@ -48,6 +48,7 @@ class AttendanceFragment : Fragment() {
 
         binding.btnRecord.setOnClickListener { recordAttendance() }
         binding.btnUnlock.setOnClickListener { unlockAttendance() }
+        binding.swipeRefresh.setColorSchemeResources(R.color.brand_burgundy)
         binding.swipeRefresh.setOnRefreshListener { loadTodayAttendance() }
 
         loadTodayAttendance()
@@ -59,12 +60,17 @@ class AttendanceFragment : Fragment() {
             try {
                 val resp = ApiClient.adminApi.getTodayAttendance(ApiClient.bearerToken())
                 todayRecords = resp.records
-                sessionLocked = resp.session != null
+                // locked = true when no session yet, OR session.locked is explicitly true
+                sessionLocked = resp.session == null || resp.session.locked
                 adapter.submitList(todayRecords)
-                binding.tvSessionStatus.text = if (resp.session != null) "Session recorded • ${if (sessionLocked) "Locked" else "Unlocked"}" else "No session yet"
+                binding.tvSessionStatus.text = when {
+                    resp.session == null -> "No session yet"
+                    resp.session.locked  -> "Session recorded • Locked"
+                    else                 -> "Session recorded • Unlocked for editing"
+                }
                 binding.tvEmpty.visibility = if (todayRecords.isEmpty()) View.VISIBLE else View.GONE
                 binding.btnRecord.isEnabled = resp.session == null
-                binding.btnUnlock.isEnabled = resp.session != null
+                binding.btnUnlock.isEnabled = resp.session != null && resp.session.locked
             } catch (e: HttpException) {
                 if (e.code() == 401) (activity as? AdminDashboardActivity)?.showSessionExpiredDialog()
             } catch (_: Exception) { toast(getString(R.string.error_network)) }

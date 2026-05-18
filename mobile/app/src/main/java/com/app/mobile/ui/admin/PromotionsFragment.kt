@@ -14,7 +14,9 @@ import com.app.mobile.R
 import com.app.mobile.adapters.PromotionAdapter
 import com.app.mobile.databinding.FragmentPromotionsBinding
 import com.app.mobile.models.CreatePromotionRequest
+import com.app.mobile.models.InventoryItem
 import com.app.mobile.models.Promotion
+import com.google.android.material.button.MaterialButton
 import kotlinx.coroutines.launch
 import retrofit2.HttpException
 import java.util.*
@@ -60,9 +62,17 @@ class PromotionsFragment : Fragment() {
     }
 
     private fun showPromoActions(promo: Promotion) {
+        val typeLabel = if (promo.type == "percentage") "${promo.value}%" else "₱${promo.value}"
+        val itemsLabel = if (promo.items.isNullOrEmpty()) "All items"
+                         else "${promo.items.size} specific item(s)"
         AlertDialog.Builder(requireContext())
             .setTitle(promo.code)
-            .setMessage("${promo.type.replaceFirstChar { it.uppercase() }} | ${if (promo.type == "percentage") "${promo.value}%" else "₱${promo.value}"}\n${promo.startDate} → ${promo.endDate}\nActive: ${promo.active}")
+            .setMessage(
+                "${promo.type.replaceFirstChar { it.uppercase() }} • $typeLabel\n" +
+                "${promo.start} → ${promo.end}\n" +
+                "Active: ${promo.active}\n" +
+                "Applies to: $itemsLabel"
+            )
             .setItems(arrayOf("Edit", "Delete")) { _, idx ->
                 if (idx == 0) showPromoDialog(promo) else confirmDelete(promo)
             }
@@ -70,26 +80,73 @@ class PromotionsFragment : Fragment() {
     }
 
     private fun showPromoDialog(promo: Promotion?) {
-        val view = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_promotion, null)
+        val view        = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_promotion, null)
         val etCode      = view.findViewById<EditText>(R.id.etCode)
         val spType      = view.findViewById<Spinner>(R.id.spType)
         val etValue     = view.findViewById<EditText>(R.id.etValue)
         val etStart     = view.findViewById<EditText>(R.id.etStartDate)
         val etEnd       = view.findViewById<EditText>(R.id.etEndDate)
         val cbActive    = view.findViewById<CheckBox>(R.id.cbActive)
+        val btnSelectItems = view.findViewById<MaterialButton>(R.id.btnSelectItems)
+        val tvSelectedItems = view.findViewById<TextView>(R.id.tvSelectedItems)
 
         val types = arrayOf("percentage", "flat")
         spType.adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_dropdown_item, types)
 
+        // ── Pre-fill existing promo ───────────────────────────────
         promo?.let {
             etCode.setText(it.code)
             spType.setSelection(types.indexOf(it.type).coerceAtLeast(0))
             etValue.setText(it.value.toString())
-            etStart.setText(it.startDate)
-            etEnd.setText(it.endDate)
+            etStart.setText(it.start)
+            etEnd.setText(it.end)
             cbActive.isChecked = it.active
         } ?: run { cbActive.isChecked = true }
 
+        // ── Item selection state ──────────────────────────────────
+        var inventoryItems = listOf<InventoryItem>()
+        val selectedItemIds = mutableSetOf<String>()
+
+        // Pre-select items if editing an existing promo
+        promo?.items?.forEach { selectedItemIds.add(it) }
+
+        fun refreshItemLabel() {
+            tvSelectedItems.text = if (selectedItemIds.isEmpty())
+                "All items (no restriction)"
+            else
+                "${selectedItemIds.size} item(s) selected"
+        }
+        refreshItemLabel()
+
+        // Load inventory items in background so the dialog opens instantly
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                inventoryItems = ApiClient.adminApi.getInventoryItems()
+            } catch (_: Exception) { /* non-fatal — item picker just stays empty */ }
+        }
+
+        btnSelectItems.setOnClickListener {
+            if (inventoryItems.isEmpty()) {
+                toast("Loading items… please try again in a moment"); return@setOnClickListener
+            }
+            val names   = inventoryItems.map { it.name }.toTypedArray()
+            val checked = inventoryItems.map { it.id in selectedItemIds }.toBooleanArray()
+
+            AlertDialog.Builder(requireContext())
+                .setTitle("Select Items to Apply Promo")
+                .setMultiChoiceItems(names, checked) { _, idx, isChecked ->
+                    if (isChecked) selectedItemIds.add(inventoryItems[idx].id)
+                    else           selectedItemIds.remove(inventoryItems[idx].id)
+                }
+                .setPositiveButton("Done") { _, _ -> refreshItemLabel() }
+                .setNeutralButton("Clear All") { _, _ ->
+                    selectedItemIds.clear(); refreshItemLabel()
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
+        }
+
+        // ── Date pickers ──────────────────────────────────────────
         fun pickDate(et: EditText) {
             val cal = Calendar.getInstance()
             DatePickerDialog(requireContext(), { _, y, m, d ->
@@ -97,8 +154,9 @@ class PromotionsFragment : Fragment() {
             }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show()
         }
         etStart.setOnClickListener { pickDate(etStart) }
-        etEnd.setOnClickListener { pickDate(etEnd) }
+        etEnd.setOnClickListener   { pickDate(etEnd) }
 
+        // ── Build & show dialog ───────────────────────────────────
         AlertDialog.Builder(requireContext())
             .setTitle(if (promo == null) "Add Promotion" else "Edit Promotion")
             .setView(view)
@@ -108,16 +166,28 @@ class PromotionsFragment : Fragment() {
                 val value = etValue.text.toString().toDoubleOrNull()
                 val start = etStart.text.toString().trim()
                 val end   = etEnd.text.toString().trim()
-                if (code.isEmpty() || value == null || start.isEmpty() || end.isEmpty()) {
-                    toast("Fill all required fields"); return@setPositiveButton
+
+                if (code.isEmpty())  { toast("Promo code is required"); return@setPositiveButton }
+                if (value == null)   { toast("Value is required");      return@setPositiveButton }
+                if (start.isEmpty()) { toast("Start date is required"); return@setPositiveButton }
+                if (end.isEmpty())   { toast("End date is required");   return@setPositiveButton }
+                if (type == "percentage" && (value <= 0.0 || value > 100.0)) {
+                    toast("Percentage must be between 1 and 100"); return@setPositiveButton
                 }
-                val body = CreatePromotionRequest(code, type, value, start, end, cbActive.isChecked, null)
+                if (start > end) { toast("End date must be after start date"); return@setPositiveButton }
+
+                val itemsList = if (selectedItemIds.isEmpty()) null else selectedItemIds.toList()
+
+                val body = CreatePromotionRequest(code, type, value, start, end, cbActive.isChecked, itemsList)
                 viewLifecycleOwner.lifecycleScope.launch {
                     try {
                         if (promo == null) ApiClient.adminApi.createPromotion(ApiClient.bearerToken(), body)
-                        else ApiClient.adminApi.updatePromotion(ApiClient.bearerToken(), promo.id, body)
+                        else               ApiClient.adminApi.updatePromotion(ApiClient.bearerToken(), promo.id, body)
                         toast(if (promo == null) "Promotion created" else "Promotion updated")
                         loadPromotions()
+                    } catch (e: HttpException) {
+                        val msg = runCatching { e.response()?.errorBody()?.string() }.getOrNull()
+                        toast("Error: ${msg ?: e.message()}")
                     } catch (_: Exception) { toast(getString(R.string.error_network)) }
                 }
             }
@@ -127,7 +197,7 @@ class PromotionsFragment : Fragment() {
     private fun confirmDelete(promo: Promotion) {
         AlertDialog.Builder(requireContext())
             .setTitle("Delete Promotion")
-            .setMessage("Delete code \"${promo.code}\"?")
+            .setMessage("Delete code \"${promo.code}\"? This cannot be undone.")
             .setPositiveButton("Delete") { _, _ ->
                 viewLifecycleOwner.lifecycleScope.launch {
                     try {

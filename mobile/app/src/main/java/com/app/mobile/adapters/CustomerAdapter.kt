@@ -50,6 +50,15 @@ class CustomerAdapter(
             b.tvEmail.text    = user.email
             b.tvJoined.text   = "Joined ${fmtDate(user.createdAt)}"
 
+            // Phone — show only when present
+            val phone = user.phone
+            if (!phone.isNullOrBlank()) {
+                b.tvPhone.text       = phone
+                b.tvPhone.visibility = android.view.View.VISIBLE
+            } else {
+                b.tvPhone.visibility = android.view.View.GONE
+            }
+
             b.avatarFrame.setBackgroundColor(avatarColor(user.id))
 
             val ctx = b.root.context
