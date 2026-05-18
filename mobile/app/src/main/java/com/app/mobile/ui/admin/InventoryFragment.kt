@@ -222,44 +222,43 @@ class InventoryFragment : Fragment(), SseClient.SseListener {
 
     // ── Inventory Settings Dialog ─────────────────────────────────────────────
     private fun showSettingsDialog() {
-        val settingsView = LayoutInflater.from(requireContext())
-            .inflate(R.layout.dialog_inventory_settings, null)
-        val etMinDays    = settingsView.findViewById<EditText>(R.id.etMinLeaseDays)
-        val etWeekly     = settingsView.findViewById<EditText>(R.id.etWeeklyDiscount)
-        val etMonthlyCap = settingsView.findViewById<EditText>(R.id.etMonthlyDiscountCap)
-
         viewLifecycleOwner.lifecycleScope.launch {
-            try {
-                val s = ApiClient.adminApi.getInventorySettings()
-                etMinDays.setText(s.minLeaseDays.toString())
-                etWeekly.setText(s.weeklyDiscount.toString())
-                etMonthlyCap.setText(s.monthlyDiscountCap.toString())
-            } catch (_: Exception) {
-                etMinDays.setText("2")
-                etWeekly.setText("100")
-                etMonthlyCap.setText("300")
-            }
-        }
+            val settings = try {
+                ApiClient.adminApi.getInventorySettings(ApiClient.bearerToken())
+            } catch (_: Exception) { null }
 
-        AlertDialog.Builder(requireContext())
-            .setTitle("Inventory Settings")
-            .setView(settingsView)
-            .setPositiveButton("Save") { _, _ ->
-                val minDays    = etMinDays.text.toString().toIntOrNull() ?: 2
-                val weekly     = etWeekly.text.toString().toDoubleOrNull() ?: 100.0
-                val monthlyCap = etMonthlyCap.text.toString().toDoubleOrNull() ?: 300.0
-                viewLifecycleOwner.lifecycleScope.launch {
-                    try {
-                        ApiClient.adminApi.updateInventorySettings(
-                            ApiClient.bearerToken(),
-                            InventorySettings(minDays, weekly, monthlyCap)
-                        )
-                        toast("Settings saved")
-                    } catch (_: Exception) { toast("Failed to save settings") }
+            if (_binding == null) return@launch
+
+            val settingsView = LayoutInflater.from(requireContext())
+                .inflate(R.layout.dialog_inventory_settings, null)
+            val etMinDays    = settingsView.findViewById<EditText>(R.id.etMinLeaseDays)
+            val etWeekly     = settingsView.findViewById<EditText>(R.id.etWeeklyDiscount)
+            val etMonthlyCap = settingsView.findViewById<EditText>(R.id.etMonthlyDiscountCap)
+
+            etMinDays.setText((settings?.minLeaseDays ?: 2).toString())
+            etWeekly.setText((settings?.weeklyDiscount ?: 100).toString())
+            etMonthlyCap.setText((settings?.monthlyDiscountCap ?: 300).toString())
+
+            AlertDialog.Builder(requireContext())
+                .setTitle("Inventory Settings")
+                .setView(settingsView)
+                .setPositiveButton("Save") { _, _ ->
+                    val minDays    = etMinDays.text.toString().toIntOrNull() ?: 2
+                    val weekly     = etWeekly.text.toString().toIntOrNull() ?: 100
+                    val monthlyCap = etMonthlyCap.text.toString().toIntOrNull() ?: 300
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        try {
+                            ApiClient.adminApi.updateInventorySettings(
+                                ApiClient.bearerToken(),
+                                InventorySettings(minDays, weekly, monthlyCap)
+                            )
+                            toast("Settings saved")
+                        } catch (_: Exception) { toast("Failed to save settings") }
+                    }
                 }
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
+                .setNegativeButton("Cancel", null)
+                .show()
+        }
     }
 
     // ── Item detail modal ─────────────────────────────────────────────────────
@@ -270,6 +269,8 @@ class InventoryFragment : Fragment(), SseClient.SseListener {
         val tvName         = dialogView.findViewById<TextView>(R.id.idtvName)
         val tvStatus       = dialogView.findViewById<TextView>(R.id.idtvStatus)
         val tvCategory     = dialogView.findViewById<TextView>(R.id.idtvCategory)
+        val labelSubtype   = dialogView.findViewById<TextView>(R.id.idlabelSubtype)
+        val tvSubtype      = dialogView.findViewById<TextView>(R.id.idtvSubtype)
         val tvPrice        = dialogView.findViewById<TextView>(R.id.idtvPrice)
         val tvPriceOld     = dialogView.findViewById<TextView>(R.id.idtvPriceOld)
         val tvPromoTag     = dialogView.findViewById<TextView>(R.id.idtvPromoTag)
@@ -307,7 +308,15 @@ class InventoryFragment : Fragment(), SseClient.SseListener {
         }
 
         // Category
-        tvCategory.text = item.category + (item.subtype?.let { " · $it" } ?: "")
+        tvCategory.text = item.category
+
+        // Subtype
+        val subtypeVal = item.subtype?.takeIf { it.isNotBlank() }
+        if (subtypeVal != null) {
+            labelSubtype.visibility = View.VISIBLE
+            tvSubtype.visibility = View.VISIBLE
+            tvSubtype.text = subtypeVal
+        }
 
         // Price + promo
         val promo = activePromo(item)
@@ -480,9 +489,15 @@ class InventoryFragment : Fragment(), SseClient.SseListener {
             }
         }
 
+        // pendingSubtype carries the desired subtype spinner value for the first onItemSelected
+        // callback that fires asynchronously when setSelection() is called during edit setup.
+        // Without this, the async callback resets the spinner to "— None —" after explicit setup.
+        var pendingSubtype: String? = null
+
         spCategory.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(p: AdapterView<*>?, v: View?, pos: Int, id: Long) {
-                updateSubtypes(categories[pos])
+                val sub = pendingSubtype.also { pendingSubtype = null }
+                updateSubtypes(categories[pos], sub)
             }
             override fun onNothingSelected(p: AdapterView<*>?) {}
         }
@@ -508,12 +523,11 @@ class InventoryFragment : Fragment(), SseClient.SseListener {
             val defaultSubs = subtypeMap[existingItem.category] ?: emptyList()
             val existingSubtype = existingItem.subtype
             if (existingSubtype != null && !defaultSubs.contains(existingSubtype)) {
-                // Custom subtype — show in "Other (custom)" + pre-fill field
-                updateSubtypes(existingItem.category, "Other (custom)")
+                pendingSubtype = "Other (custom)"
                 etCustomSub.visibility = View.VISIBLE
                 etCustomSub.setText(existingSubtype)
             } else {
-                updateSubtypes(existingItem.category, existingSubtype)
+                pendingSubtype = existingSubtype
             }
 
             etPrice.setText(existingItem.price.toString())
@@ -629,14 +643,38 @@ class InventoryFragment : Fragment(), SseClient.SseListener {
             else         -> "Inactive"
         }
 
-        AlertDialog.Builder(requireContext())
-            .setTitle("${promo.code} · $typeLabel")
-            .setMessage("Status: $statusLabel\n${promo.start} → ${promo.end}\nApplies to: $itemsLabel")
-            .setItems(arrayOf("Edit", "Delete")) { _, idx ->
-                if (idx == 0) showPromoFormDialog(promo) else confirmDeletePromo(promo)
-            }
-            .setNegativeButton("Close", null)
-            .show()
+        val dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_promo_detail, null)
+        val tvCode    = dialogView.findViewById<TextView>(R.id.pdtvCode)
+        val tvStatus  = dialogView.findViewById<TextView>(R.id.pdtvStatus)
+        val tvDisc    = dialogView.findViewById<TextView>(R.id.pdtvDiscount)
+        val tvDates   = dialogView.findViewById<TextView>(R.id.pdtvDates)
+        val tvItems   = dialogView.findViewById<TextView>(R.id.pdtvItems)
+        val btnEdit   = dialogView.findViewById<MaterialButton>(R.id.pdbtnEdit)
+        val btnDelete = dialogView.findViewById<MaterialButton>(R.id.pdbtnDelete)
+
+        tvCode.text  = promo.code
+        tvDisc.text  = typeLabel
+        tvDates.text = "${promo.start}  →  ${promo.end}"
+        tvItems.text = itemsLabel
+
+        tvStatus.text = statusLabel
+        val (bg, fg) = when (statusLabel) {
+            "Live"      -> android.graphics.Color.parseColor("#D1FAE5") to android.graphics.Color.parseColor("#065F46")
+            "Scheduled" -> android.graphics.Color.parseColor("#DBEAFE") to android.graphics.Color.parseColor("#1E40AF")
+            else        -> android.graphics.Color.parseColor("#F3F4F6") to android.graphics.Color.parseColor("#374151")
+        }
+        tvStatus.setBackgroundColor(bg)
+        tvStatus.setTextColor(fg)
+
+        val dialog = AlertDialog.Builder(requireContext())
+            .setTitle(null)
+            .setView(dialogView)
+            .create()
+
+        btnEdit.setOnClickListener   { dialog.dismiss(); showPromoFormDialog(promo) }
+        btnDelete.setOnClickListener { dialog.dismiss(); confirmDeletePromo(promo) }
+
+        dialog.show()
     }
 
     private fun showPromoFormDialog(promo: Promotion?) {

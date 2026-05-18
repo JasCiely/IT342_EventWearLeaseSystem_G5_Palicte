@@ -15,14 +15,23 @@
         android:paddingTop="16dp"
         android:paddingBottom="24dp">
 
-        <!-- Image -->
-        <ImageView
-            android:id="@+id/idivImage"
+        <!-- Much larger Image with rounded corners & shadow -->
+        <androidx.cardview.widget.CardView
             android:layout_width="match_parent"
-            android:layout_height="200dp"
-            android:scaleType="centerCrop"
-            android:background="@color/gray_300"
-            android:layout_marginBottom="16dp" />
+            android:layout_height="340dp"
+            android:layout_marginBottom="20dp"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="4dp"
+            app:cardBackgroundColor="@color/brand_surface">
+
+            <ImageView
+                android:id="@+id/idivImage"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                android:background="@color/gray_300" />
+
+        </androidx.cardview.widget.CardView>
 
         <!-- Name + Status row -->
         <LinearLayout
@@ -30,16 +39,17 @@
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:layout_marginBottom="6dp">
+            android:layout_marginBottom="8dp">
 
             <TextView
                 android:id="@+id/idtvName"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:textSize="20sp"
+                android:textSize="22sp"
                 android:textStyle="bold"
-                android:textColor="@color/brand_text_dark" />
+                android:textColor="@color/brand_text_dark"
+                android:lineSpacingExtra="2dp" />
 
             <TextView
                 android:id="@+id/idtvStatus"
@@ -47,25 +57,55 @@
                 android:layout_height="wrap_content"
                 android:textSize="12sp"
                 android:textStyle="bold"
-                android:paddingHorizontal="10dp"
-                android:paddingVertical="5dp" />
+                android:paddingHorizontal="12dp"
+                android:paddingVertical="6dp" />
         </LinearLayout>
 
         <!-- Category -->
         <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="CATEGORY"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:textColor="@color/brand_text_subtitle"
+            android:letterSpacing="0.08"
+            android:layout_marginBottom="4dp" />
+        <TextView
             android:id="@+id/idtvCategory"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textSize="13sp"
+            android:textSize="15sp"
+            android:textColor="@color/brand_text_dark"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Subcategory (initially gone) -->
+        <TextView
+            android:id="@+id/idlabelSubtype"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="SUBCATEGORY"
+            android:textSize="11sp"
+            android:textStyle="bold"
             android:textColor="@color/brand_text_subtitle"
-            android:layout_marginBottom="12dp" />
+            android:letterSpacing="0.08"
+            android:layout_marginBottom="4dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/idtvSubtype"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="15sp"
+            android:textColor="@color/brand_text_dark"
+            android:layout_marginBottom="16dp"
+            android:visibility="gone" />
 
         <!-- Divider -->
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"
             android:background="@color/input_stroke"
-            android:layout_marginBottom="14dp" />
+            android:layout_marginBottom="16dp" />
 
         <!-- Price row -->
         <TextView
@@ -75,6 +115,7 @@
             android:textSize="11sp"
             android:textStyle="bold"
             android:textColor="@color/brand_text_subtitle"
+            android:letterSpacing="0.08"
             android:layout_marginBottom="4dp" />
 
         <LinearLayout
@@ -82,22 +123,22 @@
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:layout_marginBottom="14dp">
+            android:layout_marginBottom="16dp">
 
             <TextView
                 android:id="@+id/idtvPriceOld"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textSize="14sp"
+                android:textSize="15sp"
                 android:textColor="@color/brand_text_subtitle"
-                android:layout_marginEnd="8dp"
+                android:layout_marginEnd="10dp"
                 android:visibility="gone" />
 
             <TextView
                 android:id="@+id/idtvPrice"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textSize="18sp"
+                android:textSize="22sp"
                 android:textStyle="bold"
                 android:textColor="@color/brand_burgundy" />
         </LinearLayout>
@@ -111,9 +152,9 @@
             android:textStyle="bold"
             android:textColor="#065F46"
             android:background="#D1FAE5"
-            android:paddingHorizontal="10dp"
-            android:paddingVertical="4dp"
-            android:layout_marginBottom="14dp"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="6dp"
+            android:layout_marginBottom="16dp"
             android:visibility="gone" />
 
         <!-- Sizes -->
@@ -125,15 +166,16 @@
             android:textSize="11sp"
             android:textStyle="bold"
             android:textColor="@color/brand_text_subtitle"
+            android:letterSpacing="0.08"
             android:layout_marginBottom="4dp"
             android:visibility="gone" />
         <TextView
             android:id="@+id/idtvSizes"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textSize="14sp"
+            android:textSize="15sp"
             android:textColor="@color/brand_text_dark"
-            android:layout_marginBottom="14dp"
+            android:layout_marginBottom="16dp"
             android:visibility="gone" />
 
         <!-- Age Range -->
@@ -145,15 +187,16 @@
             android:textSize="11sp"
             android:textStyle="bold"
             android:textColor="@color/brand_text_subtitle"
+            android:letterSpacing="0.08"
             android:layout_marginBottom="4dp"
             android:visibility="gone" />
         <TextView
             android:id="@+id/idtvAgeRange"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textSize="14sp"
+            android:textSize="15sp"
             android:textColor="@color/brand_text_dark"
-            android:layout_marginBottom="14dp"
+            android:layout_marginBottom="16dp"
             android:visibility="gone" />
 
         <!-- Maintenance -->
@@ -165,15 +208,16 @@
             android:textSize="11sp"
             android:textStyle="bold"
             android:textColor="@color/brand_text_subtitle"
+            android:letterSpacing="0.08"
             android:layout_marginBottom="4dp"
             android:visibility="gone" />
         <TextView
             android:id="@+id/idtvMaintenance"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textSize="14sp"
+            android:textSize="15sp"
             android:textColor="@color/brand_text_dark"
-            android:layout_marginBottom="14dp"
+            android:layout_marginBottom="16dp"
             android:visibility="gone" />
 
         <!-- Description -->
@@ -185,24 +229,25 @@
             android:textSize="11sp"
             android:textStyle="bold"
             android:textColor="@color/brand_text_subtitle"
+            android:letterSpacing="0.08"
             android:layout_marginBottom="4dp"
             android:visibility="gone" />
         <TextView
             android:id="@+id/idtvDescription"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textSize="14sp"
+            android:textSize="15sp"
             android:textColor="@color/brand_text_dark"
-            android:layout_marginBottom="14dp"
+            android:layout_marginBottom="16dp"
             android:lineSpacingMultiplier="1.4"
             android:visibility="gone" />
 
-        <!-- Photos -->
+        <!-- Photos (optional) -->
         <TextView
             android:id="@+id/idtvPhotos"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textSize="12sp"
+            android:textSize="13sp"
             android:textColor="@color/brand_text_subtitle"
             android:layout_marginBottom="20dp"
             android:visibility="gone" />
@@ -212,33 +257,44 @@
             android:layout_width="match_parent"
             android:layout_height="1dp"
             android:background="@color/input_stroke"
-            android:layout_marginBottom="16dp" />
+            android:layout_marginBottom="20dp" />
 
-        <!-- Action buttons -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/idbtnEdit"
+        <!-- Action buttons: side by side to save vertical space -->
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:text="Edit Item"
-            android:textColor="@android:color/white"
-            android:textSize="15sp"
-            android:textStyle="bold"
-            android:layout_marginBottom="10dp"
-            app:backgroundTint="@color/brand_burgundy"
-            app:cornerRadius="12dp" />
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="4dp">
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/idbtnDelete"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:text="Delete Item"
-            android:textSize="15sp"
-            android:textStyle="bold"
-            app:backgroundTint="#FEE2E2"
-            android:textColor="#B91C1C"
-            app:cornerRadius="12dp"
-            app:strokeColor="#FECACA"
-            app:strokeWidth="1dp" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/idbtnEdit"
+                android:layout_width="0dp"
+                android:layout_height="52dp"
+                android:layout_weight="1"
+                android:layout_marginEnd="8dp"
+                android:text="Edit"
+                android:textColor="@android:color/white"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                app:backgroundTint="@color/brand_burgundy"
+                app:cornerRadius="28dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/idbtnDelete"
+                android:layout_width="0dp"
+                android:layout_height="52dp"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:text="Delete"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                app:backgroundTint="#FEE2E2"
+                android:textColor="#B91C1C"
+                app:cornerRadius="28dp"
+                app:strokeColor="#FECACA"
+                app:strokeWidth="1.5dp" />
+
+        </LinearLayout>
 
     </LinearLayout>
 </ScrollView>

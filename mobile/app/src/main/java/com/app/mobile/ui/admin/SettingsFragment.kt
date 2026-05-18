@@ -83,7 +83,7 @@ class SettingsFragment : Fragment() {
             } catch (_: Exception) {}
 
             try {
-                val inv = ApiClient.adminApi.getInventorySettings()
+                val inv = ApiClient.adminApi.getInventorySettings(ApiClient.bearerToken())
                 binding.etMinLeaseDays.setText(inv.minLeaseDays.toString())
                 binding.etWeeklyDiscount.setText(inv.weeklyDiscount.toString())
                 binding.etMonthlyDiscountCap.setText(inv.monthlyDiscountCap.toString())
@@ -142,8 +142,8 @@ class SettingsFragment : Fragment() {
 
     private fun saveInventorySettings() {
         val minDays      = binding.etMinLeaseDays.text.toString().toIntOrNull()
-        val weeklyDisc   = binding.etWeeklyDiscount.text.toString().toDoubleOrNull()
-        val monthlyDisc  = binding.etMonthlyDiscountCap.text.toString().toDoubleOrNull()
+        val weeklyDisc   = binding.etWeeklyDiscount.text.toString().toIntOrNull()
+        val monthlyDisc  = binding.etMonthlyDiscountCap.text.toString().toIntOrNull()
 
         if (minDays == null || weeklyDisc == null || monthlyDisc == null) {
             toast("Fill all inventory settings fields"); return

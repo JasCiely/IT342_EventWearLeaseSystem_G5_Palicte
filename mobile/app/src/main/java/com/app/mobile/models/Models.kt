@@ -228,8 +228,8 @@ data class BookingSettings(
 // ── Inventory Settings ────────────────────────────────────────────────────
 data class InventorySettings(
     val minLeaseDays: Int = 2,
-    val weeklyDiscount: Double = 100.0,
-    val monthlyDiscountCap: Double = 300.0
+    val weeklyDiscount: Int = 100,
+    val monthlyDiscountCap: Int = 300
 )
 
 // ── Booking Availability ──────────────────────────────────────────────────

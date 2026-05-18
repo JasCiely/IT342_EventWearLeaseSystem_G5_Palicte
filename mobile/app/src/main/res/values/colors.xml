@@ -38,4 +38,5 @@
     <color name="status_active_text">#1E40AF</color>
     <color name="status_completed_bg">#EDE9FE</color>
     <color name="status_completed_text">#5B21B6</color>
+
 </resources>

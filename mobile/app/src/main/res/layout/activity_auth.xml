@@ -181,7 +181,7 @@
                     android:letterSpacing="0.08"
                     android:textStyle="bold" />
 
-                <!-- Email Input -->
+                <!-- Email Input (no toggle, stretches to end) -->
                 <RelativeLayout
                     android:layout_width="match_parent"
                     android:layout_height="54dp"
@@ -189,6 +189,7 @@
                     android:background="@drawable/bg_input">
 
                     <ImageView
+                        android:id="@+id/ivEmailIcon"
                         android:layout_width="18dp"
                         android:layout_height="18dp"
                         android:layout_alignParentStart="true"
@@ -202,6 +203,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
                         android:layout_marginStart="44dp"
+                        android:layout_alignParentEnd="true"
                         android:background="@android:color/transparent"
                         android:hint="you@example.com"
                         android:inputType="textEmailAddress"
@@ -221,7 +223,7 @@
                     android:letterSpacing="0.08"
                     android:textStyle="bold" />
 
-                <!-- Password Input -->
+                <!-- Password Input (with toggle, EditText now same width as email) -->
                 <RelativeLayout
                     android:layout_width="match_parent"
                     android:layout_height="54dp"
@@ -242,11 +244,13 @@
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
                         android:layout_marginStart="44dp"
+                        android:layout_toStartOf="@+id/ivToggleSignInPassword"
                         android:background="@android:color/transparent"
                         android:hint="••••••••"
                         android:inputType="textPassword"
-                        android:paddingEnd="48dp"
-                        android:textColorHint="@color/input_hint" />
+                        android:paddingEnd="0dp"
+                        android:textColorHint="@color/input_hint"
+                        android:textSize="14sp" />
 
                     <ImageView
                         android:id="@+id/ivToggleSignInPassword"
@@ -345,7 +349,7 @@
                     android:letterSpacing="0.08"
                     android:textStyle="bold" />
 
-                <!-- First Name Input -->
+                <!-- First Name Input (no toggle) -->
                 <RelativeLayout
                     android:layout_width="match_parent"
                     android:layout_height="54dp"
@@ -366,6 +370,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
                         android:layout_marginStart="44dp"
+                        android:layout_alignParentEnd="true"
                         android:background="@android:color/transparent"
                         android:hint="Juan"
                         android:inputType="textPersonName"
@@ -385,7 +390,7 @@
                     android:letterSpacing="0.08"
                     android:textStyle="bold" />
 
-                <!-- Last Name Input -->
+                <!-- Last Name Input (no toggle) -->
                 <RelativeLayout
                     android:layout_width="match_parent"
                     android:layout_height="54dp"
@@ -406,6 +411,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
                         android:layout_marginStart="44dp"
+                        android:layout_alignParentEnd="true"
                         android:background="@android:color/transparent"
                         android:hint="Dela Cruz"
                         android:inputType="textPersonName"
@@ -425,7 +431,7 @@
                     android:letterSpacing="0.08"
                     android:textStyle="bold" />
 
-                <!-- Email Input -->
+                <!-- Email Input (no toggle) -->
                 <RelativeLayout
                     android:layout_width="match_parent"
                     android:layout_height="54dp"
@@ -446,6 +452,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
                         android:layout_marginStart="44dp"
+                        android:layout_alignParentEnd="true"
                         android:background="@android:color/transparent"
                         android:hint="you@example.com"
                         android:inputType="textEmailAddress"
@@ -465,7 +472,7 @@
                     android:letterSpacing="0.08"
                     android:textStyle="bold" />
 
-                <!-- Password Input -->
+                <!-- Password Input (with toggle, EditText same width as email) -->
                 <RelativeLayout
                     android:layout_width="match_parent"
                     android:layout_height="54dp"
@@ -486,11 +493,13 @@
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
                         android:layout_marginStart="44dp"
+                        android:layout_toStartOf="@+id/ivToggleRegPassword"
                         android:background="@android:color/transparent"
                         android:hint="••••••••"
                         android:inputType="textPassword"
-                        android:paddingEnd="48dp"
-                        android:textColorHint="@color/input_hint" />
+                        android:paddingEnd="0dp"
+                        android:textColorHint="@color/input_hint"
+                        android:textSize="14sp" />
 
                     <ImageView
                         android:id="@+id/ivToggleRegPassword"
@@ -524,7 +533,7 @@
                     android:letterSpacing="0.08"
                     android:textStyle="bold" />
 
-                <!-- Confirm Password Input -->
+                <!-- Confirm Password Input (with toggle, EditText same width as email) -->
                 <RelativeLayout
                     android:layout_width="match_parent"
                     android:layout_height="54dp"
@@ -545,11 +554,13 @@
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
                         android:layout_marginStart="44dp"
+                        android:layout_toStartOf="@+id/ivToggleConfirmPassword"
                         android:background="@android:color/transparent"
                         android:hint="••••••••"
                         android:inputType="textPassword"
-                        android:paddingEnd="48dp"
-                        android:textColorHint="@color/input_hint" />
+                        android:paddingEnd="0dp"
+                        android:textColorHint="@color/input_hint"
+                        android:textSize="14sp" />
 
                     <ImageView
                         android:id="@+id/ivToggleConfirmPassword"

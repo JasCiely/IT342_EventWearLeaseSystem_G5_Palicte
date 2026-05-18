@@ -176,8 +176,8 @@ interface AdminApiService {
     ): BookingSettings
 
     // ── Inventory Settings ────────────────────────────────────────────────
-    @GET("api/inventory-settings")
-    suspend fun getInventorySettings(): InventorySettings
+    @GET("api/admin/inventory-settings")
+    suspend fun getInventorySettings(@Header("Authorization") token: String): InventorySettings
 
     @PUT("api/admin/inventory-settings")
     suspend fun updateInventorySettings(

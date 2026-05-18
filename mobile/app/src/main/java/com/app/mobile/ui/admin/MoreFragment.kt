@@ -34,11 +34,9 @@ class MoreFragment : Fragment() {
         binding.tvInitials.text   = "${firstName.firstOrNull() ?: ""}${lastName.firstOrNull() ?: ""}".uppercase()
 
         binding.cardCustomers.setOnClickListener { navigateTo(CustomersFragment()) }
-        binding.cardUsers.setOnClickListener { navigateTo(UsersFragment()) }
+        binding.cardUsers.setOnClickListener     { navigateTo(UsersFragment()) }
         binding.cardAttendance.setOnClickListener { navigateTo(AttendanceFragment()) }
-        binding.cardPromotions.setOnClickListener { navigateTo(PromotionsFragment()) }
-        binding.cardSettings.setOnClickListener { navigateTo(SettingsFragment()) }
-        binding.cardProfile.setOnClickListener { navigateTo(ProfileFragment()) }
+        binding.cardProfile.setOnClickListener   { navigateTo(ProfileFragment()) }
 
         binding.btnLogout.setOnClickListener {
             AlertDialog.Builder(ctx)

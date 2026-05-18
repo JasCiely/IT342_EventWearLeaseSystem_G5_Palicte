@@ -2,106 +2,217 @@
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content">
+    android:layout_height="match_parent"
+    android:background="@color/brand_cream_bg"
+    android:fillViewport="true">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="20dp">
+        android:padding="20dp"
+        android:paddingBottom="32dp">
 
-        <!-- Promo Code -->
-        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:text="Promo Code *" android:textSize="13sp" android:textColor="@color/brand_text_subtitle"
-            android:layout_marginBottom="4dp" />
-        <EditText android:id="@+id/etCode"
-            android:layout_width="match_parent" android:layout_height="52dp"
-            android:background="@drawable/bg_input" android:hint="SUMMER20"
-            android:paddingHorizontal="12dp" android:inputType="textCapCharacters"
-            android:layout_marginBottom="14dp" />
-
-        <!-- Type -->
-        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:text="Discount Type" android:textSize="13sp" android:textColor="@color/brand_text_subtitle"
-            android:layout_marginBottom="4dp" />
-        <Spinner android:id="@+id/spType"
-            android:layout_width="match_parent" android:layout_height="52dp"
-            android:layout_marginBottom="14dp" />
-
-        <!-- Value -->
-        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:text="Value *" android:textSize="13sp" android:textColor="@color/brand_text_subtitle"
-            android:layout_marginBottom="4dp" />
-        <EditText android:id="@+id/etValue"
-            android:layout_width="match_parent" android:layout_height="52dp"
-            android:background="@drawable/bg_input" android:hint="e.g. 20 for 20% or ₱200 flat"
-            android:paddingHorizontal="12dp" android:inputType="numberDecimal"
-            android:layout_marginBottom="14dp" />
-
-        <!-- Start Date -->
-        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:text="Start Date *" android:textSize="13sp" android:textColor="@color/brand_text_subtitle"
-            android:layout_marginBottom="4dp" />
-        <EditText android:id="@+id/etStartDate"
-            android:layout_width="match_parent" android:layout_height="52dp"
-            android:background="@drawable/bg_input" android:hint="YYYY-MM-DD"
-            android:paddingHorizontal="12dp" android:focusable="false" android:cursorVisible="false"
-            android:layout_marginBottom="14dp" />
-
-        <!-- End Date -->
-        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:text="End Date *" android:textSize="13sp" android:textColor="@color/brand_text_subtitle"
-            android:layout_marginBottom="4dp" />
-        <EditText android:id="@+id/etEndDate"
-            android:layout_width="match_parent" android:layout_height="52dp"
-            android:background="@drawable/bg_input" android:hint="YYYY-MM-DD"
-            android:paddingHorizontal="12dp" android:focusable="false" android:cursorVisible="false"
-            android:layout_marginBottom="14dp" />
-
-        <!-- Active -->
-        <CheckBox android:id="@+id/cbActive"
-            android:layout_width="wrap_content" android:layout_height="48dp"
-            android:text="Active" android:textSize="14sp" android:textColor="@color/brand_text_dark"
-            android:layout_marginBottom="14dp" />
-
-        <!-- ── Apply to Items (optional) ───────────────────────── -->
-        <View android:layout_width="match_parent" android:layout_height="1dp"
-            android:background="@color/gray_300" android:layout_marginBottom="14dp" />
-
-        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:text="Apply to Items (Optional)"
-            android:textSize="13sp" android:textStyle="bold"
-            android:textColor="@color/brand_text_dark"
-            android:layout_marginBottom="4dp" />
-
-        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:text="Leave empty to apply to all items"
-            android:textSize="12sp" android:textColor="@color/brand_text_subtitle"
-            android:layout_marginBottom="10dp" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnSelectItems"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:text="Select Specific Items"
-            android:textAllCaps="false"
-            android:textSize="14sp"
-            style="@style/Widget.Material3.Button.OutlinedButton"
-            app:strokeColor="@color/brand_burgundy"
-            android:textColor="@color/brand_burgundy"
-            android:layout_marginBottom="8dp" />
-
-        <TextView
-            android:id="@+id/tvSelectedItems"
+        <!-- Promo Code Section as a Card -->
+        <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="All items (no restriction)"
-            android:textSize="13sp"
-            android:textColor="@color/brand_text_subtitle"
-            android:gravity="center"
-            android:padding="8dp"
-            android:background="@color/gray_100"
-            android:layout_marginBottom="4dp" />
+            android:layout_marginBottom="24dp"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="4dp"
+            app:cardBackgroundColor="@color/brand_surface">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="20dp">
+
+                <!-- Promo Code -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Promo Code *"
+                    android:textSize="12sp"
+                    android:textColor="@color/brand_text_subtitle"
+                    android:layout_marginBottom="4dp" />
+                <EditText
+                    android:id="@+id/etCode"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:background="@drawable/bg_input"
+                    android:hint="SUMMER20"
+                    android:textSize="14sp"
+                    android:paddingHorizontal="16dp"
+                    android:inputType="textCapCharacters"
+                    android:textAllCaps="true"
+                    android:layout_marginBottom="16dp" />
+
+                <!-- Discount Type -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Discount Type *"
+                    android:textSize="12sp"
+                    android:textColor="@color/brand_text_subtitle"
+                    android:layout_marginBottom="4dp" />
+                <Spinner
+                    android:id="@+id/spType"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:background="@drawable/bg_input"
+                    android:paddingHorizontal="16dp"
+                    android:spinnerMode="dropdown"
+                    android:layout_marginBottom="16dp" />
+
+                <!-- Value -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Value *"
+                    android:textSize="12sp"
+                    android:textColor="@color/brand_text_subtitle"
+                    android:layout_marginBottom="4dp" />
+                <EditText
+                    android:id="@+id/etValue"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:background="@drawable/bg_input"
+                    android:hint="e.g., 20 for 20% or ₱200 flat"
+                    android:textSize="14sp"
+                    android:paddingHorizontal="16dp"
+                    android:inputType="numberDecimal"
+                    android:layout_marginBottom="16dp" />
+
+                <!-- Start & End Date in a row -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginBottom="16dp">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginEnd="8dp"
+                        android:orientation="vertical">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Start Date *"
+                            android:textSize="12sp"
+                            android:textColor="@color/brand_text_subtitle"
+                            android:layout_marginBottom="4dp" />
+                        <EditText
+                            android:id="@+id/etStartDate"
+                            android:layout_width="match_parent"
+                            android:layout_height="52dp"
+                            android:background="@drawable/bg_input"
+                            android:hint="YYYY-MM-DD"
+                            android:textSize="14sp"
+                            android:paddingHorizontal="16dp"
+                            android:focusable="false"
+                            android:cursorVisible="false"
+                            android:inputType="date" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="8dp"
+                        android:orientation="vertical">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="End Date *"
+                            android:textSize="12sp"
+                            android:textColor="@color/brand_text_subtitle"
+                            android:layout_marginBottom="4dp" />
+                        <EditText
+                            android:id="@+id/etEndDate"
+                            android:layout_width="match_parent"
+                            android:layout_height="52dp"
+                            android:background="@drawable/bg_input"
+                            android:hint="YYYY-MM-DD"
+                            android:textSize="14sp"
+                            android:paddingHorizontal="16dp"
+                            android:focusable="false"
+                            android:cursorVisible="false"
+                            android:inputType="date" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- Active Checkbox -->
+                <CheckBox
+                    android:id="@+id/cbActive"
+                    android:layout_width="wrap_content"
+                    android:layout_height="48dp"
+                    android:text="Active"
+                    android:textSize="14sp"
+                    android:textColor="@color/brand_text_dark"
+                    android:buttonTint="@color/brand_burgundy" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Apply to Items Section -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="24dp"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="4dp"
+            app:cardBackgroundColor="@color/brand_surface">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="20dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Apply to Items (Optional)"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/brand_text_dark"
+                    android:layout_marginBottom="4dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Leave empty to apply to all items"
+                    android:textSize="12sp"
+                    android:textColor="@color/brand_text_subtitle"
+                    android:layout_marginBottom="16dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnSelectItems"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:text="Select Specific Items"
+                    android:textAllCaps="false"
+                    android:textSize="14sp"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    app:strokeColor="@color/brand_burgundy"
+                    android:textColor="@color/brand_burgundy"
+                    android:layout_marginBottom="12dp" />
+
+                <TextView
+                    android:id="@+id/tvSelectedItems"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="All items (no restriction)"
+                    android:textSize="13sp"
+                    android:textColor="@color/brand_text_dark"
+                    android:gravity="center"
+                    android:padding="12dp"
+                    android:background="@color/gray_100"
+                    android:layout_marginTop="4dp" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
 
     </LinearLayout>
 </ScrollView>

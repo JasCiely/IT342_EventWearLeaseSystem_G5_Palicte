@@ -222,7 +222,7 @@ class CreateBookingDialogFragment : DialogFragment() {
                 if (fittingDate.isNotEmpty()) refreshTimeSpinner()
             } catch (_: Exception) {}
             try {
-                inventorySettings = ApiClient.adminApi.getInventorySettings()
+                inventorySettings = ApiClient.adminApi.getInventorySettings(ApiClient.bearerToken())
                 if (startDate.isNotEmpty() && endDate.isNotEmpty()) recalcDirect()
             } catch (_: Exception) {}
         }
@@ -413,8 +413,8 @@ class CreateBookingDialogFragment : DialogFragment() {
 
             val inv    = inventorySettings
             val weeks  = days / 7
-            val rawDisc  = weeks * (inv?.weeklyDiscount ?: 0.0)
-            val discount = minOf(rawDisc, inv?.monthlyDiscountCap ?: rawDisc)
+            val rawDisc  = weeks * (inv?.weeklyDiscount ?: 0).toDouble()
+            val discount = minOf(rawDisc, inv?.monthlyDiscountCap?.toDouble() ?: rawDisc)
             val finalPrice = maxOf(0.0, base - discount)
 
             binding.cbDaysCalc.text = "$days day${if (days != 1) "s" else ""} × ₱${String.format("%.2f", price)}"
@@ -518,8 +518,8 @@ class CreateBookingDialogFragment : DialogFragment() {
                     val base      = (item.price) * days
                     val inv       = inventorySettings
                     val weeks     = days / 7
-                    val rawDisc   = weeks * (inv?.weeklyDiscount ?: 0.0)
-                    val discount  = minOf(rawDisc, inv?.monthlyDiscountCap ?: rawDisc)
+                    val rawDisc   = weeks * (inv?.weeklyDiscount ?: 0).toDouble()
+                    val discount  = minOf(rawDisc, inv?.monthlyDiscountCap?.toDouble() ?: rawDisc)
                     val finalAmt  = maxOf(0.0, base - discount)
                     val req       = CreateDirectBookingRequest(
                         customerEmail  = email,
