@@ -10,6 +10,7 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.viewpager2.adapter.FragmentStateAdapter
+import androidx.viewpager2.widget.ViewPager2
 import com.app.mobile.AdminDashboardActivity
 import com.app.mobile.ApiClient
 import com.app.mobile.R
@@ -42,6 +43,10 @@ class BookingsFragment : Fragment() {
             tab.text = if (pos == 0) "Fitting" else "Direct Lease"
         }.attach()
 
+        binding.viewPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
+            override fun onPageSelected(position: Int) { onArchivedCountChanged() }
+        })
+
         binding.fabNewBooking.setOnClickListener {
             val dialog = CreateBookingDialogFragment()
             dialog.onSuccess = {
@@ -53,6 +58,13 @@ class BookingsFragment : Fragment() {
                 }
             }
             dialog.show(childFragmentManager, "create_booking")
+        }
+
+        binding.fabArchived.setOnClickListener {
+            when (val f = activeChildFragment()) {
+                is FittingBookingsFragment -> f.showArchivedSheet()
+                is DirectBookingsFragment  -> f.showArchivedSheet()
+            }
         }
 
         binding.btnSettings.setOnClickListener { showSettingsDialog() }
@@ -151,6 +163,22 @@ class BookingsFragment : Fragment() {
                 .setNegativeButton("Cancel", null)
                 .show()
         }
+    }
+
+    // ── Archive FAB helpers ───────────────────────────────────────────────────
+
+    private fun activeChildFragment(): Fragment? {
+        val tag = "f${binding.viewPager.currentItem}"
+        return childFragmentManager.findFragmentByTag(tag)
+    }
+
+    fun onArchivedCountChanged() {
+        val hasArchived = when (val f = activeChildFragment()) {
+            is FittingBookingsFragment -> f.hasArchivedBookings()
+            is DirectBookingsFragment  -> f.hasArchivedBookings()
+            else                       -> false
+        }
+        binding.fabArchived.visibility = if (hasArchived) View.VISIBLE else View.GONE
     }
 
     override fun onDestroyView() {

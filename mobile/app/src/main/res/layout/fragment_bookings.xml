@@ -80,6 +80,22 @@
 
     </LinearLayout>
 
+    <!-- ─── Archive FAB (above the + FAB) ─── -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabArchived"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_marginEnd="@dimen/spacing_lg"
+        android:layout_marginBottom="80dp"
+        android:contentDescription="View archived bookings"
+        app:backgroundTint="@color/brand_burgundy"
+        app:srcCompat="@android:drawable/ic_menu_recent_history"
+        app:tint="#FFFFFF"
+        app:elevation="@dimen/elevation_lg"
+        app:pressedTranslationZ="@dimen/elevation_xl"
+        android:visibility="gone" />
+
     <!-- ─── Modern FAB with Label ─── -->
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/fabNewBooking"

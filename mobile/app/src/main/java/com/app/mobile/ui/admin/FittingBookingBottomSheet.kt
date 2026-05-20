@@ -23,6 +23,8 @@ class FittingBookingBottomSheet : BottomSheetDialogFragment() {
     lateinit var booking: FittingBooking
     var allItems: List<InventoryItem> = emptyList()
     var onReload: (() -> Unit)? = null
+    var onReschedule: ((FittingBooking) -> Unit)? = null
+    var onProceedToLease: ((FittingBooking) -> Unit)? = null
 
     private var settings: BookingSettings? = null
 
@@ -148,6 +150,7 @@ class FittingBookingBottomSheet : BottomSheetDialogFragment() {
                     btnCompleteNoLease.visibility = View.VISIBLE  // Done — disabled until settings load
                     btnCompleteNoLease.isEnabled  = false
                     btnCompleteNoLease.alpha      = 0.5f
+                    btnCompleteNoLease.text       = "Mark Done (loading…)"
                     btnReschedule.visibility      = View.VISIBLE
                     btnEditSchedule.visibility    = View.VISIBLE
                     btnCancel.visibility          = View.VISIBLE
@@ -165,11 +168,11 @@ class FittingBookingBottomSheet : BottomSheetDialogFragment() {
 
         btnConfirm.setOnClickListener         { updateStatus("Confirmed") }
         btnCancel.setOnClickListener          { confirmCancelBooking() }
-        btnComplete.setOnClickListener        { dismiss(); showFittingToLeaseDialog() }
-        btnProceedToLease.setOnClickListener  { dismiss(); showFittingToLeaseDialog() }
+        btnComplete.setOnClickListener        { showFittingToLeaseDialog() }
+        btnProceedToLease.setOnClickListener  { showFittingToLeaseDialog() }
         btnCompleteNoLease.setOnClickListener { confirmCompleteNoLease() }
-        btnReschedule.setOnClickListener      { dismiss(); showRescheduleDialog() }
-        btnEditSchedule.setOnClickListener    { dismiss(); showRescheduleDialog() }
+        btnReschedule.setOnClickListener      { showRescheduleDialog() }
+        btnEditSchedule.setOnClickListener    { showRescheduleDialog() }
         btnResendEmail.setOnClickListener     { resendEmail() }
     }
 
@@ -180,6 +183,7 @@ class FittingBookingBottomSheet : BottomSheetDialogFragment() {
         val hint = v.findViewById<TextView>(R.id.tvDoneHint)
         if (btn.visibility != View.VISIBLE) return
         val active = isDoneWindowActive()
+        btn.text = "Mark Done (No Rental)"
         btn.isEnabled = active
         btn.alpha = if (active) 1f else 0.5f
         if (!active) {
@@ -259,7 +263,7 @@ class FittingBookingBottomSheet : BottomSheetDialogFragment() {
     private fun updateStatus(status: String) {
         viewLifecycleOwner.lifecycleScope.launch {
             try {
-                ApiClient.adminApi.updateFittingStatus(ApiClient.bearerToken(), booking.bookingId, status)
+                ApiClient.adminApi.updateFittingStatus(ApiClient.bearerToken(), booking.id, status)
                 toast("Status updated to $status")
                 onReload?.invoke()
                 dismiss()
@@ -292,7 +296,7 @@ class FittingBookingBottomSheet : BottomSheetDialogFragment() {
             .setPositiveButton("Mark Done") { _, _ ->
                 viewLifecycleOwner.lifecycleScope.launch {
                     try {
-                        ApiClient.adminApi.completeFittingNoLease(ApiClient.bearerToken(), booking.bookingId)
+                        ApiClient.adminApi.completeFittingNoLease(ApiClient.bearerToken(), booking.id)
                         toast("Fitting completed (no rental)")
                         onReload?.invoke()
                         dismiss()
@@ -309,8 +313,11 @@ class FittingBookingBottomSheet : BottomSheetDialogFragment() {
     private fun resendEmail() {
         viewLifecycleOwner.lifecycleScope.launch {
             try {
-                ApiClient.adminApi.resendFittingEmail(ApiClient.bearerToken(), booking.bookingId)
+                ApiClient.adminApi.resendFittingEmail(ApiClient.bearerToken(), booking.id)
                 toast("Email sent")
+            } catch (e: HttpException) {
+                if (e.code() == 401) (activity as? AdminDashboardActivity)?.showSessionExpiredDialog()
+                else toast("Failed: ${e.message()}")
             } catch (_: Exception) { toast(getString(R.string.error_network)) }
         }
     }
@@ -318,13 +325,13 @@ class FittingBookingBottomSheet : BottomSheetDialogFragment() {
     // ── Sub-dialogs (delegate to parent fragment so CalendarPickerDialog works) ─
 
     private fun showFittingToLeaseDialog() {
-        val parent = parentFragment as? FittingBookingsFragment ?: return
-        parent.showFittingToLeaseDialog(booking)
+        dismiss()
+        onProceedToLease?.invoke(booking)
     }
 
     private fun showRescheduleDialog() {
-        val parent = parentFragment as? FittingBookingsFragment ?: return
-        parent.showRescheduleDialog(booking)
+        dismiss()
+        onReschedule?.invoke(booking)
     }
 
     private fun toast(msg: String) =

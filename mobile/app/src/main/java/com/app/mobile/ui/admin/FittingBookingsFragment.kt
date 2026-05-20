@@ -31,9 +31,14 @@ class FittingBookingsFragment : Fragment(), SseClient.SseListener {
     private var _binding: FragmentFittingBookingsBinding? = null
     private val binding get() = _binding!!
     private lateinit var adapter: FittingBookingAdapter
-    private var allBookings = listOf<FittingBooking>()
-    private var searchQuery = ""
-    private var allItems    = listOf<InventoryItem>()
+    private var allBookings     = listOf<FittingBooking>()
+    private var archivedBookings = listOf<FittingBooking>()
+    private var searchQuery     = ""
+    private var allItems        = listOf<InventoryItem>()
+
+    companion object {
+        private val TERMINAL_STATUSES = setOf("COMPLETED", "CANCELLED", "CANCELED", "REJECTED", "LEASE_CONVERTED")
+    }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentFittingBookingsBinding.inflate(inflater, container, false)
@@ -82,8 +87,11 @@ class FittingBookingsFragment : Fragment(), SseClient.SseListener {
     }
 
     private fun applyFilter() {
-        val filtered = if (searchQuery.isEmpty()) allBookings
-        else allBookings.filter {
+        val (archived, active) = allBookings.partition { it.status.uppercase() in TERMINAL_STATUSES }
+        archivedBookings = archived
+
+        val filtered = if (searchQuery.isEmpty()) active
+        else active.filter {
             it.customerName.contains(searchQuery, true) ||
             it.itemName.contains(searchQuery, true) ||
             it.bookingId.contains(searchQuery, true) ||
@@ -91,15 +99,28 @@ class FittingBookingsFragment : Fragment(), SseClient.SseListener {
         }
         adapter.submitList(filtered)
         binding.tvEmpty.visibility = if (filtered.isEmpty()) View.VISIBLE else View.GONE
+
+        (parentFragment as? BookingsFragment)?.onArchivedCountChanged()
+    }
+
+    fun hasArchivedBookings() = archivedBookings.isNotEmpty()
+
+    fun showArchivedSheet() {
+        ArchivedFittingBookingsBottomSheet().apply {
+            this.allArchived          = archivedBookings
+            this.onShowBookingDetails = { booking -> showBookingDetails(booking) }
+        }.show(childFragmentManager, "archived_fittings")
     }
 
     // ── Bottom sheet on click ─────────────────────────────────────────────────
 
     private fun showBookingDetails(booking: FittingBooking) {
         FittingBookingBottomSheet().apply {
-            this.booking  = booking
-            this.allItems = this@FittingBookingsFragment.allItems
-            onReload      = { loadBookings() }
+            this.booking       = booking
+            this.allItems      = this@FittingBookingsFragment.allItems
+            onReload           = { loadBookings() }
+            onReschedule       = { b -> showRescheduleDialog(b) }
+            onProceedToLease   = { b -> showFittingToLeaseDialog(b) }
         }.show(childFragmentManager, "fitting_detail")
     }
 
@@ -209,7 +230,7 @@ class FittingBookingsFragment : Fragment(), SseClient.SseListener {
                 )
                 viewLifecycleOwner.lifecycleScope.launch {
                     try {
-                        if (booking.status.uppercase() == "CONFIRMED") ApiClient.adminApi.updateFittingStatus(ApiClient.bearerToken(), booking.bookingId, "Completed")
+                        if (booking.status.uppercase() == "CONFIRMED") ApiClient.adminApi.updateFittingStatus(ApiClient.bearerToken(), booking.id, "Completed")
                         ApiClient.adminApi.createDirectBooking(ApiClient.bearerToken(), req)
                         toast("Rental booking created!"); loadBookings()
                     } catch (e: HttpException) {
@@ -229,13 +250,29 @@ class FittingBookingsFragment : Fragment(), SseClient.SseListener {
         etDate.setText(booking.fittingDate)
         etTime.setText(booking.fittingTime)
 
+        val itemId = allItems.firstOrNull { it.name.equals(booking.itemName, ignoreCase = true) }?.id ?: ""
+
+        etDate.isFocusable = false
+        etDate.isClickable = true
         etDate.setOnClickListener {
             CalendarPickerDialog().apply {
                 mode = CalendarPickerDialog.Mode.FITTING
+                this.itemId = itemId
                 minDate = CalendarPickerDialog.todayStr()
                 currentValue = etDate.text.toString()
                 onDateSelected = { date -> etDate.setText(date) }
             }.show(childFragmentManager, "reschedule_cal")
+        }
+
+        etTime.isFocusable = false
+        etTime.isClickable = true
+        etTime.setOnClickListener {
+            val parts = etTime.text.toString().split(":")
+            val h = parts.getOrNull(0)?.toIntOrNull() ?: 9
+            val m = parts.getOrNull(1)?.toIntOrNull() ?: 0
+            android.app.TimePickerDialog(requireContext(), { _, hour, minute ->
+                etTime.setText("%02d:%02d".format(hour, minute))
+            }, h, m, true).show()
         }
 
         AlertDialog.Builder(requireContext())
@@ -247,8 +284,11 @@ class FittingBookingsFragment : Fragment(), SseClient.SseListener {
                 if (date.isEmpty() || time.isEmpty()) { toast("Fill all fields"); return@setPositiveButton }
                 viewLifecycleOwner.lifecycleScope.launch {
                     try {
-                        ApiClient.adminApi.rescheduleFitting(ApiClient.bearerToken(), booking.bookingId, RescheduleRequest(date, time))
+                        ApiClient.adminApi.rescheduleFitting(ApiClient.bearerToken(), booking.id, RescheduleRequest(date, time))
                         toast("Rescheduled successfully"); loadBookings()
+                    } catch (e: HttpException) {
+                        if (e.code() == 401) (activity as? AdminDashboardActivity)?.showSessionExpiredDialog()
+                        else toast("Failed: ${e.message()}")
                     } catch (_: Exception) { toast(getString(R.string.error_network)) }
                 }
             }

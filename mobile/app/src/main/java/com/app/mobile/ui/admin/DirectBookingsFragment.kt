@@ -31,8 +31,13 @@ class DirectBookingsFragment : Fragment(), SseClient.SseListener {
     private var _binding: FragmentDirectBookingsBinding? = null
     private val binding get() = _binding!!
     private lateinit var adapter: DirectBookingAdapter
-    private var allBookings = listOf<DirectBooking>()
-    private var searchQuery = ""
+    private var allBookings      = listOf<DirectBooking>()
+    private var archivedBookings = listOf<DirectBooking>()
+    private var searchQuery      = ""
+
+    companion object {
+        private val TERMINAL_STATUSES = setOf("Returned", "Completed", "Cancelled")
+    }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentDirectBookingsBinding.inflate(inflater, container, false)
@@ -74,14 +79,28 @@ class DirectBookingsFragment : Fragment(), SseClient.SseListener {
     }
 
     private fun applyFilter() {
-        val filtered = if (searchQuery.isEmpty()) allBookings
-        else allBookings.filter {
+        val (archived, active) = allBookings.partition { it.bookingStatus in TERMINAL_STATUSES }
+        archivedBookings = archived
+
+        val filtered = if (searchQuery.isEmpty()) active
+        else active.filter {
             it.customerName.contains(searchQuery, true) ||
             it.itemName.contains(searchQuery, true) ||
             it.bookingStatus.contains(searchQuery, true)
         }
         adapter.submitList(filtered)
         binding.tvEmpty.visibility = if (filtered.isEmpty()) View.VISIBLE else View.GONE
+
+        (parentFragment as? BookingsFragment)?.onArchivedCountChanged()
+    }
+
+    fun hasArchivedBookings() = archivedBookings.isNotEmpty()
+
+    fun showArchivedSheet() {
+        ArchivedDirectBookingsBottomSheet().apply {
+            this.allArchived          = archivedBookings
+            this.onShowBookingDetails = { booking -> showBookingDetails(booking) }
+        }.show(childFragmentManager, "archived_direct")
     }
 
     // ── Bottom sheet on click ─────────────────────────────────────────────────
