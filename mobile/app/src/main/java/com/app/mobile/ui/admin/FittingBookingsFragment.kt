@@ -139,6 +139,8 @@ class FittingBookingsFragment : Fragment(), SseClient.SseListener {
         val priceSummary  = view.findViewById<View>(R.id.ftlPriceSummary)
         val tvDaysCalc    = view.findViewById<TextView>(R.id.ftlDaysCalc)
         val tvSubtotal    = view.findViewById<TextView>(R.id.ftlSubtotal)
+        val tvDiscountRow = view.findViewById<View>(R.id.ftlDiscountRow)
+        val tvDiscountVal = view.findViewById<TextView>(R.id.ftlDiscountVal)
         val tvTotal       = view.findViewById<TextView>(R.id.ftlTotal)
         val etNotes       = view.findViewById<EditText>(R.id.etFtlNotes)
 
@@ -155,8 +157,8 @@ class FittingBookingsFragment : Fragment(), SseClient.SseListener {
         var returnDate = ""
         var availResult: Boolean? = null
         val availHandler = Handler(Looper.getMainLooper())
-        // Occupied ranges fetched before pickers are enabled
         var ftlOccupiedRanges = listOf<OccupiedDateRange>()
+        var ftlInvSettings: InventorySettings? = null
 
         // Disable date pickers until occupied ranges are loaded
         etPickup.isEnabled = false
@@ -171,11 +173,22 @@ class FittingBookingsFragment : Fragment(), SseClient.SseListener {
                     priceSummary.visibility = View.GONE; return
                 }
                 tvDateError.visibility = View.GONE
-                val days  = ((end.time - start.time) / 86_400_000L + 1).toInt()
-                val total = dailyRate * days
+                val days     = ((end.time - start.time) / 86_400_000L + 1).toInt()
+                val base     = dailyRate * days
+                val inv      = ftlInvSettings
+                val weeks    = days / 7
+                val rawDisc  = weeks * (inv?.weeklyDiscount ?: 0).toDouble()
+                val discount = minOf(rawDisc, inv?.monthlyDiscountCap?.toDouble() ?: rawDisc)
+                val finalAmt = maxOf(0.0, base - discount)
                 tvDaysCalc.text = "$days day${if (days != 1) "s" else ""} × ₱${String.format("%.2f", dailyRate)}"
-                tvSubtotal.text = "₱${String.format("%.2f", total)}"
-                tvTotal.text    = "₱${String.format("%.2f", total)}"
+                tvSubtotal.text = "₱${String.format("%.2f", base)}"
+                if (discount > 0) {
+                    tvDiscountRow.visibility = View.VISIBLE
+                    tvDiscountVal.text = "-₱${String.format("%.2f", discount)}"
+                } else {
+                    tvDiscountRow.visibility = View.GONE
+                }
+                tvTotal.text = "₱${String.format("%.2f", finalAmt)}"
                 priceSummary.visibility = View.VISIBLE
             } catch (_: Exception) { priceSummary.visibility = View.GONE }
         }
@@ -227,18 +240,24 @@ class FittingBookingsFragment : Fragment(), SseClient.SseListener {
             .setPositiveButton("Confirm Rental") { _, _ ->
                 if (pickupDate.isEmpty() || returnDate.isEmpty()) { toast("Select both dates"); return@setPositiveButton }
                 if (availResult == false) { toast("Item not available for selected dates"); return@setPositiveButton }
-                val days  = ((parseDate(returnDate).time - parseDate(pickupDate).time) / 86_400_000L + 1).toInt().coerceAtLeast(1)
-                val total = dailyRate * days
+                val days     = ((parseDate(returnDate).time - parseDate(pickupDate).time) / 86_400_000L + 1).toInt().coerceAtLeast(1)
+                val base     = dailyRate * days
+                val inv      = ftlInvSettings
+                val weeks    = days / 7
+                val rawDisc  = weeks * (inv?.weeklyDiscount ?: 0).toDouble()
+                val discount = minOf(rawDisc, inv?.monthlyDiscountCap?.toDouble() ?: rawDisc)
+                val finalAmt = maxOf(0.0, base - discount)
                 val notes = etNotes.text.toString().trim().ifEmpty { "Post-fitting rental for ${booking.itemName}" }
                 val req = CreateDirectBookingRequest(
                     customerEmail = booking.customerEmail, customerName = booking.customerName,
                     customerPhone = booking.customerPhone, itemId = itemId, itemName = booking.itemName,
-                    startDate = pickupDate, endDate = returnDate, basePrice = total,
-                    discountAmount = 0.0, finalPrice = total, notes = notes, preferredSize = booking.preferredSize
+                    startDate = pickupDate, endDate = returnDate, basePrice = base,
+                    discountAmount = discount, finalPrice = finalAmt, notes = notes, preferredSize = booking.preferredSize
                 )
                 viewLifecycleOwner.lifecycleScope.launch {
                     try {
-                        if (booking.status.uppercase() == "CONFIRMED") ApiClient.adminApi.updateFittingStatus(ApiClient.bearerToken(), booking.id, "Completed")
+                        val fittingStatus = resolveFittingStatusOnRental(booking.fittingDate, booking.fittingTime)
+                        ApiClient.adminApi.updateFittingStatus(ApiClient.bearerToken(), booking.id, fittingStatus)
                         ApiClient.adminApi.createDirectBooking(ApiClient.bearerToken(), req)
                         toast("Rental booking created!"); loadBookings()
                     } catch (e: HttpException) {
@@ -250,19 +269,21 @@ class FittingBookingsFragment : Fragment(), SseClient.SseListener {
             .setNegativeButton("Cancel", null)
             .create()
         ftlDialog.show()
-        // Fetch occupied ranges async; enable pickers once ready
+        // Fetch inventory settings and occupied ranges async; enable pickers once ready.
         viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                ftlInvSettings = ApiClient.adminApi.getInventorySettings(ApiClient.bearerToken())
+            } catch (_: Exception) { }
+
             try {
                 val ranges = ApiClient.adminApi.getOccupiedDates(ApiClient.bearerToken(), itemId)
                 if (!ftlDialog.isShowing) return@launch
                 ftlOccupiedRanges = ranges
-                etPickup.isEnabled = true
-                etReturn.isEnabled = true
-            } catch (_: Exception) {
-                if (!ftlDialog.isShowing) return@launch
-                etPickup.isEnabled = true
-                etReturn.isEnabled = true
-            }
+            } catch (_: Exception) { }
+
+            if (!ftlDialog.isShowing) return@launch
+            etPickup.isEnabled = true
+            etReturn.isEnabled = true
         }
     }
 
@@ -416,6 +437,18 @@ class FittingBookingsFragment : Fragment(), SseClient.SseListener {
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private fun resolveFittingStatusOnRental(fittingDate: String, fittingTime: String): String {
+        return try {
+            val dp = fittingDate.split("-")
+            val tp = fittingTime.split(":")
+            val fittingCal = Calendar.getInstance().apply {
+                set(dp[0].toInt(), dp[1].toInt() - 1, dp[2].toInt(), tp[0].toInt(), tp[1].toInt(), 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            if (Calendar.getInstance().before(fittingCal)) "Cancelled" else "Completed"
+        } catch (_: Exception) { "Cancelled" }
+    }
 
     private fun parseDate(s: String): Date {
         val parts = s.split("-")

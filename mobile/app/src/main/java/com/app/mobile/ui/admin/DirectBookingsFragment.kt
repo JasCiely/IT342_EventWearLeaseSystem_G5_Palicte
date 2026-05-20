@@ -261,10 +261,12 @@ class DirectBookingsFragment : Fragment(), SseClient.SseListener {
         val etEnd       = view.findViewById<EditText>(R.id.etNewEndDate)
         val tvAvail     = view.findViewById<TextView>(R.id.tvAvailability)
         val tvDateError = view.findViewById<TextView>(R.id.tvDateError)
-        val priceSummary = view.findViewById<View>(R.id.layoutPriceSummary)
-        val tvDaysCalc  = view.findViewById<TextView>(R.id.tvDaysCalc)
-        val tvSubtotal  = view.findViewById<TextView>(R.id.tvSubtotal)
-        val tvTotal     = view.findViewById<TextView>(R.id.tvTotal)
+        val priceSummary  = view.findViewById<View>(R.id.layoutPriceSummary)
+        val tvDaysCalc    = view.findViewById<TextView>(R.id.tvDaysCalc)
+        val tvSubtotal    = view.findViewById<TextView>(R.id.tvSubtotal)
+        val tvDiscountRow = view.findViewById<View>(R.id.layoutDiscountRow)
+        val tvDiscountVal = view.findViewById<TextView>(R.id.tvDiscountVal)
+        val tvTotal       = view.findViewById<TextView>(R.id.tvTotal)
 
         tvCurrent.text = "${booking.startDate} → ${booking.endDate}"
         etStart.setText(booking.startDate)
@@ -275,9 +277,8 @@ class DirectBookingsFragment : Fragment(), SseClient.SseListener {
         var newEnd             = booking.endDate
         var availResult: Boolean? = null
         val availHandler       = Handler(Looper.getMainLooper())
-        // Occupied ranges for OTHER bookings of this item (current booking excluded).
-        // Populated async; date pickers are disabled until this arrives.
         var editOccupiedRanges = listOf<OccupiedDateRange>()
+        var editInvSettings: InventorySettings? = null
 
         fun recalcPrice() {
             if (newStart.isEmpty() || newEnd.isEmpty()) { priceSummary.visibility = View.GONE; return }
@@ -290,11 +291,22 @@ class DirectBookingsFragment : Fragment(), SseClient.SseListener {
                     return
                 }
                 tvDateError.visibility = View.GONE
-                val days  = ((e.time - s.time) / 86_400_000L + 1).toInt()
-                val total = dailyRate * days
+                val days     = ((e.time - s.time) / 86_400_000L + 1).toInt()
+                val base     = dailyRate * days
+                val inv      = editInvSettings
+                val weeks    = days / 7
+                val rawDisc  = weeks * (inv?.weeklyDiscount ?: 0).toDouble()
+                val discount = minOf(rawDisc, inv?.monthlyDiscountCap?.toDouble() ?: rawDisc)
+                val finalAmt = maxOf(0.0, base - discount)
                 tvDaysCalc.text = "$days day${if (days != 1) "s" else ""} × ₱${String.format("%.2f", dailyRate)}"
-                tvSubtotal.text = "₱${String.format("%.2f", total)}"
-                tvTotal.text    = "₱${String.format("%.2f", total)}"
+                tvSubtotal.text = "₱${String.format("%.2f", base)}"
+                if (discount > 0) {
+                    tvDiscountRow.visibility = View.VISIBLE
+                    tvDiscountVal.text = "-₱${String.format("%.2f", discount)}"
+                } else {
+                    tvDiscountRow.visibility = View.GONE
+                }
+                tvTotal.text = "₱${String.format("%.2f", finalAmt)}"
                 priceSummary.visibility = View.VISIBLE
             } catch (_: Exception) { priceSummary.visibility = View.GONE }
         }
@@ -373,9 +385,13 @@ class DirectBookingsFragment : Fragment(), SseClient.SseListener {
 
         editDialog.show()
 
-        // Async: load occupied ranges for this item excluding the current booking,
-        // then enable the date pickers so the calendar shows red blocked dates.
+        // Async: load inventory settings and occupied ranges, then enable date pickers.
         viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                editInvSettings = ApiClient.adminApi.getInventorySettings(ApiClient.bearerToken())
+                if (editDialog.isShowing) recalcPrice()
+            } catch (_: Exception) { }
+
             val itemId = booking.inventoryItemId ?: ""
             if (itemId.isNotEmpty()) {
                 try {
