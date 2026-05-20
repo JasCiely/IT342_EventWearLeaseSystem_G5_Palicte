@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <!-- Current dates info -->
+    <LinearLayout
+        android:id="@+id/currentDatesRow"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@drawable/bg_card_white"
+        android:padding="12dp"
+        android:layout_marginBottom="16dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Current Rental Period"
+            android:textSize="11sp"
+            android:textColor="@color/brand_text_subtitle"
+            android:layout_marginBottom="4dp" />
+
+        <TextView
+            android:id="@+id/tvCurrentDates"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:textColor="@color/warning_amber" />
+
+    </LinearLayout>
+
+    <!-- New Start Date -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="New Start Date"
+        android:textSize="13sp"
+        android:textColor="@color/brand_text_subtitle"
+        android:layout_marginBottom="4dp" />
+
+    <EditText
+        android:id="@+id/etNewStartDate"
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:background="@drawable/bg_input"
+        android:hint="Select start date"
+        android:paddingHorizontal="12dp"
+        android:inputType="none"
+        android:focusable="false"
+        android:cursorVisible="false"
+        android:layout_marginBottom="12dp" />
+
+    <!-- New End Date -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="New End Date"
+        android:textSize="13sp"
+        android:textColor="@color/brand_text_subtitle"
+        android:layout_marginBottom="4dp" />
+
+    <EditText
+        android:id="@+id/etNewEndDate"
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:background="@drawable/bg_input"
+        android:hint="Select end date"
+        android:paddingHorizontal="12dp"
+        android:inputType="none"
+        android:focusable="false"
+        android:cursorVisible="false"
+        android:layout_marginBottom="12dp" />
+
+    <!-- Availability status -->
+    <TextView
+        android:id="@+id/tvAvailability"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="13sp"
+        android:padding="10dp"
+        android:visibility="gone"
+        android:layout_marginBottom="8dp" />
+
+    <!-- Price summary -->
+    <LinearLayout
+        android:id="@+id/layoutPriceSummary"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@drawable/bg_card_white"
+        android:padding="12dp"
+        android:layout_marginBottom="4dp"
+        android:visibility="gone">
+
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <TextView android:id="@+id/tvDaysCalc" android:layout_width="0dp"
+                android:layout_height="wrap_content" android:layout_weight="1"
+                android:textSize="13sp" android:textColor="@color/brand_text_subtitle" />
+            <TextView android:id="@+id/tvSubtotal" android:layout_width="wrap_content"
+                android:layout_height="wrap_content" android:textSize="13sp"
+                android:textColor="@color/brand_text_subtitle" />
+        </LinearLayout>
+
+        <View android:layout_width="match_parent" android:layout_height="1dp"
+            android:background="@color/gray_300" android:layout_marginVertical="8dp" />
+
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:text="New Total"
+                android:textSize="14sp" android:textStyle="bold" android:textColor="@color/brand_text_dark" />
+            <TextView android:id="@+id/tvTotal" android:layout_width="wrap_content"
+                android:layout_height="wrap_content" android:textSize="14sp"
+                android:textStyle="bold" android:textColor="@color/brand_burgundy" />
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!-- Error -->
+    <TextView
+        android:id="@+id/tvDateError"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="12sp"
+        android:textColor="@color/error_red"
+        android:layout_marginTop="4dp"
+        android:visibility="gone" />
+
+</LinearLayout>

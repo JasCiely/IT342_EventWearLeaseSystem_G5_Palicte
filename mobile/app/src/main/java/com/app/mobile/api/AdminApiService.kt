@@ -205,6 +205,13 @@ interface AdminApiService {
         @Query("itemId") itemId: String
     ): List<OccupiedDateRange>
 
+    @GET("api/direct-bookings/unavailable-dates")
+    suspend fun getUnavailableDates(
+        @Header("Authorization") token: String,
+        @Query("itemId") itemId: String,
+        @Query("excludeBookingId") excludeBookingId: String = ""
+    ): List<OccupiedDateRange>
+
     @GET("api/direct-bookings/availability")
     suspend fun checkDirectAvailability(
         @Header("Authorization") token: String,

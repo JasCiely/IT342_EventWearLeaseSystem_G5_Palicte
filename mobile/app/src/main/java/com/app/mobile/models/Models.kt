@@ -38,6 +38,7 @@ data class Staff(
 data class FittingBooking(
     val id: String,
     val bookingId: String,
+    val leaseBookingId: String? = null,
     val itemName: String,
     val customerName: String,
     val customerEmail: String,
@@ -54,6 +55,7 @@ data class FittingBooking(
 data class DirectBooking(
     val id: String,
     val userId: String?,
+    val inventoryItemId: String?,
     val itemName: String,
     val startDate: String,
     val endDate: String,

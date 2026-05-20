@@ -20,19 +20,28 @@ class FittingBookingAdapter(
             b.tvCustomer.text     = item.customerName
             b.tvDateTime.text     = "${item.fittingDate} at ${item.fittingTime}"
             b.tvSize.text         = "Size: ${item.preferredSize}"
-            b.tvStatus.text       = item.status
+            b.tvStatus.text       = normalizeStatus(item.status)
             applyStatusStyle(item.status)
             b.root.setOnClickListener { onClick(item) }
         }
 
+        private fun normalizeStatus(s: String) = when (s.uppercase()) {
+            "PENDING"          -> "Pending"
+            "CONFIRMED"        -> "Confirmed"
+            "COMPLETED"        -> "Completed"
+            "CANCELLED", "CANCELED" -> "Cancelled"
+            "REJECTED"         -> "Rejected"
+            "LEASE_CONVERTED"  -> "Lease Converted"
+            else               -> s
+        }
+
         private fun applyStatusStyle(status: String) {
-            val ctx = b.root.context
-            val (bg, txt) = when (status) {
-                "Pending"   -> Color.parseColor("#FEF3C7") to Color.parseColor("#92400E")
-                "Confirmed" -> Color.parseColor("#D1FAE5") to Color.parseColor("#065F46")
-                "Completed" -> Color.parseColor("#EDE9FE") to Color.parseColor("#5B21B6")
-                "Cancelled" -> Color.parseColor("#FEE2E2") to Color.parseColor("#991B1B")
-                else        -> Color.parseColor("#F3F4F6") to Color.parseColor("#374151")
+            val (bg, txt) = when (status.uppercase()) {
+                "PENDING"          -> Color.parseColor("#FEF3C7") to Color.parseColor("#92400E")
+                "CONFIRMED"        -> Color.parseColor("#D1FAE5") to Color.parseColor("#065F46")
+                "COMPLETED"        -> Color.parseColor("#EDE9FE") to Color.parseColor("#5B21B6")
+                "CANCELLED", "CANCELED" -> Color.parseColor("#FEE2E2") to Color.parseColor("#991B1B")
+                else               -> Color.parseColor("#F3F4F6") to Color.parseColor("#374151")
             }
             b.tvStatus.setBackgroundColor(bg)
             b.tvStatus.setTextColor(txt)

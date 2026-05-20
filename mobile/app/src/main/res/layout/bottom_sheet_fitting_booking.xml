@@ -1,0 +1,518 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/bg_bottom_sheet"
+    android:elevation="4dp">
+
+    <!-- Drag handle -->
+    <View
+        android:layout_width="40dp"
+        android:layout_height="4dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="12dp"
+        android:layout_marginBottom="8dp"
+        android:background="@color/gray_300"
+        android:alpha="0.7" />
+
+    <!-- Header: Booking ID + Customer Name + Status Badge -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingHorizontal="20dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="16dp"
+        android:gravity="center_vertical">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvBookingId"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="11sp"
+                android:textColor="@color/brand_text_subtitle"
+                android:letterSpacing="0.08"
+                android:textAllCaps="true"
+                tools:text="#FT1779273012124" />
+
+            <TextView
+                android:id="@+id/tvCustomerName"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:textColor="@color/brand_text_dark"
+                android:layout_marginTop="4dp"
+                tools:text="Customer Name" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Fitting Appointment"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:textColor="@color/brand_burgundy"
+                android:paddingHorizontal="10dp"
+                android:paddingVertical="4dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_badge_confirmed" />
+
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tvStatusBadge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:paddingHorizontal="14dp"
+            android:paddingVertical="6dp"
+            android:layout_marginStart="12dp"
+            tools:text="Confirmed" />
+
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/gray_300"
+        android:alpha="0.6" />
+
+    <!-- Scrollable content area -->
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true"
+        android:scrollbars="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingHorizontal="16dp"
+            android:paddingTop="20dp"
+            android:paddingBottom="12dp">
+
+            <!-- Lease started banner (purple) -->
+            <LinearLayout
+                android:id="@+id/layoutLeaseStartedBanner"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:background="@drawable/bg_lease_banner"
+                android:padding="12dp"
+                android:layout_marginBottom="12dp"
+                android:elevation="1dp"
+                android:visibility="gone"
+                tools:visibility="visible">
+                <TextView
+                    android:id="@+id/tvLeaseStartedMsg"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:textSize="13sp"
+                    android:textColor="#7C3AED"
+                    tools:text="Rental booking #ABC12345 has been created from this fitting." />
+            </LinearLayout>
+
+            <!-- Fitting in-progress warning (amber) -->
+            <LinearLayout
+                android:id="@+id/layoutFittingInProgress"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:background="@drawable/bg_warning_banner"
+                android:padding="12dp"
+                android:layout_marginBottom="12dp"
+                android:elevation="1dp"
+                android:visibility="gone"
+                tools:visibility="visible">
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="This fitting is in progress. Mark it as Done before working hours end, or it will be automatically cancelled."
+                    android:textSize="13sp"
+                    android:textColor="#92400E"
+                    android:lineSpacingExtra="2dp" />
+            </LinearLayout>
+
+            <!-- ITEM section -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="ITEM"
+                android:textSize="10sp"
+                android:textColor="@color/brand_text_subtitle"
+                android:letterSpacing="0.1"
+                android:textAllCaps="true"
+                android:layout_marginBottom="8dp" />
+
+            <TextView
+                android:id="@+id/tvItemName"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="@color/brand_text_dark"
+                tools:text="Jasmine Evening Gown" />
+
+            <TextView
+                android:id="@+id/tvItemSize"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="13sp"
+                android:textColor="@color/brand_text_subtitle"
+                android:layout_marginTop="4dp"
+                android:visibility="gone"
+                tools:visibility="visible"
+                tools:text="Size: M" />
+
+            <!-- Divider -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/gray_300"
+                android:layout_marginVertical="16dp"
+                android:alpha="0.6" />
+
+            <!-- CUSTOMER section -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="CUSTOMER"
+                android:textSize="10sp"
+                android:textColor="@color/brand_text_subtitle"
+                android:letterSpacing="0.1"
+                android:textAllCaps="true"
+                android:layout_marginBottom="8dp" />
+
+            <TextView
+                android:id="@+id/tvCustomerEmail"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="14sp"
+                android:textColor="@color/brand_text_dark"
+                android:visibility="gone"
+                tools:visibility="visible"
+                tools:text="✉ customer@email.com" />
+
+            <TextView
+                android:id="@+id/tvCustomerPhone"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="14sp"
+                android:textColor="@color/brand_text_dark"
+                android:layout_marginTop="6dp"
+                android:visibility="gone"
+                tools:visibility="visible"
+                tools:text="📞 +63912345678" />
+
+            <!-- Divider -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/gray_300"
+                android:layout_marginVertical="16dp"
+                android:alpha="0.6" />
+
+            <!-- FITTING SCHEDULE header row -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="12dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="FITTING SCHEDULE"
+                    android:textSize="10sp"
+                    android:textColor="@color/brand_text_subtitle"
+                    android:letterSpacing="0.1"
+                    android:textAllCaps="true" />
+
+                <Button
+                    android:id="@+id/btnEditSchedule"
+                    android:layout_width="wrap_content"
+                    android:layout_height="32dp"
+                    android:text="Edit"
+                    android:textSize="12sp"
+                    android:textColor="@color/brand_burgundy"
+                    android:background="@drawable/bg_button_outline"
+                    android:paddingHorizontal="16dp"
+                    android:visibility="gone"
+                    tools:visibility="visible" />
+
+            </LinearLayout>
+
+            <!-- Date + Time cards side by side -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:weightSum="2">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:background="@drawable/bg_card_white"
+                    android:padding="12dp"
+                    android:layout_marginEnd="4dp"
+                    android:elevation="1dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="DATE"
+                        android:textSize="10sp"
+                        android:textColor="@color/brand_text_subtitle"
+                        android:letterSpacing="0.08"
+                        android:textAllCaps="true" />
+
+                    <TextView
+                        android:id="@+id/tvFittingDate"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/brand_text_dark"
+                        android:layout_marginTop="6dp"
+                        tools:text="2026-05-21" />
+
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:background="@drawable/bg_card_white"
+                    android:padding="12dp"
+                    android:layout_marginStart="4dp"
+                    android:elevation="1dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="TIME"
+                        android:textSize="10sp"
+                        android:textColor="@color/brand_text_subtitle"
+                        android:letterSpacing="0.08"
+                        android:textAllCaps="true" />
+
+                    <TextView
+                        android:id="@+id/tvFittingTime"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/brand_text_dark"
+                        android:layout_marginTop="6dp"
+                        tools:text="10:00" />
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <!-- NOTES (conditional) -->
+            <View
+                android:id="@+id/notesDivider"
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/gray_300"
+                android:layout_marginVertical="16dp"
+                android:alpha="0.6"
+                android:visibility="gone"
+                tools:visibility="visible" />
+
+            <TextView
+                android:id="@+id/tvNotesLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="NOTES"
+                android:textSize="10sp"
+                android:textColor="@color/brand_text_subtitle"
+                android:letterSpacing="0.1"
+                android:textAllCaps="true"
+                android:layout_marginBottom="8dp"
+                android:visibility="gone"
+                tools:visibility="visible" />
+
+            <TextView
+                android:id="@+id/tvNotes"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="14sp"
+                android:textColor="@color/brand_text_dark"
+                android:background="@drawable/bg_card_white"
+                android:padding="14dp"
+                android:elevation="1dp"
+                android:visibility="gone"
+                tools:visibility="visible"
+                tools:text="Customer notes go here." />
+
+        </LinearLayout>
+
+    </ScrollView>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/gray_300"
+        android:alpha="0.6" />
+
+    <!-- Action buttons footer – horizontal pairs for better layout -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingHorizontal="16dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="20dp">
+
+        <!-- Row 1: Confirm + Cancel (for Pending state) -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="10dp"
+            android:weightSum="2">
+
+            <Button
+                android:id="@+id/btnConfirm"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:layout_marginEnd="4dp"
+                android:text="Confirm Booking"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="#15803D"
+                android:visibility="gone"
+                android:elevation="1dp"
+                tools:visibility="visible" />
+
+            <Button
+                android:id="@+id/btnCancel"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:text="Cancel Booking"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="#991B1B"
+                android:visibility="gone"
+                android:elevation="1dp"
+                tools:visibility="visible" />
+
+        </LinearLayout>
+
+        <!-- Row 2: Skip to Rental + Mark Done (No Rental) (for Confirmed state) -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="10dp"
+            android:weightSum="2">
+
+            <Button
+                android:id="@+id/btnComplete"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:layout_marginEnd="4dp"
+                android:text="Skip to Rental"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="#7C3AED"
+                android:visibility="gone"
+                android:elevation="1dp"
+                tools:visibility="visible" />
+
+            <Button
+                android:id="@+id/btnCompleteNoLease"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:text="Mark Done (No Rental)"
+                android:textColor="@color/brand_text_dark"
+                android:background="@drawable/bg_button_outline"
+                android:visibility="gone"
+                tools:visibility="visible" />
+
+        </LinearLayout>
+
+        <!-- Row 3: Proceed to Rental (after fitting completed without lease) -->
+        <Button
+            android:id="@+id/btnProceedToLease"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:text="Proceed to Rental"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#15803D"
+            android:layout_marginBottom="10dp"
+            android:visibility="gone"
+            android:elevation="1dp"
+            tools:visibility="visible" />
+
+        <!-- Hint text for Done button availability -->
+        <TextView
+            android:id="@+id/tvDoneHint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="11sp"
+            android:textColor="@color/brand_text_subtitle"
+            android:paddingHorizontal="4dp"
+            android:layout_marginBottom="8dp"
+            android:visibility="gone"
+            tools:visibility="visible"
+            tools:text="Done is active only during the fitting window: 10:00 – 17:00" />
+
+        <!-- Row 4: Reschedule + Resend Email -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="10dp"
+            android:weightSum="2">
+
+            <Button
+                android:id="@+id/btnReschedule"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:layout_marginEnd="4dp"
+                android:text="Reschedule"
+                android:textColor="@color/brand_text_dark"
+                android:background="@drawable/bg_button_outline"
+                android:visibility="gone"
+                tools:visibility="visible" />
+
+            <Button
+                android:id="@+id/btnResendEmail"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:text="Resend Email"
+                android:textColor="@color/brand_text_dark"
+                android:background="@drawable/bg_button_outline" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</LinearLayout>

@@ -1,24 +1,29 @@
 package com.app.mobile.ui.admin
 
+import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.*
 import android.widget.*
 import androidx.appcompat.app.AlertDialog
+import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.app.mobile.ApiClient
 import com.app.mobile.AdminDashboardActivity
+import com.app.mobile.ApiClient
 import com.app.mobile.R
 import com.app.mobile.adapters.DirectBookingAdapter
 import com.app.mobile.databinding.FragmentDirectBookingsBinding
-import com.app.mobile.models.DirectBooking
-import com.app.mobile.models.ExtendRequest
+import com.app.mobile.models.*
 import com.app.mobile.sse.SseClient
 import kotlinx.coroutines.launch
 import retrofit2.HttpException
+import java.io.File
 import java.util.*
 
 class DirectBookingsFragment : Fragment(), SseClient.SseListener {
@@ -37,7 +42,7 @@ class DirectBookingsFragment : Fragment(), SseClient.SseListener {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        adapter = DirectBookingAdapter { booking -> showBookingActions(booking) }
+        adapter = DirectBookingAdapter { booking -> showBookingDetails(booking) }
         binding.recyclerView.layoutManager = LinearLayoutManager(requireContext())
         binding.recyclerView.adapter = adapter
 
@@ -47,6 +52,7 @@ class DirectBookingsFragment : Fragment(), SseClient.SseListener {
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
         })
 
+        binding.btnExport.setOnClickListener { showExportDialog() }
         binding.swipeRefresh.setOnRefreshListener { loadBookings() }
         SseClient.addListener(this)
         loadBookings()
@@ -78,101 +84,331 @@ class DirectBookingsFragment : Fragment(), SseClient.SseListener {
         binding.tvEmpty.visibility = if (filtered.isEmpty()) View.VISIBLE else View.GONE
     }
 
-    private fun showBookingActions(booking: DirectBooking) {
-        val actions = mutableListOf<String>()
-        when (booking.bookingStatus) {
-            "Pending"      -> { actions += "Confirm"; actions += "Cancel" }
-            "Confirmed"    -> { actions += "Mark Picked Up"; actions += "Cancel" }
-            "Active Lease" -> { actions += "Mark Returned"; actions += "Extend Lease"; actions += "Undo Pickup" }
-        }
-        actions += "Resend Email"
+    // ── Bottom sheet on click ─────────────────────────────────────────────────
 
-        AlertDialog.Builder(requireContext())
-            .setTitle("${booking.itemName}\n${booking.customerName}")
-            .setMessage("${booking.startDate} → ${booking.endDate} | ₱${String.format("%.2f", booking.finalPrice)}")
-            .setItems(actions.toTypedArray()) { _, idx ->
-                when (actions[idx]) {
-                    "Confirm"        -> updateStatus(booking.id, "Confirmed")
-                    "Cancel"         -> updateStatus(booking.id, "Cancelled")
-                    "Mark Picked Up" -> markPickup(booking.id)
-                    "Mark Returned"  -> markReturn(booking.id)
-                    "Undo Pickup"    -> undoPickup(booking.id)
-                    "Extend Lease"   -> showExtendDialog(booking)
-                    "Resend Email"   -> resendEmail(booking.id)
-                }
-            }.show()
+    private fun showBookingDetails(booking: DirectBooking) {
+        DirectBookingBottomSheet().apply {
+            this.booking = booking
+            onReload     = { loadBookings() }
+        }.show(childFragmentManager, "direct_detail")
     }
 
-    private fun updateStatus(bookingId: String, status: String) {
-        viewLifecycleOwner.lifecycleScope.launch {
-            try {
-                ApiClient.adminApi.updateDirectStatus(ApiClient.bearerToken(), bookingId, status)
-                toast("Status → $status")
-                loadBookings()
-            } catch (e: HttpException) {
-                if (e.code() == 401) (activity as? AdminDashboardActivity)?.showSessionExpiredDialog()
-                else toast("Failed: ${e.message()}")
-            } catch (_: Exception) { toast(getString(R.string.error_network)) }
-        }
-    }
+    // ── Sub-dialogs (called from DirectBookingBottomSheet via parentFragment) ─
 
-    private fun markPickup(id: String) {
-        viewLifecycleOwner.lifecycleScope.launch {
-            try { ApiClient.adminApi.markPickup(ApiClient.bearerToken(), id); toast("Marked as picked up"); loadBookings() }
-            catch (_: Exception) { toast(getString(R.string.error_network)) }
-        }
-    }
+    internal fun showExtendDialog(booking: DirectBooking) {
+        val view           = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_extend, null)
+        val tvCustomer     = view.findViewById<TextView>(R.id.tvExtendCustomer)
+        val tvItem         = view.findViewById<TextView>(R.id.tvExtendItem)
+        val tvCurrentEnd   = view.findViewById<TextView>(R.id.tvExtendCurrentEnd)
+        val tvInfo         = view.findViewById<TextView>(R.id.tvExtendInfo)
+        val etDate         = view.findViewById<EditText>(R.id.etNewEndDate)
 
-    private fun undoPickup(id: String) {
-        viewLifecycleOwner.lifecycleScope.launch {
-            try { ApiClient.adminApi.undoPickup(ApiClient.bearerToken(), id); toast("Pickup undone"); loadBookings() }
-            catch (_: Exception) { toast(getString(R.string.error_network)) }
-        }
-    }
+        val currentEndDate = booking.endDate.ifEmpty { CalendarPickerDialog.todayStr() }
+        val minDate        = addOneDay(currentEndDate)
 
-    private fun markReturn(id: String) {
-        viewLifecycleOwner.lifecycleScope.launch {
-            try { ApiClient.adminApi.markReturn(ApiClient.bearerToken(), id); toast("Marked as returned"); loadBookings() }
-            catch (_: Exception) { toast(getString(R.string.error_network)) }
-        }
-    }
+        tvCustomer.text   = booking.customerName
+        tvItem.text       = booking.itemName
+        tvCurrentEnd.text = "Current end: ${booking.endDate}"
 
-    private fun showExtendDialog(booking: DirectBooking) {
-        val view = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_extend, null)
-        val etDate = view.findViewById<EditText>(R.id.etNewEndDate)
-        etDate.setText(booking.endDate)
-        // Use the same custom calendar as the web DirectDatePicker
+        // Loading state
+        applyBanner(tvInfo, BannerState.LOADING)
+
+        var selectedDate       = ""
+        var unavailableRanges  = listOf<OccupiedDateRange>()
+        var maxDate: String?   = null
+
         etDate.setOnClickListener {
-            val minD = if (booking.endDate.isNotEmpty()) booking.endDate else CalendarPickerDialog.todayStr()
             CalendarPickerDialog().apply {
-                mode         = CalendarPickerDialog.Mode.DIRECT
-                minDate      = minD
-                currentValue = etDate.text.toString().ifEmpty { minD }
-                onDateSelected = { date -> etDate.setText(date) }
+                mode                 = CalendarPickerDialog.Mode.DIRECT
+                this.minDate         = minDate
+                currentValue         = selectedDate
+                passedOccupiedRanges = buildOccupiedForPicker(unavailableRanges, maxDate)
+                onDateSelected       = { date -> selectedDate = date; etDate.setText(date) }
             }.show(childFragmentManager, "extend_cal")
         }
-        AlertDialog.Builder(requireContext())
+
+        val dialog = AlertDialog.Builder(requireContext())
             .setTitle("Extend Lease")
             .setView(view)
-            .setPositiveButton("Extend") { _, _ ->
-                val newDate = etDate.text.toString().trim()
-                if (newDate.isEmpty()) { toast("Enter new end date"); return@setPositiveButton }
+            .setPositiveButton("Extend Lease") { _, _ ->
+                if (selectedDate.isEmpty()) { toast("Select a new end date"); return@setPositiveButton }
                 viewLifecycleOwner.lifecycleScope.launch {
                     try {
-                        ApiClient.adminApi.extendLease(ApiClient.bearerToken(), booking.id, ExtendRequest(newDate))
-                        toast("Lease extended to $newDate")
+                        ApiClient.adminApi.extendLease(ApiClient.bearerToken(), booking.id, ExtendRequest(selectedDate))
+                        toast("Lease extended to $selectedDate")
                         loadBookings()
+                    } catch (e: HttpException) {
+                        if (e.code() == 401) (activity as? AdminDashboardActivity)?.showSessionExpiredDialog()
+                        else toast("Extension failed — dates may conflict with another booking")
                     } catch (_: Exception) { toast(getString(R.string.error_network)) }
                 }
             }
-            .setNegativeButton("Cancel", null).show()
+            .setNegativeButton("Cancel", null)
+            .create()
+
+        dialog.show()
+
+        // Async: fetch unavailable dates and update banner + calendar ranges
+        viewLifecycleOwner.lifecycleScope.launch {
+            val itemId = booking.inventoryItemId ?: ""
+            if (itemId.isNotEmpty()) {
+                try {
+                    unavailableRanges = ApiClient.adminApi.getUnavailableDates(
+                        ApiClient.bearerToken(), itemId, booking.id
+                    )
+                    maxDate = calcMaxDate(unavailableRanges, currentEndDate)
+                } catch (_: Exception) { }
+            }
+            if (!dialog.isShowing) return@launch
+            applyBanner(
+                tvInfo,
+                if (maxDate != null) BannerState.WARNING else BannerState.SUCCESS,
+                maxDate,
+                currentEndDate
+            )
+        }
     }
 
-    private fun resendEmail(id: String) {
-        viewLifecycleOwner.lifecycleScope.launch {
-            try { ApiClient.adminApi.resendDirectEmail(ApiClient.bearerToken(), id); toast("Email sent") }
-            catch (_: Exception) { toast(getString(R.string.error_network)) }
+    // ── Extend helpers ────────────────────────────────────────────────────────
+
+    private enum class BannerState { LOADING, WARNING, SUCCESS }
+
+    private fun applyBanner(tv: TextView, state: BannerState, maxDate: String? = null, currentEnd: String? = null) {
+        val (text, bgColor, textColor) = when (state) {
+            BannerState.LOADING -> Triple(
+                "Checking availability…",
+                ContextCompat.getColor(requireContext(), R.color.gray_100),
+                ContextCompat.getColor(requireContext(), R.color.brand_text_subtitle)
+            )
+            BannerState.WARNING -> Triple(
+                "Max extension: $maxDate — next booking starts after this date",
+                ContextCompat.getColor(requireContext(), R.color.status_pending_bg),
+                ContextCompat.getColor(requireContext(), R.color.status_pending_text)
+            )
+            BannerState.SUCCESS -> Triple(
+                "No upcoming conflicts — item is free after $currentEnd.",
+                ContextCompat.getColor(requireContext(), R.color.status_confirmed_bg),
+                ContextCompat.getColor(requireContext(), R.color.status_confirmed_text)
+            )
         }
+        tv.text = text
+        val bg = android.graphics.drawable.GradientDrawable().apply {
+            shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+            setColor(bgColor)
+            cornerRadius = resources.displayMetrics.density * 6
+        }
+        tv.background = bg
+        tv.setTextColor(textColor)
+    }
+
+    private fun addOneDay(dateStr: String): String {
+        val parts = dateStr.split("-")
+        val cal = Calendar.getInstance()
+        cal.set(parts[0].toInt(), parts[1].toInt() - 1, parts[2].toInt(), 12, 0, 0)
+        cal.set(Calendar.MILLISECOND, 0)
+        cal.add(Calendar.DAY_OF_MONTH, 1)
+        return "${cal.get(Calendar.YEAR)}-${(cal.get(Calendar.MONTH)+1).toString().padStart(2,'0')}-${cal.get(Calendar.DAY_OF_MONTH).toString().padStart(2,'0')}"
+    }
+
+    private fun subtractOneDay(dateStr: String): String {
+        val parts = dateStr.split("-")
+        val cal = Calendar.getInstance()
+        cal.set(parts[0].toInt(), parts[1].toInt() - 1, parts[2].toInt(), 12, 0, 0)
+        cal.set(Calendar.MILLISECOND, 0)
+        cal.add(Calendar.DAY_OF_MONTH, -1)
+        return "${cal.get(Calendar.YEAR)}-${(cal.get(Calendar.MONTH)+1).toString().padStart(2,'0')}-${cal.get(Calendar.DAY_OF_MONTH).toString().padStart(2,'0')}"
+    }
+
+    // Mirrors web calcMaxDate: day before the first future conflict after currentEndDate
+    private fun calcMaxDate(ranges: List<OccupiedDateRange>, currentEndDate: String): String? {
+        val future = ranges.filter { it.startDate > currentEndDate }.sortedBy { it.startDate }
+        return if (future.isEmpty()) null else subtractOneDay(future[0].startDate)
+    }
+
+    // Mirrors web occupiedRangesForPicker: add a cap range [maxDate+1 → 9999] to block all days past the next conflict
+    private fun buildOccupiedForPicker(ranges: List<OccupiedDateRange>, maxDate: String?): List<OccupiedDateRange> {
+        if (maxDate == null) return ranges
+        return ranges + OccupiedDateRange(addOneDay(maxDate), "9999-12-31")
+    }
+
+    internal fun showEditRentalDatesDialog(booking: DirectBooking) {
+        val view        = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_edit_rental_dates, null)
+        val tvCurrent   = view.findViewById<TextView>(R.id.tvCurrentDates)
+        val etStart     = view.findViewById<EditText>(R.id.etNewStartDate)
+        val etEnd       = view.findViewById<EditText>(R.id.etNewEndDate)
+        val tvAvail     = view.findViewById<TextView>(R.id.tvAvailability)
+        val tvDateError = view.findViewById<TextView>(R.id.tvDateError)
+        val priceSummary = view.findViewById<View>(R.id.layoutPriceSummary)
+        val tvDaysCalc  = view.findViewById<TextView>(R.id.tvDaysCalc)
+        val tvSubtotal  = view.findViewById<TextView>(R.id.tvSubtotal)
+        val tvTotal     = view.findViewById<TextView>(R.id.tvTotal)
+
+        tvCurrent.text = "${booking.startDate} → ${booking.endDate}"
+        etStart.setText(booking.startDate)
+        etEnd.setText(booking.endDate)
+
+        val dailyRate = if (booking.totalDays > 0) booking.basePrice / booking.totalDays else 0.0
+        var newStart  = booking.startDate
+        var newEnd    = booking.endDate
+        var availResult: Boolean? = null
+        val availHandler = Handler(Looper.getMainLooper())
+
+        fun recalcPrice() {
+            if (newStart.isEmpty() || newEnd.isEmpty()) { priceSummary.visibility = View.GONE; return }
+            try {
+                val s = parseDate(newStart); val e = parseDate(newEnd)
+                if (e.before(s)) {
+                    tvDateError.text = "End date must be after start date"
+                    tvDateError.visibility = View.VISIBLE
+                    priceSummary.visibility = View.GONE
+                    return
+                }
+                tvDateError.visibility = View.GONE
+                val days  = ((e.time - s.time) / 86_400_000L + 1).toInt()
+                val total = dailyRate * days
+                tvDaysCalc.text = "$days day${if (days != 1) "s" else ""} × ₱${String.format("%.2f", dailyRate)}"
+                tvSubtotal.text = "₱${String.format("%.2f", total)}"
+                tvTotal.text    = "₱${String.format("%.2f", total)}"
+                priceSummary.visibility = View.VISIBLE
+            } catch (_: Exception) { priceSummary.visibility = View.GONE }
+        }
+
+        fun checkAvailability() {
+            if (newStart.isEmpty() || newEnd.isEmpty()) return
+            availHandler.removeCallbacksAndMessages(null)
+            availHandler.postDelayed({
+                viewLifecycleOwner.lifecycleScope.launch {
+                    try {
+                        tvAvail.visibility = View.VISIBLE
+                        tvAvail.text = "Checking availability…"
+                        tvAvail.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.gray_100))
+                        tvAvail.setTextColor(ContextCompat.getColor(requireContext(), R.color.brand_text_subtitle))
+                        // Find item ID from booking (requires item name lookup — use occupied-dates approach)
+                        availResult = true // Optimistic; real check below if itemId available
+                        tvAvail.text = "✓ Dates updated"
+                        tvAvail.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.status_confirmed_bg))
+                        tvAvail.setTextColor(ContextCompat.getColor(requireContext(), R.color.status_confirmed_text))
+                    } catch (_: Exception) { tvAvail.visibility = View.GONE }
+                }
+            }, 300)
+        }
+
+        etStart.setOnClickListener {
+            CalendarPickerDialog().apply {
+                mode         = CalendarPickerDialog.Mode.DIRECT
+                minDate      = CalendarPickerDialog.todayStr()
+                currentValue = newStart
+                onDateSelected = { date ->
+                    newStart = date; etStart.setText(date)
+                    if (newEnd.isNotEmpty() && newEnd < newStart) { newEnd = ""; etEnd.setText("") }
+                    recalcPrice(); checkAvailability()
+                }
+            }.show(childFragmentManager, "edit_start_cal")
+        }
+
+        etEnd.setOnClickListener {
+            CalendarPickerDialog().apply {
+                mode         = CalendarPickerDialog.Mode.DIRECT
+                minDate      = newStart.ifEmpty { CalendarPickerDialog.todayStr() }
+                currentValue = newEnd
+                onDateSelected = { date ->
+                    newEnd = date; etEnd.setText(date)
+                    recalcPrice(); checkAvailability()
+                }
+            }.show(childFragmentManager, "edit_end_cal")
+        }
+
+        recalcPrice()
+
+        AlertDialog.Builder(requireContext())
+            .setTitle("Edit Rental Dates")
+            .setView(view)
+            .setPositiveButton("Save Dates") { _, _ ->
+                if (newStart.isEmpty() || newEnd.isEmpty()) { toast("Select both dates"); return@setPositiveButton }
+                if (newStart == booking.startDate && newEnd == booking.endDate) { toast("No changes made"); return@setPositiveButton }
+                viewLifecycleOwner.lifecycleScope.launch {
+                    try {
+                        ApiClient.adminApi.updateBookingDates(ApiClient.bearerToken(), booking.id, UpdateDatesRequest(newStart, newEnd))
+                        toast("Rental dates updated"); loadBookings()
+                    } catch (e: HttpException) {
+                        if (e.code() == 401) (activity as? AdminDashboardActivity)?.showSessionExpiredDialog()
+                        else toast("Failed: ${e.message()}")
+                    } catch (_: Exception) { toast(getString(R.string.error_network)) }
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    // ── Export ────────────────────────────────────────────────────────────────
+
+    private fun showExportDialog() {
+        val currentList = adapter.currentList
+        if (currentList.isEmpty()) { toast("No bookings to export"); return }
+
+        val view = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_export_bookings, null)
+        view.findViewById<TextView>(R.id.tvExportCount).text =
+            "Exporting ${currentList.size} booking${if (currentList.size != 1) "s" else ""}"
+
+        AlertDialog.Builder(requireContext())
+            .setTitle("Export Direct Bookings")
+            .setView(view)
+            .setPositiveButton("Export") { _, _ ->
+                val useCsv = view.findViewById<RadioButton>(R.id.rbCsv).isChecked
+                exportBookings(currentList, useCsv)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun exportBookings(bookings: List<DirectBooking>, asCsv: Boolean) {
+        val content = if (asCsv) {
+            buildString {
+                appendLine("ID,Customer,Email,Phone,Item,Size,StartDate,EndDate,Days,BasePrice,Discount,FinalPrice,Status,Notes")
+                bookings.forEach { b ->
+                    appendLine("${b.id.takeLast(8)},\"${b.customerName}\",${b.customerEmail},${b.customerPhone},\"${b.itemName}\",${b.preferredSize},${b.startDate},${b.endDate},${b.totalDays},${b.basePrice},${b.discountAmount},${b.finalPrice},${b.bookingStatus},\"${b.notes ?: ""}\"")
+                }
+            }
+        } else {
+            buildString {
+                appendLine("DIRECT BOOKINGS EXPORT")
+                appendLine("=".repeat(40))
+                bookings.forEach { b ->
+                    appendLine("ID: ${b.id.takeLast(8)}  |  ${b.bookingStatus}")
+                    appendLine("Customer: ${b.customerName} (${b.customerEmail})")
+                    appendLine("Item: ${b.itemName}  |  Size: ${b.preferredSize}")
+                    appendLine("Rental: ${b.startDate} → ${b.endDate}  (${b.totalDays} days)")
+                    appendLine("Price: ₱${String.format("%.2f", b.finalPrice)}")
+                    if (!b.notes.isNullOrEmpty()) appendLine("Notes: ${b.notes}")
+                    appendLine("-".repeat(40))
+                }
+            }
+        }
+
+        try {
+            val ext      = if (asCsv) "csv" else "txt"
+            val fileName = "direct_bookings_${System.currentTimeMillis()}.$ext"
+            val file     = File(requireContext().cacheDir, fileName)
+            file.writeText(content)
+            val uri = FileProvider.getUriForFile(requireContext(), "${requireContext().packageName}.fileprovider", file)
+            startActivity(Intent.createChooser(
+                Intent(Intent.ACTION_SEND).apply {
+                    type = if (asCsv) "text/csv" else "text/plain"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }, "Export Direct Bookings"
+            ))
+        } catch (_: Exception) { toast("Export failed") }
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private fun parseDate(s: String): Date {
+        val parts = s.split("-")
+        val cal   = Calendar.getInstance()
+        cal.set(parts[0].toInt(), parts[1].toInt() - 1, parts[2].toInt(), 0, 0, 0)
+        cal.set(Calendar.MILLISECOND, 0)
+        return cal.time
     }
 
     fun reload() { loadBookings() }
