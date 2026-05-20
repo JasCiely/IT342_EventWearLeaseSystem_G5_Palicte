@@ -49,10 +49,15 @@
     </LinearLayout>
 
     <!-- Tab Indicator -->
-    <View android:id="@+id/cbTabIndicatorLeft"
-        android:layout_width="0dp" android:layout_height="3dp"
-        android:background="@color/brand_burgundy"
-        android:layout_marginBottom="1dp" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="3dp"
+        android:orientation="horizontal">
+        <View android:id="@+id/cbTabIndicatorLeft"
+            android:layout_width="0dp" android:layout_height="match_parent"
+            android:layout_weight="1" android:background="@color/brand_burgundy" />
+        <View android:id="@+id/cbTabIndicatorRight"
+            android:layout_width="0dp" android:layout_height="match_parent"
+            android:layout_weight="1" android:background="@color/brand_surface" />
+    </LinearLayout>
 
     <!-- Scrollable body -->
     <ScrollView android:layout_width="match_parent" android:layout_height="0dp"
@@ -176,9 +181,12 @@
                 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
                     android:text="Time Slot *" android:textSize="13sp"
                     android:textColor="#718096" android:layout_marginBottom="4dp" />
-                <Spinner android:id="@+id/cbTimeSpinner"
+                <EditText android:id="@+id/etFittingTime"
                     android:layout_width="match_parent" android:layout_height="52dp"
                     android:background="@drawable/bg_input" android:paddingHorizontal="12dp"
+                    android:hint="Select a date first"
+                    android:inputType="none"
+                    android:focusable="false" android:cursorVisible="false"
                     android:layout_marginBottom="12dp" />
             </LinearLayout>
 

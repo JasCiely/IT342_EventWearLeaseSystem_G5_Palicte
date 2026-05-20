@@ -199,7 +199,7 @@ interface AdminApiService {
     ): DirectBooking
 
     // ── Availability ──────────────────────────────────────────────────────
-    @GET("api/bookings/direct/occupied-dates")
+    @GET("api/direct-bookings/unavailable-dates")
     suspend fun getOccupiedDates(
         @Header("Authorization") token: String,
         @Query("itemId") itemId: String

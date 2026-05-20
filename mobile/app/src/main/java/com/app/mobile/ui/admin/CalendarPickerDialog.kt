@@ -270,7 +270,10 @@ class CalendarPickerDialog : DialogFragment() {
                 showDot = isFull
             }
             Mode.DIRECT -> {
-                val blocked = !isPast && !isNonWork && isDateBlocked(ds)
+                // Non-working-day check intentionally omitted: a date that falls
+                // inside an existing booking range must show red regardless of
+                // shop schedule (direct leases span all calendar days).
+                val blocked = !isPast && isDateBlocked(ds)
                 isFull = blocked
                 showDot = blocked
             }
@@ -305,6 +308,9 @@ class CalendarPickerDialog : DialogFragment() {
             }
 
         // ── Apply visual state ────────────────────────────────────────────────
+        // Order matters: isFull is checked before isNonWork so that a blocked
+        // date inside an occupied direct-lease range shows red even when the
+        // shop is closed that day (non-working).
         when {
             isSelected -> {
                 cell.background = roundedBg(
@@ -316,14 +322,14 @@ class CalendarPickerDialog : DialogFragment() {
             isPast -> {
                 tvDay.setTextColor(Color.parseColor("#DDDDDD"))
             }
+            isFull -> {
+                cell.background = roundedBg(Color.parseColor("#FFF0F0"))
+                tvDay.setTextColor(Color.parseColor("#EF4444"))
+            }
             isNonWork -> {
                 cell.background = roundedBg(Color.parseColor("#F7F4F3"))
                 tvDay.setTextColor(Color.parseColor("#CCCCCC"))
                 tvDay.paintFlags = tvDay.paintFlags or Paint.STRIKE_THRU_TEXT_FLAG
-            }
-            isFull -> {
-                cell.background = roundedBg(Color.parseColor("#FFF0F0"))
-                tvDay.setTextColor(Color.parseColor("#EF4444"))
             }
             isToday -> {
                 // today border ring + burgundy text (web: inset 0 0 0 1.5px #6b2d39)

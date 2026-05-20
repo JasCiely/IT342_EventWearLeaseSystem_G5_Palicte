@@ -46,6 +46,7 @@ class CreateBookingDialogFragment : DialogFragment() {
     private var fittingDate      = ""
     private var fittingTime      = ""
     private var bookedSlots      = listOf<String>()
+    private var isLoadingSlots   = false
     // Time slots built dynamically from BookingSettings (default matches web)
     private var timeSlots        = CalendarPickerDialog.buildTimeSlots(null)
 
@@ -129,10 +130,24 @@ class CreateBookingDialogFragment : DialogFragment() {
                     fittingDate = date
                     binding.etFittingDate.setText(date)
                     fittingTime = ""
-                    refreshTimeSpinner()
+                    bookedSlots = emptyList()
+                    updateTimeField()
                     if (selectedItem != null) loadBookedSlots()
                 }
             }.show(childFragmentManager, "fitting_cal")
+        }
+
+        binding.etFittingTime.setOnClickListener {
+            if (fittingDate.isEmpty()) return@setOnClickListener
+            TimeSlotPickerDialog().apply {
+                timeSlots    = this@CreateBookingDialogFragment.timeSlots
+                bookedSlots  = this@CreateBookingDialogFragment.bookedSlots
+                currentValue = fittingTime
+                onSlotSelected = { slot ->
+                    fittingTime = slot
+                    updateTimeField()
+                }
+            }.show(childFragmentManager, "time_slot_picker")
         }
 
         binding.etStartDate.setOnClickListener {
@@ -184,18 +199,14 @@ class CreateBookingDialogFragment : DialogFragment() {
         val burgundy = ContextCompat.getColor(requireContext(), R.color.brand_burgundy)
         val subtitle = ContextCompat.getColor(requireContext(), R.color.brand_text_subtitle)
 
+        val surface = ContextCompat.getColor(requireContext(), R.color.brand_surface)
         if (tab == "fitting") {
             binding.tabFitting.setTextColor(burgundy)
             binding.tabFitting.setTypeface(null, android.graphics.Typeface.BOLD)
             binding.tabDirect.setTextColor(subtitle)
             binding.tabDirect.setTypeface(null, android.graphics.Typeface.NORMAL)
-            binding.cbTabIndicatorLeft.layoutParams =
-                (binding.cbTabIndicatorLeft.layoutParams as LinearLayout.LayoutParams).also {
-                    it.weight = 1f
-                    (binding.cbTabIndicatorLeft.parent as? LinearLayout)?.also { row ->
-                        // set left half highlight
-                    }
-                }
+            binding.cbTabIndicatorLeft.setBackgroundColor(burgundy)
+            binding.cbTabIndicatorRight.setBackgroundColor(surface)
             binding.sectionFitting.visibility = View.VISIBLE
             binding.sectionDirect.visibility  = View.GONE
             binding.cbBtnSubmit.text = "Create Fitting Booking"
@@ -204,9 +215,12 @@ class CreateBookingDialogFragment : DialogFragment() {
             binding.tabFitting.setTypeface(null, android.graphics.Typeface.NORMAL)
             binding.tabDirect.setTextColor(burgundy)
             binding.tabDirect.setTypeface(null, android.graphics.Typeface.BOLD)
+            binding.cbTabIndicatorLeft.setBackgroundColor(surface)
+            binding.cbTabIndicatorRight.setBackgroundColor(burgundy)
             binding.sectionFitting.visibility = View.GONE
             binding.sectionDirect.visibility  = View.VISIBLE
             binding.cbBtnSubmit.text = "Create Rental Booking"
+            if (selectedItem != null && occupiedRanges.isEmpty()) loadOccupiedRanges()
         }
         clearError()
     }
@@ -218,8 +232,7 @@ class CreateBookingDialogFragment : DialogFragment() {
             try {
                 bookingSettings = ApiClient.adminApi.getBookingSettings(ApiClient.bearerToken())
                 timeSlots = CalendarPickerDialog.buildTimeSlots(bookingSettings)
-                // Refresh spinner if fitting date was already picked
-                if (fittingDate.isNotEmpty()) refreshTimeSpinner()
+                updateTimeField()
             } catch (_: Exception) {}
             try {
                 inventorySettings = ApiClient.adminApi.getInventorySettings(ApiClient.bearerToken())
@@ -287,18 +300,17 @@ class CreateBookingDialogFragment : DialogFragment() {
         }
 
         // Reset dates and availability when item changes
-        fittingDate = ""; fittingTime = ""
+        fittingDate = ""; fittingTime = ""; bookedSlots = emptyList()
         binding.etFittingDate.setText("")
         startDate = ""; endDate = ""
         binding.etStartDate.setText(""); binding.etEndDate.setText("")
         binding.cbAvailability.visibility = View.GONE
         binding.cbPriceSummary.visibility = View.GONE
         occupiedRanges = listOf()
+        updateTimeField()
 
-        if (currentTab == "direct") {
-            triggerAvailCheck()
-            loadOccupiedRanges()
-        }
+        loadOccupiedRanges()
+        if (currentTab == "direct") triggerAvailCheck()
     }
 
     // ── Occupied ranges (Direct mode) ─────────────────────────────────────────
@@ -372,28 +384,47 @@ class CreateBookingDialogFragment : DialogFragment() {
 
     // ── Fitting slots ─────────────────────────────────────────────────────────
 
-    private fun loadBookedSlots() {
-        val itemId = selectedItem?.id ?: return
-        val date   = fittingDate.ifEmpty { return }
-        viewLifecycleOwner.lifecycleScope.launch {
-            try {
-                bookedSlots = ApiClient.adminApi.getBookedFittingSlots(itemId, date)
-                refreshTimeSpinner()
-            } catch (_: Exception) { bookedSlots = emptyList(); refreshTimeSpinner() }
+    /** Updates the time-slot trigger field text/hint to reflect current state. */
+    private fun updateTimeField() {
+        val b = _binding ?: return
+        when {
+            fittingDate.isEmpty() -> {
+                b.etFittingTime.setText("")
+                b.etFittingTime.hint = "Select a date first"
+                b.etFittingTime.isEnabled = false
+            }
+            isLoadingSlots -> {
+                b.etFittingTime.setText("")
+                b.etFittingTime.hint = "Loading slots…"
+                b.etFittingTime.isEnabled = false
+            }
+            fittingTime.isNotEmpty() -> {
+                b.etFittingTime.setText(CalendarPickerDialog.slotLabel(fittingTime))
+                b.etFittingTime.isEnabled = true
+            }
+            else -> {
+                b.etFittingTime.setText("")
+                b.etFittingTime.hint = "Tap to choose a time slot"
+                b.etFittingTime.isEnabled = true
+            }
         }
     }
 
-    private fun refreshTimeSpinner() {
-        val available = timeSlots.filter { it !in bookedSlots }
-        val labels    = listOf("Select time slot…") + available.map { CalendarPickerDialog.slotLabel(it) }
-        val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, labels)
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        binding.cbTimeSpinner.adapter = adapter
-        binding.cbTimeSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(p: AdapterView<*>?, v: View?, pos: Int, id: Long) {
-                fittingTime = if (pos == 0) "" else available[pos - 1]
+    private fun loadBookedSlots() {
+        val itemId = selectedItem?.id ?: return
+        val date   = fittingDate.ifEmpty { return }
+        isLoadingSlots = true
+        updateTimeField()
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                bookedSlots = ApiClient.adminApi.getBookedFittingSlots(itemId, date)
+            } catch (_: Exception) {
+                bookedSlots = emptyList()
             }
-            override fun onNothingSelected(p: AdapterView<*>?) {}
+            isLoadingSlots = false
+            // Clear selected time if it became booked
+            if (fittingTime.isNotEmpty() && fittingTime in bookedSlots) fittingTime = ""
+            updateTimeField()
         }
     }
 

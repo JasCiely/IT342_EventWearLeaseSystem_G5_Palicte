@@ -155,6 +155,12 @@ class FittingBookingsFragment : Fragment(), SseClient.SseListener {
         var returnDate = ""
         var availResult: Boolean? = null
         val availHandler = Handler(Looper.getMainLooper())
+        // Occupied ranges fetched before pickers are enabled
+        var ftlOccupiedRanges = listOf<OccupiedDateRange>()
+
+        // Disable date pickers until occupied ranges are loaded
+        etPickup.isEnabled = false
+        etReturn.isEnabled = false
 
         fun recalcPrice() {
             if (pickupDate.isEmpty() || returnDate.isEmpty()) { priceSummary.visibility = View.GONE; return }
@@ -197,6 +203,7 @@ class FittingBookingsFragment : Fragment(), SseClient.SseListener {
             CalendarPickerDialog().apply {
                 mode = CalendarPickerDialog.Mode.DIRECT; this.itemId = itemId
                 minDate = CalendarPickerDialog.todayStr(); currentValue = pickupDate
+                passedOccupiedRanges = ftlOccupiedRanges
                 onDateSelected = { date ->
                     pickupDate = date; etPickup.setText(date)
                     if (returnDate.isNotEmpty() && returnDate < pickupDate) { returnDate = ""; etReturn.setText("") }
@@ -209,11 +216,12 @@ class FittingBookingsFragment : Fragment(), SseClient.SseListener {
             CalendarPickerDialog().apply {
                 mode = CalendarPickerDialog.Mode.DIRECT; this.itemId = itemId
                 minDate = pickupDate.ifEmpty { CalendarPickerDialog.todayStr() }; currentValue = returnDate
+                passedOccupiedRanges = ftlOccupiedRanges
                 onDateSelected = { date -> returnDate = date; etReturn.setText(date); recalcPrice(); checkAvailability() }
             }.show(childFragmentManager, "ftl_return_cal")
         }
 
-        AlertDialog.Builder(requireContext())
+        val ftlDialog = AlertDialog.Builder(requireContext())
             .setTitle("Proceed to Rental")
             .setView(view)
             .setPositiveButton("Confirm Rental") { _, _ ->
@@ -240,7 +248,22 @@ class FittingBookingsFragment : Fragment(), SseClient.SseListener {
                 }
             }
             .setNegativeButton("Cancel", null)
-            .show()
+            .create()
+        ftlDialog.show()
+        // Fetch occupied ranges async; enable pickers once ready
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                val ranges = ApiClient.adminApi.getOccupiedDates(ApiClient.bearerToken(), itemId)
+                if (!ftlDialog.isShowing) return@launch
+                ftlOccupiedRanges = ranges
+                etPickup.isEnabled = true
+                etReturn.isEnabled = true
+            } catch (_: Exception) {
+                if (!ftlDialog.isShowing) return@launch
+                etPickup.isEnabled = true
+                etReturn.isEnabled = true
+            }
+        }
     }
 
     internal fun showRescheduleDialog(booking: FittingBooking) {
@@ -252,6 +275,38 @@ class FittingBookingsFragment : Fragment(), SseClient.SseListener {
 
         val itemId = allItems.firstOrNull { it.name.equals(booking.itemName, ignoreCase = true) }?.id ?: ""
 
+        var rscTimeSlots  = CalendarPickerDialog.buildTimeSlots(null)
+        var rscBooked     = listOf<String>()
+        var isLoadingSlots = false
+
+        fun updateTimeHint() {
+            etTime.isEnabled = when {
+                isLoadingSlots -> false.also { etTime.hint = "Loading slots…" }
+                else           -> true.also  { if (etTime.text.isNullOrEmpty()) etTime.hint = "Tap to choose a time slot" }
+            }
+        }
+
+        fun loadSlotsForDate(date: String) {
+            if (date.isEmpty() || itemId.isEmpty()) return
+            isLoadingSlots = true; updateTimeHint()
+            viewLifecycleOwner.lifecycleScope.launch {
+                rscBooked = try { ApiClient.adminApi.getBookedFittingSlots(itemId, date) } catch (_: Exception) { emptyList() }
+                isLoadingSlots = false
+                // Clear chosen time if it is now booked by someone else
+                if (etTime.text.toString() in rscBooked) etTime.setText("")
+                updateTimeHint()
+            }
+        }
+
+        // Load settings to build time slots list
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                val settings  = ApiClient.adminApi.getBookingSettings(ApiClient.bearerToken())
+                rscTimeSlots  = CalendarPickerDialog.buildTimeSlots(settings)
+            } catch (_: Exception) {}
+            loadSlotsForDate(booking.fittingDate)
+        }
+
         etDate.isFocusable = false
         etDate.isClickable = true
         etDate.setOnClickListener {
@@ -260,19 +315,23 @@ class FittingBookingsFragment : Fragment(), SseClient.SseListener {
                 this.itemId = itemId
                 minDate = CalendarPickerDialog.todayStr()
                 currentValue = etDate.text.toString()
-                onDateSelected = { date -> etDate.setText(date) }
+                onDateSelected = { date ->
+                    etDate.setText(date)
+                    etTime.setText("")
+                    loadSlotsForDate(date)
+                }
             }.show(childFragmentManager, "reschedule_cal")
         }
 
         etTime.isFocusable = false
         etTime.isClickable = true
         etTime.setOnClickListener {
-            val parts = etTime.text.toString().split(":")
-            val h = parts.getOrNull(0)?.toIntOrNull() ?: 9
-            val m = parts.getOrNull(1)?.toIntOrNull() ?: 0
-            android.app.TimePickerDialog(requireContext(), { _, hour, minute ->
-                etTime.setText("%02d:%02d".format(hour, minute))
-            }, h, m, true).show()
+            TimeSlotPickerDialog().apply {
+                timeSlots   = rscTimeSlots
+                bookedSlots = rscBooked
+                currentValue = etTime.text.toString()
+                onSlotSelected = { slot -> etTime.setText(slot) }
+            }.show(childFragmentManager, "reschedule_tsp")
         }
 
         AlertDialog.Builder(requireContext())

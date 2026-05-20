@@ -129,7 +129,9 @@ class DirectBookingsFragment : Fragment(), SseClient.SseListener {
         tvItem.text       = booking.itemName
         tvCurrentEnd.text = "Current end: ${booking.endDate}"
 
-        // Loading state
+        // Disable the date field while occupied ranges are being fetched so the
+        // calendar always opens with correct blocked-date data (not empty list).
+        etDate.isEnabled = false
         applyBanner(tvInfo, BannerState.LOADING)
 
         var selectedDate       = ""
@@ -179,6 +181,8 @@ class DirectBookingsFragment : Fragment(), SseClient.SseListener {
                 } catch (_: Exception) { }
             }
             if (!dialog.isShowing) return@launch
+            // Enable the date picker now that ranges are ready
+            etDate.isEnabled = true
             applyBanner(
                 tvInfo,
                 if (maxDate != null) BannerState.WARNING else BannerState.SUCCESS,
@@ -267,10 +271,13 @@ class DirectBookingsFragment : Fragment(), SseClient.SseListener {
         etEnd.setText(booking.endDate)
 
         val dailyRate = if (booking.totalDays > 0) booking.basePrice / booking.totalDays else 0.0
-        var newStart  = booking.startDate
-        var newEnd    = booking.endDate
+        var newStart           = booking.startDate
+        var newEnd             = booking.endDate
         var availResult: Boolean? = null
-        val availHandler = Handler(Looper.getMainLooper())
+        val availHandler       = Handler(Looper.getMainLooper())
+        // Occupied ranges for OTHER bookings of this item (current booking excluded).
+        // Populated async; date pickers are disabled until this arrives.
+        var editOccupiedRanges = listOf<OccupiedDateRange>()
 
         fun recalcPrice() {
             if (newStart.isEmpty() || newEnd.isEmpty()) { priceSummary.visibility = View.GONE; return }
@@ -312,11 +319,16 @@ class DirectBookingsFragment : Fragment(), SseClient.SseListener {
             }, 300)
         }
 
+        // Disable pickers until occupied ranges are loaded
+        etStart.isEnabled = false
+        etEnd.isEnabled   = false
+
         etStart.setOnClickListener {
             CalendarPickerDialog().apply {
-                mode         = CalendarPickerDialog.Mode.DIRECT
-                minDate      = CalendarPickerDialog.todayStr()
-                currentValue = newStart
+                mode                 = CalendarPickerDialog.Mode.DIRECT
+                minDate              = CalendarPickerDialog.todayStr()
+                currentValue         = newStart
+                passedOccupiedRanges = editOccupiedRanges
                 onDateSelected = { date ->
                     newStart = date; etStart.setText(date)
                     if (newEnd.isNotEmpty() && newEnd < newStart) { newEnd = ""; etEnd.setText("") }
@@ -327,9 +339,10 @@ class DirectBookingsFragment : Fragment(), SseClient.SseListener {
 
         etEnd.setOnClickListener {
             CalendarPickerDialog().apply {
-                mode         = CalendarPickerDialog.Mode.DIRECT
-                minDate      = newStart.ifEmpty { CalendarPickerDialog.todayStr() }
-                currentValue = newEnd
+                mode                 = CalendarPickerDialog.Mode.DIRECT
+                minDate              = newStart.ifEmpty { CalendarPickerDialog.todayStr() }
+                currentValue         = newEnd
+                passedOccupiedRanges = editOccupiedRanges
                 onDateSelected = { date ->
                     newEnd = date; etEnd.setText(date)
                     recalcPrice(); checkAvailability()
@@ -339,7 +352,7 @@ class DirectBookingsFragment : Fragment(), SseClient.SseListener {
 
         recalcPrice()
 
-        AlertDialog.Builder(requireContext())
+        val editDialog = AlertDialog.Builder(requireContext())
             .setTitle("Edit Rental Dates")
             .setView(view)
             .setPositiveButton("Save Dates") { _, _ ->
@@ -356,7 +369,26 @@ class DirectBookingsFragment : Fragment(), SseClient.SseListener {
                 }
             }
             .setNegativeButton("Cancel", null)
-            .show()
+            .create()
+
+        editDialog.show()
+
+        // Async: load occupied ranges for this item excluding the current booking,
+        // then enable the date pickers so the calendar shows red blocked dates.
+        viewLifecycleOwner.lifecycleScope.launch {
+            val itemId = booking.inventoryItemId ?: ""
+            if (itemId.isNotEmpty()) {
+                try {
+                    editOccupiedRanges = ApiClient.adminApi.getUnavailableDates(
+                        ApiClient.bearerToken(), itemId, booking.id
+                    )
+                } catch (_: Exception) { }
+            }
+            if (editDialog.isShowing) {
+                etStart.isEnabled = true
+                etEnd.isEnabled   = true
+            }
+        }
     }
 
     // ── Export ────────────────────────────────────────────────────────────────
