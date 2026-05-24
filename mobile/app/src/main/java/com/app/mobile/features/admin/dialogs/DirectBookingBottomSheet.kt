@@ -43,6 +43,14 @@ class DirectBookingBottomSheet : BottomSheetDialogFragment() {
         bindActionButtons(view)
     }
 
+    fun rebind(newBooking: DirectBooking) {
+        booking = newBooking
+        val v = view ?: return
+        bindHeader(v)
+        bindDetails(v)
+        bindActionButtons(v)
+    }
+
     private fun bindHeader(v: View) {
         v.findViewById<TextView>(R.id.tvBookingId).text = "#${booking.id.takeLast(8).uppercase()}"
         v.findViewById<TextView>(R.id.tvCustomerName).text = booking.customerName
@@ -134,6 +142,9 @@ class DirectBookingBottomSheet : BottomSheetDialogFragment() {
             "Active Lease" -> {
                 btnReturn.visibility      = View.VISIBLE
                 btnExtendLease.visibility = View.VISIBLE
+                val isReturnableToday = !booking.endDate.isNullOrEmpty() && today >= booking.endDate
+                btnReturn.isEnabled = isReturnableToday
+                btnReturn.alpha     = if (isReturnableToday) 1.0f else 0.4f
             }
         }
         btnResendEmail.visibility = View.VISIBLE

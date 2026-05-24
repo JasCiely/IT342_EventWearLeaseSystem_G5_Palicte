@@ -120,9 +120,16 @@ class DirectBookingsFragment : Fragment(), SseClient.SseListener {
         val tvCurrentEnd   = view.findViewById<TextView>(R.id.tvExtendCurrentEnd)
         val tvInfo         = view.findViewById<TextView>(R.id.tvExtendInfo)
         val etDate         = view.findViewById<EditText>(R.id.etNewEndDate)
+        val priceSummary   = view.findViewById<View>(R.id.layoutExtendPriceSummary)
+        val tvDaysCalc     = view.findViewById<TextView>(R.id.tvExtendDaysCalc)
+        val tvSubtotal     = view.findViewById<TextView>(R.id.tvExtendSubtotal)
+        val tvDiscountRow  = view.findViewById<View>(R.id.layoutExtendDiscountRow)
+        val tvDiscountVal  = view.findViewById<TextView>(R.id.tvExtendDiscountVal)
+        val tvTotal        = view.findViewById<TextView>(R.id.tvExtendTotal)
 
         val currentEndDate = booking.endDate.ifEmpty { CalendarPickerDialog.todayStr() }
         val minDate        = addOneDay(currentEndDate)
+        val dailyRate      = if (booking.totalDays > 0) booking.basePrice / booking.totalDays else 0.0
 
         tvCustomer.text   = booking.customerName
         tvItem.text       = booking.itemName
@@ -131,9 +138,34 @@ class DirectBookingsFragment : Fragment(), SseClient.SseListener {
         etDate.isEnabled = false
         applyBanner(tvInfo, BannerState.LOADING)
 
-        var selectedDate       = ""
-        var unavailableRanges  = listOf<OccupiedDateRange>()
-        var maxDate: String?   = null
+        var selectedDate      = ""
+        var unavailableRanges = listOf<OccupiedDateRange>()
+        var maxDate: String?  = null
+        var extendInvSettings: InventorySettings? = null
+
+        fun recalcExtendPrice() {
+            if (selectedDate.isEmpty()) { priceSummary.visibility = View.GONE; return }
+            try {
+                val s = parseDate(booking.startDate); val e = parseDate(selectedDate)
+                val days    = ((e.time - s.time) / 86_400_000L + 1).toInt()
+                val base    = dailyRate * days
+                val inv     = extendInvSettings
+                val weeks   = days / 7
+                val rawDisc = weeks * (inv?.weeklyDiscount ?: 0).toDouble()
+                val discount = minOf(rawDisc, inv?.monthlyDiscountCap?.toDouble() ?: rawDisc)
+                val finalAmt = maxOf(0.0, base - discount)
+                tvDaysCalc.text = "$days day${if (days != 1) "s" else ""} × ₱${String.format("%.2f", dailyRate)}"
+                tvSubtotal.text = "₱${String.format("%.2f", base)}"
+                if (discount > 0) {
+                    tvDiscountRow.visibility = View.VISIBLE
+                    tvDiscountVal.text = "-₱${String.format("%.2f", discount)}"
+                } else {
+                    tvDiscountRow.visibility = View.GONE
+                }
+                tvTotal.text = "₱${String.format("%.2f", finalAmt)}"
+                priceSummary.visibility = View.VISIBLE
+            } catch (_: Exception) { priceSummary.visibility = View.GONE }
+        }
 
         etDate.setOnClickListener {
             CalendarPickerDialog().apply {
@@ -141,7 +173,7 @@ class DirectBookingsFragment : Fragment(), SseClient.SseListener {
                 this.minDate         = minDate
                 currentValue         = selectedDate
                 passedOccupiedRanges = buildOccupiedForPicker(unavailableRanges, maxDate)
-                onDateSelected       = { date -> selectedDate = date; etDate.setText(date) }
+                onDateSelected       = { date -> selectedDate = date; etDate.setText(date); recalcExtendPrice() }
             }.show(childFragmentManager, "extend_cal")
         }
 
@@ -159,9 +191,13 @@ class DirectBookingsFragment : Fragment(), SseClient.SseListener {
             btn.isEnabled = false
             viewLifecycleOwner.lifecycleScope.launch {
                 try {
-                    ApiClient.adminApi.extendLease(ApiClient.bearerToken(), booking.id, ExtendRequest(selectedDate))
+                    val updatedBooking = ApiClient.adminApi.extendLease(ApiClient.bearerToken(), booking.id, ExtendRequest(selectedDate))
                     toast("Lease extended to $selectedDate")
                     dialog.dismiss()
+                    // Immediately refresh the bottom sheet (if still open) with the updated
+                    // booking returned by the API — basePrice now covers startDate → newEndDate
+                    val bs = childFragmentManager.findFragmentByTag("direct_detail") as? DirectBookingBottomSheet
+                    bs?.rebind(updatedBooking)
                     loadBookings()
                 } catch (e: HttpException) {
                     btn.isEnabled = true
@@ -178,6 +214,11 @@ class DirectBookingsFragment : Fragment(), SseClient.SseListener {
         }
 
         viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                extendInvSettings = ApiClient.adminApi.getInventorySettings(ApiClient.bearerToken())
+                if (dialog.isShowing) recalcExtendPrice()
+            } catch (_: Exception) { }
+
             val itemId = booking.inventoryItemId ?: ""
             if (itemId.isNotEmpty()) {
                 try {

@@ -33,6 +33,7 @@ import {
 import { fetchBookingSettings, saveBookingSettings, getDefaultSettings } from '../services/bookingSettingsApi';
 import { authFetch } from '../../../shared/services/apiClient.js';
 import { sseService } from '../../../shared/services/sseService';
+import { calculateLeasePricing } from '../../../shared/constants/sharedData';
 import FittingToLeaseModal from './FittingToLeaseModal';
 import CreateBookingModal from './CreateBookingModal';
 
@@ -560,6 +561,12 @@ function ExtendLeaseModal({ booking, onConfirm, onClose, bookingSettings }) {
     return () => { cancelled = true; };
   }, [booking.inventoryItemId, booking.id]);
 
+  const pricePreview = useMemo(() => {
+    if (!newEndDate || !booking.basePrice || !booking.totalDays) return null;
+    const dailyRate = booking.basePrice / booking.totalDays;
+    return calculateLeasePricing(dailyRate, booking.startDate, newEndDate);
+  }, [newEndDate, booking.basePrice, booking.totalDays, booking.startDate]);
+
   const handle = async () => {
     if (!newEndDate) return;
     setSubmitting(true);
@@ -611,6 +618,26 @@ function ExtendLeaseModal({ booking, onConfirm, onClose, bookingSettings }) {
               label="new end date"
             />
           </div>
+
+          {pricePreview && (
+            <div style={{ marginTop: '0.75rem', background: '#faf9f7', border: '1px solid #e5e3df', borderRadius: 8, padding: '0.65rem 0.85rem', fontSize: '0.8rem' }}>
+              <div style={{ fontWeight: 600, color: '#444', marginBottom: '0.4rem' }}>Updated Pricing</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#666', marginBottom: '0.2rem' }}>
+                <span>Base Price ({pricePreview.totalDays} days)</span>
+                <span>₱{pricePreview.basePrice.toLocaleString()}</span>
+              </div>
+              {pricePreview.discount > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#059669', marginBottom: '0.2rem' }}>
+                  <span>Discount ({pricePreview.weeks} week{pricePreview.weeks !== 1 ? 's' : ''})</span>
+                  <span>-₱{pricePreview.discount.toLocaleString()}</span>
+                </div>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, color: '#222', borderTop: '1px solid #e5e3df', paddingTop: '0.3rem', marginTop: '0.3rem' }}>
+                <span>Total</span>
+                <span>₱{pricePreview.finalPrice.toLocaleString()}</span>
+              </div>
+            </div>
+          )}
         </div>
         <div className="inv-modal-footer">
           <button className="inv-btn-ghost" onClick={onClose} disabled={submitting}>Cancel</button>
@@ -1756,24 +1783,29 @@ function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, on
           )}
 
           {/* Active Lease: two dedicated action buttons replace the single next-action pattern */}
-          {!isFitting && booking.status === 'Active Lease' && (
-            <>
-              <button
-                className="inv-btn-primary"
-                style={{ background: '#0d9488' }}
-                onClick={() => onReturn(booking)}
-              >
-                <RotateCcw size={13} /> Returned <ChevronRight size={13} />
-              </button>
-              <button
-                className="inv-btn-primary"
-                style={{ background: '#6b2d39' }}
-                onClick={() => onExtend(booking)}
-              >
-                <CalendarIcon size={13} /> Extend <ChevronRight size={13} />
-              </button>
-            </>
-          )}
+          {!isFitting && booking.status === 'Active Lease' && (() => {
+            const isReturnableToday = booking.endDate && now.toISOString().split('T')[0] >= booking.endDate;
+            return (
+              <>
+                <button
+                  className="inv-btn-primary"
+                  style={{ background: '#0d9488', opacity: isReturnableToday ? 1 : 0.4, cursor: isReturnableToday ? 'pointer' : 'not-allowed' }}
+                  onClick={() => onReturn(booking)}
+                  disabled={!isReturnableToday}
+                  title={!isReturnableToday ? `Return available from ${booking.endDate}` : undefined}
+                >
+                  <RotateCcw size={13} /> Returned <ChevronRight size={13} />
+                </button>
+                <button
+                  className="inv-btn-primary"
+                  style={{ background: '#6b2d39' }}
+                  onClick={() => onExtend(booking)}
+                >
+                  <CalendarIcon size={13} /> Extend <ChevronRight size={13} />
+                </button>
+              </>
+            );
+          })()}
 
           {/* Completed: show maintenance status and admin override */}
           {!isFitting && booking.status === 'Completed' && itemDetails && (
@@ -1890,13 +1922,20 @@ function BookingCard({ booking, isFitting, onOpen, onAction, onReturn, onExtend,
         ) : null}
         {!isFitting && booking.status === 'Active Lease' ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            <button
-              className="inv-btn-sm"
-              style={{ background: '#0d9488', fontSize: '0.68rem' }}
-              onClick={e => { e.stopPropagation(); onReturn(booking); }}
-            >
-              <RotateCcw size={10} /> Returned
-            </button>
+            {(() => {
+              const isReturnableToday = booking.endDate && new Date().toISOString().split('T')[0] >= booking.endDate;
+              return (
+                <button
+                  className="inv-btn-sm"
+                  style={{ background: '#0d9488', fontSize: '0.68rem', opacity: isReturnableToday ? 1 : 0.4, cursor: isReturnableToday ? 'pointer' : 'not-allowed' }}
+                  onClick={e => { e.stopPropagation(); if (isReturnableToday) onReturn(booking); }}
+                  disabled={!isReturnableToday}
+                  title={!isReturnableToday ? `Return available from ${booking.endDate}` : undefined}
+                >
+                  <RotateCcw size={10} /> Returned
+                </button>
+              );
+            })()}
             <button
               className="inv-btn-sm"
               style={{ background: '#6b2d39', fontSize: '0.68rem' }}
@@ -2524,12 +2563,12 @@ export default function BookingsManagement() {
       const updated = await extendLease(extendModal.id, newEndDate);
       setDirectBookings(prev => prev.map(b =>
         b.id === extendModal.id
-          ? { ...b, endDate: updated.endDate || newEndDate, totalDays: updated.totalDays }
+          ? { ...b, endDate: updated.endDate || newEndDate, totalDays: updated.totalDays, basePrice: updated.basePrice, discountAmount: updated.discountAmount, finalPrice: updated.finalPrice }
           : b
       ));
       if (drawer?.id === extendModal.id) {
         setDrawer(prev => prev
-          ? { ...prev, endDate: updated.endDate || newEndDate, totalDays: updated.totalDays }
+          ? { ...prev, endDate: updated.endDate || newEndDate, totalDays: updated.totalDays, basePrice: updated.basePrice, discountAmount: updated.discountAmount, finalPrice: updated.finalPrice }
           : null);
       }
       showToastMsg('success', `Lease extended to ${newEndDate}`);
