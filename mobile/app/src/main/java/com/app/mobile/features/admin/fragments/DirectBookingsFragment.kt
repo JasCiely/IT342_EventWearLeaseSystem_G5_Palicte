@@ -148,23 +148,34 @@ class DirectBookingsFragment : Fragment(), SseClient.SseListener {
         val dialog = AlertDialog.Builder(requireContext())
             .setTitle("Extend Lease")
             .setView(view)
-            .setPositiveButton("Extend Lease") { _, _ ->
-                if (selectedDate.isEmpty()) { toast("Select a new end date"); return@setPositiveButton }
-                viewLifecycleOwner.lifecycleScope.launch {
-                    try {
-                        ApiClient.adminApi.extendLease(ApiClient.bearerToken(), booking.id, ExtendRequest(selectedDate))
-                        toast("Lease extended to $selectedDate")
-                        loadBookings()
-                    } catch (e: HttpException) {
-                        if (e.code() == 401) (activity as? AdminDashboardActivity)?.showSessionExpiredDialog()
-                        else toast("Extension failed — dates may conflict with another booking")
-                    } catch (_: Exception) { toast(getString(R.string.error_network)) }
-                }
-            }
+            .setPositiveButton("Extend Lease", null)
             .setNegativeButton("Cancel", null)
             .create()
 
         dialog.show()
+
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener { btn ->
+            if (selectedDate.isEmpty()) { toast("Select a new end date"); return@setOnClickListener }
+            btn.isEnabled = false
+            viewLifecycleOwner.lifecycleScope.launch {
+                try {
+                    ApiClient.adminApi.extendLease(ApiClient.bearerToken(), booking.id, ExtendRequest(selectedDate))
+                    toast("Lease extended to $selectedDate")
+                    dialog.dismiss()
+                    loadBookings()
+                } catch (e: HttpException) {
+                    btn.isEnabled = true
+                    if (e.code() == 401) (activity as? AdminDashboardActivity)?.showSessionExpiredDialog()
+                    else {
+                        val msg = try {
+                            org.json.JSONObject(e.response()?.errorBody()?.string() ?: "")
+                                .optString("error", "Extension failed — dates may conflict with another booking")
+                        } catch (_: Exception) { "Extension failed — dates may conflict with another booking" }
+                        toast(msg)
+                    }
+                } catch (_: Exception) { btn.isEnabled = true; toast(getString(R.string.error_network)) }
+            }
+        }
 
         viewLifecycleOwner.lifecycleScope.launch {
             val itemId = booking.inventoryItemId ?: ""

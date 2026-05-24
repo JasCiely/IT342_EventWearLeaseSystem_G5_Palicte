@@ -104,13 +104,13 @@ interface AdminApiService {
         @Path("bookingId") bookingId: String
     ): DirectBooking
 
-    @PUT("api/admin/bookings/direct/{bookingId}/return")
+    @PUT("api/direct-bookings/{bookingId}/return")
     suspend fun markReturn(
         @Header("Authorization") token: String,
         @Path("bookingId") bookingId: String
     ): DirectBooking
 
-    @PUT("api/admin/bookings/direct/{bookingId}/extend")
+    @PUT("api/direct-bookings/{bookingId}/extend")
     suspend fun extendLease(
         @Header("Authorization") token: String,
         @Path("bookingId") bookingId: String,
