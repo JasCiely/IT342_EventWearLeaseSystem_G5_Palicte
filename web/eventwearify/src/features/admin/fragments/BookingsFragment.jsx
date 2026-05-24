@@ -1440,10 +1440,15 @@ function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, on
           <div>
             <div className="bk-drawer-id">#{(booking.id || booking.bookingId || '').slice(-8)}</div>
             <div className="bk-drawer-customer">{booking.customerName}</div>
-            <div style={{ marginTop: 4, display: 'flex', gap: 6, alignItems: 'center' }}>
+            <div style={{ marginTop: 4, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
               <span className="inv-badge" style={{ background: isFitting ? 'rgba(107,45,57,0.08)' : 'rgba(29,78,216,0.08)', color: isFitting ? '#6b2d39' : '#1d4ed8', fontSize: '0.68rem' }}>
                 {isFitting ? <><Scissors size={10} /> Fitting</> : <><PackageCheck size={10} /> Direct Rental</>}
               </span>
+              {!isFitting && booking.extended && (
+                <span className="inv-badge" style={{ background: 'rgba(59,130,246,0.1)', color: '#1d4ed8', fontSize: '0.68rem' }}>
+                  <CalendarIcon size={10} /> Extended
+                </span>
+              )}
             </div>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
@@ -1856,6 +1861,11 @@ function BookingCard({ booking, isFitting, onOpen, onAction, onReturn, onExtend,
             {hasLeaseStarted && (
               <span className="bk-overdue-badge" style={{ background: 'rgba(124,58,237,0.1)', color: '#7c3aed' }}>
                 <PackageCheck size={9} /> Lease Created
+              </span>
+            )}
+            {!isFitting && booking.extended && (
+              <span className="bk-overdue-badge" style={{ background: 'rgba(59,130,246,0.1)', color: '#1d4ed8' }}>
+                <CalendarIcon size={9} /> Extended
               </span>
             )}
           </div>

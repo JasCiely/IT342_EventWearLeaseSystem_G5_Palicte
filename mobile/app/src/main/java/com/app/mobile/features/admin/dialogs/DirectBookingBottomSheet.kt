@@ -50,6 +50,9 @@ class DirectBookingBottomSheet : BottomSheetDialogFragment() {
         val tvStatus = v.findViewById<TextView>(R.id.tvStatusBadge)
         tvStatus.text = booking.bookingStatus
         applyStatusBadge(tvStatus, booking.bookingStatus)
+
+        val tvExtended = v.findViewById<TextView>(R.id.tvExtendedBadge)
+        tvExtended.visibility = if (booking.extended) View.VISIBLE else View.GONE
     }
 
     private fun bindDetails(v: View) {
