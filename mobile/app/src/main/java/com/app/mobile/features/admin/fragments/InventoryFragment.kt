@@ -27,6 +27,7 @@ import com.app.mobile.shared.models.*
 import com.app.mobile.shared.sse.SseClient
 import com.bumptech.glide.Glide
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.card.MaterialCardView
 import com.google.gson.Gson
 import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaType
@@ -67,18 +68,15 @@ class InventoryFragment : Fragment(), SseClient.SseListener {
 
     private var selectedUris = mutableListOf<Uri>()
     private var tvPhotoCount: TextView? = null
+    private var llPhotoPreview: LinearLayout? = null
+    private var hsvPhotoPreview: HorizontalScrollView? = null
+    private var existingPhotoUrlsForDialog: List<String> = emptyList()
 
-    private val photoPicker = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
+    private val photoPicker = registerForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
+        if (uris.isNotEmpty()) {
             selectedUris.clear()
-            val clip = result.data?.clipData
-            if (clip != null) {
-                for (i in 0 until clip.itemCount) selectedUris.add(clip.getItemAt(i).uri)
-            } else {
-                result.data?.data?.let { selectedUris.add(it) }
-            }
-            tvPhotoCount?.text = if (selectedUris.isEmpty()) "No new photos selected"
-                                 else "${selectedUris.size} new photo(s) selected"
+            selectedUris.addAll(uris)
+            updatePhotoPreview()
         }
     }
 
@@ -400,8 +398,10 @@ class InventoryFragment : Fragment(), SseClient.SseListener {
         val spStatus   = view.findViewById<Spinner>(R.id.spinnerStatus)
         val etAgeRange = view.findViewById<EditText>(R.id.etAgeRange)
         val etDesc     = view.findViewById<EditText>(R.id.etDescription)
-        val btnPhotos  = view.findViewById<MaterialButton>(R.id.btnSelectPhotos)
-        tvPhotoCount   = view.findViewById(R.id.tvPhotoCount)
+        val btnPhotos   = view.findViewById<MaterialButton>(R.id.btnSelectPhotos)
+        tvPhotoCount    = view.findViewById(R.id.tvPhotoCount)
+        llPhotoPreview  = view.findViewById(R.id.llPhotoPreview)
+        hsvPhotoPreview = view.findViewById(R.id.hsvPhotoPreview)
 
         val catAdapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, categories)
         catAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
@@ -501,50 +501,52 @@ class InventoryFragment : Fragment(), SseClient.SseListener {
             existingItem.ageRange?.let { etAgeRange.setText(it) }
             existingItem.description?.let { etDesc.setText(it) }
             existingItem.sizes?.forEach { preSelectedSizes.add(it) }
-
-            val existingCount = existingItem.mediaFiles?.size ?: 0
-            tvPhotoCount?.text = if (existingCount > 0)
-                "$existingCount existing photo(s) — select to add more"
-            else
-                "No photos — select to add"
         }
         buildSizeChips(preSelectedSizes)
 
         btnPhotos.setOnClickListener {
-            val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
-                type = "image/*"
-                putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
-            }
-            photoPicker.launch(Intent.createChooser(intent, "Select Photos"))
+            photoPicker.launch("image/*")
         }
 
-        AlertDialog.Builder(requireContext())
+        existingPhotoUrlsForDialog = existingItem?.mediaFiles?.map { it.url } ?: emptyList()
+        updatePhotoPreview()
+
+        val dialog = AlertDialog.Builder(requireContext())
             .setTitle(if (existingItem == null) "Add Inventory Item" else "Edit Item")
             .setView(view)
-            .setPositiveButton(if (existingItem == null) "Add" else "Save") { _, _ ->
-                val name  = etName.text.toString().trim()
-                val cat   = categories[spCategory.selectedItemPosition]
-                val price = etPrice.text.toString().toDoubleOrNull()
-                if (name.isEmpty() || price == null) {
-                    toast("Name and price are required"); return@setPositiveButton
-                }
-                val selectedSubRaw = spSubtype.selectedItem?.toString() ?: ""
-                val subtype = when {
-                    selectedSubRaw == "— None —"      -> null
-                    selectedSubRaw == "Other (custom)" -> etCustomSub.text.toString().trim().ifEmpty { null }
-                    else                               -> selectedSubRaw
-                }
-                val sizeList  = if (selectedSizes.isEmpty()) null else selectedSizes.toList()
-                val status    = statusOptions[spStatus.selectedItemPosition]
-                val ageRange  = etAgeRange.text.toString().trim().ifEmpty { null }
-                val desc      = etDesc.text.toString().trim().ifEmpty { null }
+            .create()
 
-                val itemData = CreateItemRequest(name, cat, subtype, sizeList, price, status, ageRange, desc)
-                if (existingItem == null) createItem(itemData)
-                else updateItem(existingItem.id, itemData, existingItem)
+        dialog.setOnDismissListener {
+            llPhotoPreview = null
+            hsvPhotoPreview = null
+            existingPhotoUrlsForDialog = emptyList()
+        }
+
+        val btnSave = view.findViewById<MaterialButton>(R.id.btnSaveItem)
+        btnSave.text = if (existingItem == null) "ADD ITEM" else "SAVE CHANGES"
+        btnSave.setOnClickListener {
+            val name  = etName.text.toString().trim()
+            val cat   = categories[spCategory.selectedItemPosition]
+            val price = etPrice.text.toString().toDoubleOrNull()
+            if (name.isEmpty()) { toast("Name is required"); return@setOnClickListener }
+            if (price == null)  { toast("Price is required"); return@setOnClickListener }
+            val selectedSubRaw = spSubtype.selectedItem?.toString() ?: ""
+            val subtype = when {
+                selectedSubRaw == "— None —"       -> null
+                selectedSubRaw == "Other (custom)" -> etCustomSub.text.toString().trim().ifEmpty { null }
+                else                               -> selectedSubRaw
             }
-            .setNegativeButton("Cancel", null)
-            .show()
+            val sizeList = if (selectedSizes.isEmpty()) null else selectedSizes.toList()
+            val status   = statusOptions[spStatus.selectedItemPosition]
+            val ageRange = etAgeRange.text.toString().trim().ifEmpty { null }
+            val desc     = etDesc.text.toString().trim().ifEmpty { null }
+            val itemData = CreateItemRequest(name, cat, subtype, sizeList, price, status, ageRange, desc)
+            dialog.dismiss()
+            if (existingItem == null) createItem(itemData)
+            else updateItem(existingItem.id, itemData, existingItem)
+        }
+
+        dialog.show()
     }
 
     private fun createItem(data: CreateItemRequest) {
@@ -589,6 +591,50 @@ class InventoryFragment : Fragment(), SseClient.SseListener {
             val ext      = if (mimeType.contains("png")) "png" else "jpg"
             MultipartBody.Part.createFormData("files", "photo_$i.$ext", body)
         }.filterNotNull()
+    }
+
+    private fun updatePhotoPreview() {
+        val ll  = llPhotoPreview  ?: return
+        val hsv = hsvPhotoPreview ?: return
+        ll.removeAllViews()
+        val hasExisting = existingPhotoUrlsForDialog.isNotEmpty()
+        val hasNew      = selectedUris.isNotEmpty()
+        if (!hasExisting && !hasNew) {
+            hsv.visibility = View.GONE
+            tvPhotoCount?.text = "No photos selected"
+            return
+        }
+        hsv.visibility = View.VISIBLE
+        val density = resources.displayMetrics.density
+        val size    = (80 * density).toInt()
+        val margin  = (8  * density).toInt()
+        val radius  = 10f * density
+
+        fun addThumb(source: Any) {
+            val card = MaterialCardView(requireContext()).apply {
+                val lp = LinearLayout.LayoutParams(size, size).also { it.marginEnd = margin }
+                layoutParams = lp
+                this.radius = radius
+                cardElevation = 0f
+                clipChildren = true
+            }
+            val iv = ImageView(requireContext()).apply {
+                layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+                scaleType = ImageView.ScaleType.CENTER_CROP
+            }
+            card.addView(iv)
+            ll.addView(card)
+            Glide.with(this@InventoryFragment).load(source).centerCrop().into(iv)
+        }
+
+        existingPhotoUrlsForDialog.forEach { addThumb(it) }
+        selectedUris.forEach { addThumb(it) }
+
+        tvPhotoCount?.text = when {
+            hasNew && hasExisting -> "${selectedUris.size} new + ${existingPhotoUrlsForDialog.size} existing"
+            hasNew                -> "${selectedUris.size} photo(s) selected"
+            else                  -> "${existingPhotoUrlsForDialog.size} existing photo(s)"
+        }
     }
 
     private fun showPromoActions(promo: Promotion) {
@@ -755,6 +801,9 @@ class InventoryFragment : Fragment(), SseClient.SseListener {
         super.onDestroyView()
         SseClient.removeListener(this)
         tvPhotoCount = null
+        llPhotoPreview = null
+        hsvPhotoPreview = null
+        existingPhotoUrlsForDialog = emptyList()
         _binding = null
     }
 }

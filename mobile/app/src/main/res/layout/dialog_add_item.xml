@@ -270,7 +270,26 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@+id/btnSelectPhotos" />
 
-        <!-- Save Button (optional but recommended) -->
+        <!-- Photo thumbnail preview strip -->
+        <HorizontalScrollView
+            android:id="@+id/hsvPhotoPreview"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:scrollbars="none"
+            android:visibility="gone"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/tvPhotoCount">
+
+            <LinearLayout
+                android:id="@+id/llPhotoPreview"
+                android:layout_width="wrap_content"
+                android:layout_height="88dp"
+                android:orientation="horizontal"
+                android:paddingVertical="4dp" />
+        </HorizontalScrollView>
+
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnSaveItem"
             android:layout_width="0dp"
@@ -284,7 +303,7 @@
             app:cornerRadius="12dp"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/tvPhotoCount" />
+            app:layout_constraintTop_toBottomOf="@+id/hsvPhotoPreview" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 </ScrollView>
