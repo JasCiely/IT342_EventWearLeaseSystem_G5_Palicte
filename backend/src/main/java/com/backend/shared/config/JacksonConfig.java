@@ -12,8 +12,9 @@ public class JacksonConfig {
     @Bean
     @Primary
     public ObjectMapper objectMapper() {
-        ObjectMapper mapper = new ObjectMapper();
-        mapper.configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
-        return mapper;
+        return new ObjectMapper()
+                .findAndRegisterModules()
+                .configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false)
+                .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     }
 }

@@ -11,7 +11,6 @@ import com.app.mobile.features.admin.fragments.BookingsFragment
 import com.app.mobile.features.admin.fragments.DashboardFragment
 import com.app.mobile.features.admin.fragments.InventoryFragment
 import com.app.mobile.features.admin.fragments.MoreFragment
-import com.app.mobile.features.admin.fragments.StaffFragment
 import com.app.mobile.features.auth.activities.Auth
 import com.app.mobile.shared.sse.SseClient
 import com.app.mobile.shared.utils.SessionManager
@@ -34,7 +33,6 @@ class AdminDashboardActivity : AppCompatActivity() {
                 R.id.nav_dashboard  -> DashboardFragment()
                 R.id.nav_bookings   -> BookingsFragment()
                 R.id.nav_inventory  -> InventoryFragment()
-                R.id.nav_staff      -> StaffFragment()
                 R.id.nav_more       -> MoreFragment()
                 else                -> DashboardFragment()
             }
@@ -49,6 +47,10 @@ class AdminDashboardActivity : AppCompatActivity() {
         supportFragmentManager.beginTransaction()
             .replace(R.id.fragmentContainer, fragment)
             .commit()
+    }
+
+    fun navigateTo(navItemId: Int) {
+        binding.bottomNav.selectedItemId = navItemId
     }
 
     fun showSessionExpiredDialog() {

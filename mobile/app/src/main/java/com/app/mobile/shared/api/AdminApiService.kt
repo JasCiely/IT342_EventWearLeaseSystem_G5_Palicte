@@ -47,34 +47,6 @@ interface AdminApiService {
         @Body body: StatusRequest
     ): AdminUser
 
-    // ── Staff ─────────────────────────────────────────────────────────────
-    @GET("api/admin/staff")
-    suspend fun getStaff(
-        @Header("Authorization") token: String,
-        @Query("page") page: Int = 0,
-        @Query("size") size: Int = 50,
-        @Query("search") search: String = ""
-    ): PageResponse<Staff>
-
-    @POST("api/admin/staff")
-    suspend fun createStaff(
-        @Header("Authorization") token: String,
-        @Body body: CreateStaffRequest
-    ): Staff
-
-    @PUT("api/admin/staff/{id}")
-    suspend fun updateStaff(
-        @Header("Authorization") token: String,
-        @Path("id") id: String,
-        @Body body: CreateStaffRequest
-    ): Staff
-
-    @DELETE("api/admin/staff/{id}")
-    suspend fun deleteStaff(
-        @Header("Authorization") token: String,
-        @Path("id") id: String
-    )
-
     // ── Fitting Bookings ──────────────────────────────────────────────────
     @GET("api/admin/bookings/fitting")
     suspend fun getFittingBookings(
@@ -297,8 +269,14 @@ interface AdminApiService {
     @GET("api/admin/attendance/today")
     suspend fun getTodayAttendance(@Header("Authorization") token: String): TodayAttendanceResponse
 
+    @DELETE("api/admin/attendance/reset")
+    suspend fun resetAttendance(@Header("Authorization") token: String): MessageResponse
+
     @PUT("api/admin/attendance/unlock")
-    suspend fun unlockAttendance(@Header("Authorization") token: String): MessageResponse
+    suspend fun unlockAttendance(
+        @Header("Authorization") token: String,
+        @Query("date") date: String = ""
+    ): MessageResponse
 
     @PUT("api/admin/attendance/edit/{recordId}")
     suspend fun editAttendanceRecord(

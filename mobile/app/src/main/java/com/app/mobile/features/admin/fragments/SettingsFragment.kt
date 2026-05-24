@@ -57,9 +57,13 @@ class SettingsFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             try {
                 val settings = ApiClient.adminApi.getSettings(ApiClient.bearerToken())
-                settings.salarySettings?.let { s ->
-                    binding.etBaseRate.setText(s.baseRate.toString())
-                    binding.etOvertimeRate.setText(s.overtimeRate.toString())
+                if (settings.defaultDailyRate > 0) {
+                    binding.etBaseRate.setText(settings.defaultDailyRate.toInt().toString())
+                } else {
+                    settings.salarySettings?.let { s ->
+                        binding.etBaseRate.setText(s.baseRate.toString())
+                        binding.etOvertimeRate.setText(s.overtimeRate.toString())
+                    }
                 }
             } catch (e: HttpException) {
                 if (e.code() == 401) (activity as? AdminDashboardActivity)?.showSessionExpiredDialog()
@@ -97,7 +101,7 @@ class SettingsFragment : Fragment() {
         if (baseRate == null || overtimeRate == null) { toast("Enter valid rates"); return }
         viewLifecycleOwner.lifecycleScope.launch {
             try {
-                ApiClient.adminApi.updateSalarySettings(ApiClient.bearerToken(), SalarySettingsRequest(baseRate, overtimeRate))
+                ApiClient.adminApi.updateSalarySettings(ApiClient.bearerToken(), SalarySettingsRequest(baseRate))
                 toast("Salary settings saved")
             } catch (_: Exception) { toast(getString(R.string.error_network)) }
         }

@@ -1,5 +1,7 @@
 package com.app.mobile.shared.models
 
+import com.google.gson.annotations.SerializedName
+
 data class PageResponse<T>(
     val content: List<T>,
     val totalElements: Int,
@@ -21,18 +23,6 @@ data class AdminUser(
 ) {
     val fullName get() = "$firstName $lastName"
     val initials get() = "${firstName.firstOrNull() ?: ""}${lastName.firstOrNull() ?: ""}".uppercase()
-}
-
-data class Staff(
-    val id: String,
-    val fullName: String,
-    val email: String,
-    val role: String,
-    val status: String,
-    val daysWorked: Int,
-    val customRate: Double?
-) {
-    val initials get() = fullName.split(" ").mapNotNull { it.firstOrNull() }.take(2).joinToString("").uppercase()
 }
 
 data class FittingBooking(
@@ -109,10 +99,13 @@ data class Promotion(
 data class AttendanceRecord(
     val id: String,
     val staffId: String,
+    val staffName: String?,
     val attendanceDate: String,
     val status: String,
-    val isLate: Boolean,
-    val lateMinutes: Int?
+    @SerializedName("late") val isLate: Boolean,
+    val lateMinutes: Int?,
+    val recordedAt: String?,
+    val editedAt: String?
 )
 
 data class TodayAttendanceItem(
@@ -120,20 +113,19 @@ data class TodayAttendanceItem(
     val staffId: String,
     val staffName: String?,
     val status: String,
-    val isLate: Boolean,
+    @SerializedName("late") val isLate: Boolean,
     val lateMinutes: Int?
 )
 
-data class AttendanceSession(
-    val id: String,
-    val date: String,
-    val recordedBy: String,
-    val locked: Boolean = true
-)
-
+// Matches the flat JSON returned by GET /api/admin/attendance/today
+// { id, date, recordedBy, locked, records: [...] }
+// When no session exists the backend returns 500, so all fields default to null/empty.
 data class TodayAttendanceResponse(
-    val session: AttendanceSession?,
-    val records: List<TodayAttendanceItem>
+    val id: String? = null,
+    val date: String? = null,
+    val recordedBy: String? = null,
+    val locked: Boolean = true,
+    val records: List<TodayAttendanceItem> = emptyList()
 )
 
 data class SalarySettings(
@@ -142,7 +134,8 @@ data class SalarySettings(
 )
 
 data class AppSettings(
-    val salarySettings: SalarySettings?
+    val defaultDailyRate: Double = 300.0,
+    val salarySettings: SalarySettings? = null
 )
 
 data class UserProfile(
@@ -168,21 +161,13 @@ data class MessageResponse(val message: String)
 data class StatusResponse(val id: String, val status: String)
 data class TokenValidResponse(val valid: Boolean, val email: String?)
 
-data class CreateStaffRequest(
-    val fullName: String,
-    val email: String,
-    val role: String,
-    val status: String,
-    val customRate: Double?
-)
-
 data class UpdateAttendanceRequest(
     val status: String,
     val isLate: Boolean,
     val lateMinutes: Int?
 )
 
-data class SalarySettingsRequest(val baseRate: Double, val overtimeRate: Double)
+data class SalarySettingsRequest(val defaultDailyRate: Double)
 
 data class UpdateProfileRequest(
     val firstName: String,

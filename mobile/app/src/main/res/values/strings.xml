@@ -4,7 +4,6 @@
     <string name="nav_dashboard">Dashboard</string>
     <string name="nav_bookings">Bookings</string>
     <string name="nav_inventory">Inventory</string>
-    <string name="nav_staff">Staff</string>
     <string name="nav_more">More</string>
     <string name="session_expired_title">Session Expired</string>
     <string name="session_expired_message">Your session has expired. Please sign in again.</string>
@@ -15,16 +14,21 @@
     <string name="error_network">Network error. Please try again.</string>
 
     <!-- Dashboard -->
-    <string name="admin_dashboard_subtitle">Admin Dashboard</string>
     <string name="dashboard_overview">Overview</string>
-    <string name="dashboard_total_users">Total Users</string>
-    <string name="dashboard_fitting_bookings">Fitting Bookings</string>
-    <string name="dashboard_direct_leases">Direct Leases</string>
-    <string name="dashboard_total_items">Total Items</string>
-    <string name="dashboard_available">Available</string>
-    <string name="dashboard_staff">Staff</string>
+    <string name="dashboard_total_bookings">Total Bookings</string>
+    <string name="dashboard_active_bookings">Active Bookings</string>
+    <string name="dashboard_active_leases">Active Leases</string>
+    <string name="dashboard_pending_pickups">Pending Pickups</string>
+    <string name="dashboard_total_items">Inventory Items</string>
+    <string name="dashboard_customers">Customers</string>
     <string name="dashboard_pipeline_title">Booking Pipeline</string>
+    <string name="dashboard_status_summary">Status Summary</string>
+    <string name="dashboard_people_overview">People Overview</string>
     <string name="dashboard_fitting_snapshot">Fitting Snapshot</string>
+    <string name="dashboard_recent_activity">Recent Activity</string>
+    <string name="dashboard_no_activity">No booking activity yet.</string>
+    <string name="dashboard_alert_pending_approvals"> direct booking(s) awaiting approval</string>
+    <string name="dashboard_alert_overdue"> overdue lease(s) past return date</string>
 
     <!-- Inventory filters -->
     <string name="filter_all">All</string>

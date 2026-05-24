@@ -38,5 +38,15 @@
     <color name="status_active_text">#1E40AF</color>
     <color name="status_completed_bg">#EDE9FE</color>
     <color name="status_completed_text">#5B21B6</color>
+    <color name="status_returned_bg">#E0F2FE</color>
+    <color name="status_returned_text">#0369A1</color>
+    <color name="status_converted_bg">#EDE9FE</color>
+    <color name="status_converted_text">#5B21B6</color>
+
+    <!-- KPI accent colors -->
+    <color name="kpi_purple">#7C3AED</color>
+    <color name="kpi_teal">#0E7490</color>
+    <color name="kpi_green">#15803D</color>
+    <color name="progress_track">#F0EEEC</color>
 
 </resources>

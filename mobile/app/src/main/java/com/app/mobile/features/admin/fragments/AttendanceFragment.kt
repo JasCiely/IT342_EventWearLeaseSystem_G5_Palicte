@@ -59,19 +59,32 @@ class AttendanceFragment : Fragment() {
             binding.swipeRefresh.isRefreshing = true
             try {
                 val resp = ApiClient.adminApi.getTodayAttendance(ApiClient.bearerToken())
+                val hasSession = resp.id != null
                 todayRecords = resp.records
-                sessionLocked = resp.session == null || resp.session.locked
+                sessionLocked = !hasSession || resp.locked
                 adapter.submitList(todayRecords)
                 binding.tvSessionStatus.text = when {
-                    resp.session == null -> "No session yet"
-                    resp.session.locked  -> "Session recorded • Locked"
-                    else                 -> "Session recorded • Unlocked for editing"
+                    !hasSession  -> "No session yet"
+                    resp.locked  -> "Session recorded • Locked"
+                    else         -> "Session recorded • Unlocked for editing"
                 }
                 binding.tvEmpty.visibility = if (todayRecords.isEmpty()) View.VISIBLE else View.GONE
-                binding.btnRecord.isEnabled = resp.session == null
-                binding.btnUnlock.isEnabled = resp.session != null && resp.session.locked
+                binding.btnRecord.isEnabled = !hasSession
+                binding.btnUnlock.isEnabled = hasSession && resp.locked
             } catch (e: HttpException) {
-                if (e.code() == 401) (activity as? AdminDashboardActivity)?.showSessionExpiredDialog()
+                when (e.code()) {
+                    401 -> (activity as? AdminDashboardActivity)?.showSessionExpiredDialog()
+                    else -> {
+                        // 500 = no session recorded yet for today
+                        todayRecords = emptyList()
+                        sessionLocked = true
+                        adapter.submitList(emptyList())
+                        binding.tvSessionStatus.text = "No session yet"
+                        binding.tvEmpty.visibility = View.VISIBLE
+                        binding.btnRecord.isEnabled = true
+                        binding.btnUnlock.isEnabled = false
+                    }
+                }
             } catch (_: Exception) { toast(getString(R.string.error_network)) }
             binding.swipeRefresh.isRefreshing = false
         }
