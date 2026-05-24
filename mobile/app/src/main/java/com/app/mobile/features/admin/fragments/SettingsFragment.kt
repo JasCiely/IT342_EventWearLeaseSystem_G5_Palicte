@@ -58,7 +58,7 @@ class SettingsFragment : Fragment() {
             try {
                 val settings = ApiClient.adminApi.getSettings(ApiClient.bearerToken())
                 if (settings.defaultDailyRate > 0) {
-                    binding.etBaseRate.setText(settings.defaultDailyRate.toInt().toString())    
+                    binding.etBaseRate.setText(settings.defaultDailyRate.toInt().toString())
                 } else {
                     settings.salarySettings?.let { s ->
                         binding.etBaseRate.setText(s.baseRate.toString())

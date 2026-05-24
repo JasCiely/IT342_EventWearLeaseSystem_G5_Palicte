@@ -30,6 +30,13 @@ interface AdminApiService {
         @Body body: UpdateProfileRequest
     ): UserProfile
 
+    @Multipart
+    @POST("api/user/profile/photo")
+    suspend fun uploadProfilePhoto(
+        @Header("Authorization") token: String,
+        @Part photo: MultipartBody.Part
+    ): UserProfile
+
     // ── Admin Users ───────────────────────────────────────────────────────
     @GET("api/admin/users")
     suspend fun getUsers(
