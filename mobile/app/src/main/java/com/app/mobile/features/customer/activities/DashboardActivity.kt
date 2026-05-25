@@ -2,144 +2,120 @@ package com.app.mobile.features.customer.activities
 
 import android.content.Intent
 import android.os.Bundle
-import android.view.View
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.widget.NestedScrollView
+import androidx.core.content.ContextCompat
+import androidx.fragment.app.Fragment
 import com.app.mobile.R
 import com.app.mobile.features.auth.activities.Auth
-import com.app.mobile.features.auth.repositories.AuthRepository
+import com.app.mobile.features.customer.fragments.*
 import com.app.mobile.shared.utils.SessionManager
-import com.google.android.material.button.MaterialButton
 
 class DashboardActivity : AppCompatActivity() {
 
-    private var activeTab = "Overview"
+    private lateinit var tvHeaderTitle: TextView
+    private lateinit var tvHeaderSubtitle: TextView
+    private lateinit var tvHeaderInitials: TextView
+
+    private lateinit var navBrowse: LinearLayout
+    private lateinit var navMyBookings: LinearLayout
+    private lateinit var navNotifications: LinearLayout
+    private lateinit var navProfile: LinearLayout
+
+    private lateinit var tvNavBrowse: TextView
+    private lateinit var tvNavBookings: TextView
+    private lateinit var tvNavNotifications: TextView
+    private lateinit var tvNavProfile: TextView
+
+    private lateinit var ivNavBrowse: ImageView
+    private lateinit var ivNavBookings: ImageView
+    private lateinit var ivNavNotifications: ImageView
+    private lateinit var ivNavProfile: ImageView
+
+    private var activeTab = "Browse"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_dashboard)
 
-        val firstName = SessionManager.getFirstName(this) ?: "User"
+        tvHeaderTitle      = findViewById(R.id.tvHeaderTitle)
+        tvHeaderSubtitle   = findViewById(R.id.tvHeaderSubtitle)
+        tvHeaderInitials   = findViewById(R.id.tvHeaderInitials)
 
-        val tvWelcome         = findViewById<TextView>(R.id.tvWelcome)
-        val tvSubtitle        = findViewById<TextView>(R.id.tvHeaderSubtitle)
-        val btnBrowseOutfits  = findViewById<MaterialButton>(R.id.btnBrowseOutfits)
-        val btnLogout         = findViewById<MaterialButton>(R.id.btnLogout)
+        navBrowse          = findViewById(R.id.navBrowse)
+        navMyBookings      = findViewById(R.id.navMyBookings)
+        navNotifications   = findViewById(R.id.navNotifications)
+        navProfile         = findViewById(R.id.navProfile)
 
-        val navOverview       = findViewById<LinearLayout>(R.id.navOverview)
-        val navMyBookings     = findViewById<LinearLayout>(R.id.navMyBookings)
-        val navNotifications  = findViewById<LinearLayout>(R.id.navNotifications)
-        val navProfile        = findViewById<LinearLayout>(R.id.navProfile)
+        tvNavBrowse        = findViewById(R.id.tvNavBrowse)
+        tvNavBookings      = findViewById(R.id.tvNavBookings)
+        tvNavNotifications = findViewById(R.id.tvNavNotifications)
+        tvNavProfile       = findViewById(R.id.tvNavProfile)
 
-        val tvNavOverview      = findViewById<TextView>(R.id.tvNavOverview)
-        val tvNavBookings      = findViewById<TextView>(R.id.tvNavBookings)
-        val tvNavNotifications = findViewById<TextView>(R.id.tvNavNotifications)
-        val tvNavProfile       = findViewById<TextView>(R.id.tvNavProfile)
+        ivNavBrowse        = findViewById(R.id.ivNavBrowse)
+        ivNavBookings      = findViewById(R.id.ivNavBookings)
+        ivNavNotifications = findViewById(R.id.ivNavNotifications)
+        ivNavProfile       = findViewById(R.id.ivNavProfile)
 
-        val layoutOverview      = findViewById<LinearLayout>(R.id.layoutOverview)
-        val layoutMyBookings    = findViewById<LinearLayout>(R.id.layoutMyBookings)
-        val layoutNotifications = findViewById<LinearLayout>(R.id.layoutNotifications)
-        val layoutProfile       = findViewById<LinearLayout>(R.id.layoutProfile)
+        val firstName = SessionManager.getFirstName(this) ?: "U"
+        val lastName  = SessionManager.getLastName(this) ?: ""
+        tvHeaderInitials.text = "${firstName.firstOrNull() ?: ""}${lastName.firstOrNull() ?: ""}".uppercase()
 
-        val tvProfileName     = findViewById<TextView>(R.id.tvProfileName)
-        val tvProfileEmail    = findViewById<TextView>(R.id.tvProfileEmail)
-        val tvProfileRole     = findViewById<TextView>(R.id.tvProfileRole)
-        val tvProfileInitials = findViewById<TextView>(R.id.tvProfileInitials)
-
-        val scrollView          = findViewById<NestedScrollView>(R.id.scrollView)
-        val sectionPopularPicks = findViewById<View>(R.id.sectionPopularPicks)
-
-        tvWelcome.text  = "Welcome back, $firstName!"
-        tvSubtitle.text = "Manage your bookings and explore new outfits."
-
-        val lastName = SessionManager.getLastName(this) ?: ""
-        val email    = SessionManager.getEmail(this) ?: ""
-        val role     = SessionManager.getRole(this) ?: "USER"
-        val initials = "${firstName.firstOrNull() ?: ""}${lastName.firstOrNull() ?: ""}".uppercase()
-
-        tvProfileName.text     = "$firstName $lastName"
-        tvProfileEmail.text    = email
-        tvProfileRole.text     = role
-        tvProfileInitials.text = initials
-
-        fun setActiveTab(tab: String) {
-            activeTab = tab
-            layoutOverview.visibility      = View.GONE
-            layoutMyBookings.visibility    = View.GONE
-            layoutNotifications.visibility = View.GONE
-            layoutProfile.visibility       = View.GONE
-
-            listOf(tvNavOverview, tvNavBookings, tvNavNotifications, tvNavProfile).forEach {
-                it.setTextColor(getColor(R.color.brand_text_subtitle))
-                it.paint.isFakeBoldText = false
-            }
-            listOf(navOverview, navMyBookings, navNotifications, navProfile).forEach {
-                it.setBackgroundColor(android.graphics.Color.TRANSPARENT)
-            }
-
-            when (tab) {
-                "Overview" -> {
-                    layoutOverview.visibility = View.VISIBLE
-                    tvNavOverview.setTextColor(getColor(R.color.brand_burgundy))
-                    tvNavOverview.paint.isFakeBoldText = true
-                    navOverview.setBackgroundResource(R.drawable.bg_nav_active)
-                }
-                "MyBookings" -> {
-                    layoutMyBookings.visibility = View.VISIBLE
-                    tvNavBookings.setTextColor(getColor(R.color.brand_burgundy))
-                    tvNavBookings.paint.isFakeBoldText = true
-                    navMyBookings.setBackgroundResource(R.drawable.bg_nav_active)
-                }
-                "Notifications" -> {
-                    layoutNotifications.visibility = View.VISIBLE
-                    tvNavNotifications.setTextColor(getColor(R.color.brand_burgundy))
-                    tvNavNotifications.paint.isFakeBoldText = true
-                    navNotifications.setBackgroundResource(R.drawable.bg_nav_active)
-                }
-                "Profile" -> {
-                    layoutProfile.visibility = View.VISIBLE
-                    tvNavProfile.setTextColor(getColor(R.color.brand_burgundy))
-                    tvNavProfile.paint.isFakeBoldText = true
-                    navProfile.setBackgroundResource(R.drawable.bg_nav_active)
-                }
-            }
-        }
-
-        navOverview.setOnClickListener      { setActiveTab("Overview") }
+        navBrowse.setOnClickListener        { setActiveTab("Browse") }
         navMyBookings.setOnClickListener    { setActiveTab("MyBookings") }
         navNotifications.setOnClickListener { setActiveTab("Notifications") }
         navProfile.setOnClickListener       { setActiveTab("Profile") }
 
-        btnBrowseOutfits.setOnClickListener {
-            setActiveTab("Overview")
-            scrollView.post { scrollView.smoothScrollTo(0, sectionPopularPicks.top) }
-        }
-
-        btnLogout.setOnClickListener {
-            val token = SessionManager.getToken(this)
-            AuthRepository.logout(
-                token = token,
-                onSuccess = {
-                    runOnUiThread { clearSessionAndGoToAuth() }
-                },
-                onError = {
-                    runOnUiThread { clearSessionAndGoToAuth() }
-                }
-            )
-        }
-
-        setActiveTab("Overview")
+        if (savedInstanceState == null) setActiveTab("Browse")
     }
 
-    override fun onResume() {
-        super.onResume()
-        if (!SessionManager.isLoggedIn(this)) {
-            clearSessionAndGoToAuth()
+    fun setActiveTab(tab: String) {
+        activeTab = tab
+
+        val burgundy  = ContextCompat.getColor(this, R.color.brand_burgundy)
+        val subtle    = ContextCompat.getColor(this, R.color.brand_text_subtitle)
+
+        listOf(tvNavBrowse, tvNavBookings, tvNavNotifications, tvNavProfile).forEach {
+            it.setTextColor(subtle)
+            it.paint.isFakeBoldText = false
         }
+        listOf(ivNavBrowse, ivNavBookings, ivNavNotifications, ivNavProfile).forEach {
+            it.imageTintList = android.content.res.ColorStateList.valueOf(subtle)
+        }
+
+        fun activate(tv: TextView, iv: ImageView) {
+            tv.setTextColor(burgundy)
+            tv.paint.isFakeBoldText = true
+            iv.imageTintList = android.content.res.ColorStateList.valueOf(burgundy)
+        }
+
+        val (title, subtitle, fragment) = when (tab) {
+            "Browse"        -> Triple("Browse Collection", "Find your perfect outfit",    CustomerBrowseFragment() as Fragment)
+            "MyBookings"    -> Triple("My Bookings",       "Track your reservations",     CustomerMyBookingsFragment())
+            "Notifications" -> Triple("Notifications",     "Stay up to date",             CustomerNotificationsFragment())
+            "Profile"       -> Triple("My Profile",        "Manage your account",         CustomerProfileFragment())
+            else            -> Triple("Browse Collection", "Find your perfect outfit",    CustomerBrowseFragment())
+        }
+
+        tvHeaderTitle.text    = title
+        tvHeaderSubtitle.text = subtitle
+
+        when (tab) {
+            "Browse"        -> activate(tvNavBrowse, ivNavBrowse)
+            "MyBookings"    -> activate(tvNavBookings, ivNavBookings)
+            "Notifications" -> activate(tvNavNotifications, ivNavNotifications)
+            "Profile"       -> activate(tvNavProfile, ivNavProfile)
+        }
+
+        supportFragmentManager.beginTransaction()
+            .replace(R.id.fragmentContainer, fragment)
+            .commit()
     }
+
+    fun goToMyBookings() = setActiveTab("MyBookings")
 
     fun showSessionExpiredDialog() {
         if (isFinishing || isDestroyed) return
@@ -152,9 +128,9 @@ class DashboardActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun clearSessionAndGoToAuth() {
-        SessionManager.clearSession(this)
-        goToAuth()
+    override fun onResume() {
+        super.onResume()
+        if (!SessionManager.isLoggedIn(this)) goToAuth()
     }
 
     private fun goToAuth() {

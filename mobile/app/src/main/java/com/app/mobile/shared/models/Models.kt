@@ -29,13 +29,14 @@ data class FittingBooking(
     val id: String,
     val bookingId: String,
     val leaseBookingId: String? = null,
+    val itemId: String? = null,
     val itemName: String,
     val customerName: String,
     val customerEmail: String,
     val customerPhone: String,
     val fittingDate: String,
     val fittingTime: String,
-    val preferredSize: String,
+    val preferredSize: String? = null,
     val notes: String?,
     val status: String,
     val leaseStarted: Boolean = false,
@@ -57,7 +58,7 @@ data class DirectBooking(
     val customerName: String,
     val customerEmail: String,
     val customerPhone: String,
-    val preferredSize: String,
+    val preferredSize: String? = null,
     val notes: String?,
     val extended: Boolean = false,
     val createdAt: String
@@ -190,6 +191,15 @@ data class RescheduleRequest(val fittingDate: String, val fittingTime: String)
 data class ExtendRequest(val newEndDate: String)
 data class UpdateDatesRequest(val startDate: String, val endDate: String)
 
+data class CustomerBookFittingRequest(
+    val itemId: String,
+    val itemName: String,
+    val fittingDate: String,
+    val fittingTime: String,
+    val preferredSize: String?,
+    val notes: String?
+)
+
 data class CreateItemRequest(
     val name: String,
     val category: String,
@@ -222,7 +232,8 @@ data class InventorySettings(
 // ── Booking Availability ──────────────────────────────────────────────────
 data class OccupiedDateRange(
     val startDate: String,
-    val endDate: String
+    val endDate: String,
+    val status: String? = null
 )
 
 data class DirectAvailabilityResponse(
@@ -246,10 +257,11 @@ data class CreateDirectBookingRequest(
     val customerEmail: String,
     val customerName: String,
     val customerPhone: String,
-    val itemId: String,
+    val inventoryItemId: String,
     val itemName: String,
     val startDate: String,
     val endDate: String,
+    val totalDays: Int,
     val basePrice: Double,
     val discountAmount: Double = 0.0,
     val finalPrice: Double,

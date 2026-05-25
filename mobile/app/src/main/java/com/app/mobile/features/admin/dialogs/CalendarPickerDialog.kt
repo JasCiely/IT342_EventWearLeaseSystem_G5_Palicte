@@ -421,8 +421,7 @@ class CalendarPickerDialog : DialogFragment() {
     }
 
     private fun isWorkdayOver(s: BookingSettings?): Boolean {
-        if (s?.enableTimeRestrictions != true) return false
-        val close = s.shopCloseTime.split(":")
+        val close = s?.shopCloseTime?.split(":") ?: listOf("17", "0")
         val closeH = close.getOrNull(0)?.toIntOrNull() ?: 17
         val closeM = close.getOrNull(1)?.toIntOrNull() ?: 0
         val now = Calendar.getInstance()

@@ -525,18 +525,19 @@ class CreateBookingDialogFragment : DialogFragment() {
                     val discount  = minOf(rawDisc, inv?.monthlyDiscountCap?.toDouble() ?: rawDisc)
                     val finalAmt  = maxOf(0.0, base - discount)
                     val req       = CreateDirectBookingRequest(
-                        customerEmail  = email,
-                        customerName   = name,
-                        customerPhone  = phone,
-                        itemId         = item.id,
-                        itemName       = item.name,
-                        startDate      = startDate,
-                        endDate        = endDate,
-                        basePrice      = base,
-                        discountAmount = discount,
-                        finalPrice     = finalAmt,
-                        notes          = notes,
-                        preferredSize  = selectedSize.ifEmpty { null }
+                        customerEmail   = email,
+                        customerName    = name,
+                        customerPhone   = phone,
+                        inventoryItemId = item.id,
+                        itemName        = item.name,
+                        startDate       = startDate,
+                        endDate         = endDate,
+                        totalDays       = days,
+                        basePrice       = base,
+                        discountAmount  = discount,
+                        finalPrice      = finalAmt,
+                        notes           = notes,
+                        preferredSize   = selectedSize.ifEmpty { null }
                     )
                     ApiClient.adminApi.createDirectBooking(ApiClient.bearerToken(), req)
                 }

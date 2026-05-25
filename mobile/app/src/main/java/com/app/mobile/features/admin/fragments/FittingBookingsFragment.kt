@@ -249,8 +249,8 @@ class FittingBookingsFragment : Fragment(), SseClient.SseListener {
                 val notes = etNotes.text.toString().trim().ifEmpty { "Post-fitting rental for ${booking.itemName}" }
                 val req = CreateDirectBookingRequest(
                     customerEmail = booking.customerEmail, customerName = booking.customerName,
-                    customerPhone = booking.customerPhone, itemId = itemId, itemName = booking.itemName,
-                    startDate = pickupDate, endDate = returnDate, basePrice = base,
+                    customerPhone = booking.customerPhone, inventoryItemId = itemId, itemName = booking.itemName,
+                    startDate = pickupDate, endDate = returnDate, totalDays = days, basePrice = base,
                     discountAmount = discount, finalPrice = finalAmt, notes = notes, preferredSize = booking.preferredSize
                 )
                 viewLifecycleOwner.lifecycleScope.launch {
