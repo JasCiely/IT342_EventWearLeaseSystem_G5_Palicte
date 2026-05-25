@@ -12,6 +12,7 @@ public class UserSummaryResponse {
     private String firstName;
     private String lastName;
     private String email;
+    private String phone;
     private String role;
     private boolean active;
     private LocalDateTime createdAt;
@@ -22,6 +23,7 @@ public class UserSummaryResponse {
         dto.setFirstName(user.getFirstName());
         dto.setLastName(user.getLastName());
         dto.setEmail(user.getEmail());
+        dto.setPhone(user.getPhone());
         dto.setRole(user.getRole().name());
         dto.setActive(user.isActive());
         dto.setCreatedAt(user.getCreatedAt());
