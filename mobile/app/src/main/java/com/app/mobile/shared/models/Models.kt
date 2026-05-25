@@ -211,6 +211,11 @@ data class CreateItemRequest(
     val description: String?
 )
 
+data class UpdateStatusRequest(
+    val status: String,
+    val maintenanceEndDate: String? = null
+)
+
 // ── Booking Settings ──────────────────────────────────────────────────────
 data class BookingSettings(
     val enableTimeRestrictions: Boolean = true,

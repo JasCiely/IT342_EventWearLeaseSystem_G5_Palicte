@@ -246,6 +246,13 @@ interface AdminApiService {
         @Path("id") id: String
     ): InventoryItem
 
+    @PATCH("api/inventory/items/{id}/status")
+    suspend fun patchItemStatus(
+        @Header("Authorization") token: String,
+        @Path("id") id: String,
+        @Body body: UpdateStatusRequest
+    ): InventoryItem
+
     // ── Promotions ────────────────────────────────────────────────────────
     @GET("api/inventory/promotions")
     suspend fun getPromotions(): List<Promotion>

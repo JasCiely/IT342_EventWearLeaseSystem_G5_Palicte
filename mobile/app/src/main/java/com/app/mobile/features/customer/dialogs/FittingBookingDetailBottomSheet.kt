@@ -20,6 +20,7 @@ class FittingBookingDetailBottomSheet : BottomSheetDialogFragment() {
 
     private lateinit var booking: FittingBooking
     var onCancelled: (() -> Unit)? = null
+    var onRescheduled: (() -> Unit)? = null
 
     companion object {
         fun newInstance(booking: FittingBooking): FittingBookingDetailBottomSheet {
@@ -33,14 +34,15 @@ class FittingBookingDetailBottomSheet : BottomSheetDialogFragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        val tvStatus   = view.findViewById<TextView>(R.id.tvStatus)
-        val tvItemName = view.findViewById<TextView>(R.id.tvItemName)
-        val tvDateTime = view.findViewById<TextView>(R.id.tvDateTime)
-        val tvSize     = view.findViewById<TextView>(R.id.tvSize)
-        val labelNotes = view.findViewById<TextView>(R.id.labelNotes)
-        val tvNotes    = view.findViewById<TextView>(R.id.tvNotes)
-        val btnCancel  = view.findViewById<MaterialButton>(R.id.btnCancel)
-        val btnClose   = view.findViewById<MaterialButton>(R.id.btnClose)
+        val tvStatus      = view.findViewById<TextView>(R.id.tvStatus)
+        val tvItemName    = view.findViewById<TextView>(R.id.tvItemName)
+        val tvDateTime    = view.findViewById<TextView>(R.id.tvDateTime)
+        val tvSize        = view.findViewById<TextView>(R.id.tvSize)
+        val labelNotes    = view.findViewById<TextView>(R.id.labelNotes)
+        val tvNotes       = view.findViewById<TextView>(R.id.tvNotes)
+        val btnReschedule = view.findViewById<MaterialButton>(R.id.btnReschedule)
+        val btnCancel     = view.findViewById<MaterialButton>(R.id.btnCancel)
+        val btnClose      = view.findViewById<MaterialButton>(R.id.btnClose)
 
         tvItemName.text = booking.itemName
         tvDateTime.text = "${booking.fittingDate} at ${booking.fittingTime}"
@@ -62,6 +64,18 @@ class FittingBookingDetailBottomSheet : BottomSheetDialogFragment() {
         tvStatus.text = booking.status.replaceFirstChar { it.uppercase() }
         tvStatus.setBackgroundColor(bg)
         tvStatus.setTextColor(fg)
+
+        val canReschedule = booking.status.uppercase() == "CONFIRMED"
+        btnReschedule.visibility = if (canReschedule) View.VISIBLE else View.GONE
+
+        btnReschedule.setOnClickListener {
+            val dialog = RescheduleFittingDialog.newInstance(booking)
+            dialog.onRescheduled = {
+                onRescheduled?.invoke()
+                dismiss()
+            }
+            dialog.show(childFragmentManager, "reschedule_fitting")
+        }
 
         val canCancel = booking.status.uppercase() == "PENDING"
         btnCancel.visibility = if (canCancel) View.VISIBLE else View.GONE

@@ -1,6 +1,7 @@
 package com.app.mobile.shared.api
 
 import com.app.mobile.shared.models.*
+import okhttp3.MultipartBody
 import retrofit2.http.*
 
 interface CustomerApiService {
@@ -22,6 +23,13 @@ interface CustomerApiService {
         @Header("Authorization") token: String,
         @Path("id") id: String
     ): MessageResponse
+
+    @PATCH("api/inventory/bookings/{id}/reschedule")
+    suspend fun rescheduleFittingBooking(
+        @Header("Authorization") token: String,
+        @Path("id") id: String,
+        @Body body: RescheduleRequest
+    ): FittingBooking
 
     // ── Direct Bookings ───────────────────────────────────────────────────
     @POST("api/direct-bookings")
@@ -46,6 +54,13 @@ interface CustomerApiService {
         @Path("id") id: String
     ): MessageResponse
 
+    @PUT("api/direct-bookings/{id}/edit-dates")
+    suspend fun editDirectBookingDates(
+        @Header("Authorization") token: String,
+        @Path("id") id: String,
+        @Body body: UpdateDatesRequest
+    ): DirectBooking
+
     // ── Profile ───────────────────────────────────────────────────────────
     @GET("api/user/profile")
     suspend fun getProfile(@Header("Authorization") token: String): UserProfile
@@ -55,6 +70,19 @@ interface CustomerApiService {
         @Header("Authorization") token: String,
         @Body body: UpdateProfileRequest
     ): UserProfile
+
+    @Multipart
+    @POST("api/user/profile/photo")
+    suspend fun uploadProfilePhoto(
+        @Header("Authorization") token: String,
+        @Part photo: MultipartBody.Part
+    ): UserProfile
+
+    @POST("api/auth/change-password")
+    suspend fun changePassword(
+        @Header("Authorization") token: String,
+        @Body body: ChangePasswordRequest
+    ): MessageResponse
 
     // ── Shared Read-Only ──────────────────────────────────────────────────
     @GET("api/inventory/items")

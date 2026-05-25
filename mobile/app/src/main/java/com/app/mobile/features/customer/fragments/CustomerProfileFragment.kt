@@ -1,11 +1,13 @@
 package com.app.mobile.features.customer.fragments
 
+import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.view.*
 import android.widget.*
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
-import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.app.mobile.R
@@ -13,15 +15,24 @@ import com.app.mobile.features.auth.activities.Auth
 import com.app.mobile.features.auth.repositories.AuthRepository
 import com.app.mobile.features.customer.activities.DashboardActivity
 import com.app.mobile.shared.api.ApiClient
+import com.app.mobile.shared.models.ChangePasswordRequest
 import com.app.mobile.shared.models.UpdateProfileRequest
 import com.app.mobile.shared.utils.SessionManager
+import com.bumptech.glide.Glide
 import com.google.android.material.button.MaterialButton
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import retrofit2.HttpException
 
 class CustomerProfileFragment : Fragment() {
 
+    private lateinit var avatarContainer: FrameLayout
     private lateinit var tvInitials: TextView
+    private lateinit var ivProfilePhoto: ImageView
     private lateinit var tvFullName: TextView
     private lateinit var tvEmail: TextView
     private lateinit var tvRole: TextView
@@ -33,29 +44,36 @@ class CustomerProfileFragment : Fragment() {
     private lateinit var btnChangePassword: MaterialButton
     private lateinit var btnLogout: MaterialButton
 
+    private val pickImage = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri ?: return@registerForActivityResult
+        uploadPhoto(uri)
+    }
+
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View =
         inflater.inflate(R.layout.fragment_customer_profile, container, false)
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        tvInitials       = view.findViewById(R.id.tvInitials)
-        tvFullName       = view.findViewById(R.id.tvFullName)
-        tvEmail          = view.findViewById(R.id.tvEmail)
-        tvRole           = view.findViewById(R.id.tvRole)
-        tvFirstName      = view.findViewById(R.id.tvFirstName)
-        tvLastName       = view.findViewById(R.id.tvLastName)
-        tvEmailField     = view.findViewById(R.id.tvEmailField)
-        tvPhone          = view.findViewById(R.id.tvPhone)
-        btnEditProfile   = view.findViewById(R.id.btnEditProfile)
+        avatarContainer   = view.findViewById(R.id.avatarContainer)
+        tvInitials        = view.findViewById(R.id.tvInitials)
+        ivProfilePhoto    = view.findViewById(R.id.ivProfilePhoto)
+        tvFullName        = view.findViewById(R.id.tvFullName)
+        tvEmail           = view.findViewById(R.id.tvEmail)
+        tvRole            = view.findViewById(R.id.tvRole)
+        tvFirstName       = view.findViewById(R.id.tvFirstName)
+        tvLastName        = view.findViewById(R.id.tvLastName)
+        tvEmailField      = view.findViewById(R.id.tvEmailField)
+        tvPhone           = view.findViewById(R.id.tvPhone)
+        btnEditProfile    = view.findViewById(R.id.btnEditProfile)
         btnChangePassword = view.findViewById(R.id.btnChangePassword)
-        btnLogout        = view.findViewById(R.id.btnLogout)
+        btnLogout         = view.findViewById(R.id.btnLogout)
 
         populateFromSession()
         loadProfile()
 
+        avatarContainer.setOnClickListener { pickImage.launch("image/*") }
         btnEditProfile.setOnClickListener { showEditProfileDialog() }
-
         btnChangePassword.setOnClickListener { showChangePasswordDialog() }
 
         btnLogout.setOnClickListener {
@@ -81,12 +99,14 @@ class CustomerProfileFragment : Fragment() {
         val lastName  = SessionManager.getLastName(ctx) ?: ""
         val email     = SessionManager.getEmail(ctx) ?: ""
 
-        tvInitials.text  = "${firstName.firstOrNull() ?: ""}${lastName.firstOrNull() ?: ""}".uppercase()
-        tvFullName.text  = "$firstName $lastName".trim()
-        tvEmail.text     = email
-        tvFirstName.text = firstName
-        tvLastName.text  = lastName
+        tvInitials.text   = "${firstName.firstOrNull() ?: ""}${lastName.firstOrNull() ?: ""}".uppercase()
+        tvFullName.text   = "$firstName $lastName".trim()
+        tvEmail.text      = email
+        tvFirstName.text  = firstName
+        tvLastName.text   = lastName
         tvEmailField.text = email
+
+        prefs().getString(KEY_PHOTO_URL, null)?.let { showPhotoFromUrl(it) }
     }
 
     private fun loadProfile() {
@@ -114,10 +134,63 @@ class CustomerProfileFragment : Fragment() {
                     role      = profile.role,
                     phone     = profile.phone ?: ""
                 )
+
+                profile.profilePhotoUrl?.let { url ->
+                    prefs().edit().putString(KEY_PHOTO_URL, url).apply()
+                    showPhotoFromUrl(url)
+                }
             } catch (e: HttpException) {
                 if (e.code() == 401) (activity as? DashboardActivity)?.showSessionExpiredDialog()
             } catch (_: Exception) {}
         }
+    }
+
+    private fun uploadPhoto(uri: Uri) {
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                val ctx      = requireContext()
+                val mimeType = ctx.contentResolver.getType(uri) ?: "image/jpeg"
+                val ext = when (mimeType) {
+                    "image/png"  -> "png"
+                    "image/webp" -> "webp"
+                    else         -> "jpg"
+                }
+                val bytes = withContext(Dispatchers.IO) {
+                    ctx.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                } ?: run {
+                    Toast.makeText(ctx, "Could not read image", Toast.LENGTH_SHORT).show()
+                    return@launch
+                }
+
+                val body    = bytes.toRequestBody(mimeType.toMediaType())
+                val part    = MultipartBody.Part.createFormData("photo", "photo.$ext", body)
+                val updated = ApiClient.customerApi.uploadProfilePhoto(ApiClient.bearerToken(), part)
+
+                updated.profilePhotoUrl?.let { url ->
+                    prefs().edit().putString(KEY_PHOTO_URL, url).apply()
+                    showPhotoFromUrl(url)
+                }
+                Toast.makeText(ctx, "Photo updated", Toast.LENGTH_SHORT).show()
+            } catch (e: HttpException) {
+                if (e.code() == 401) {
+                    (activity as? DashboardActivity)?.showSessionExpiredDialog()
+                } else {
+                    Toast.makeText(requireContext(), "Upload failed", Toast.LENGTH_SHORT).show()
+                }
+            } catch (_: Exception) {
+                Toast.makeText(requireContext(), "Could not upload photo", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun showPhotoFromUrl(url: String) {
+        if (!isAdded) return
+        Glide.with(this)
+            .load(url)
+            .circleCrop()
+            .into(ivProfilePhoto)
+        ivProfilePhoto.visibility = View.VISIBLE
+        tvInitials.visibility     = View.GONE
     }
 
     private fun showEditProfileDialog() {
@@ -184,8 +257,8 @@ class CustomerProfileFragment : Fragment() {
     private fun showChangePasswordDialog() {
         val ctx  = requireContext()
         val view = layoutInflater.inflate(R.layout.dialog_change_password, null)
-        val etOld    = view.findViewById<EditText>(R.id.etOldPassword)
-        val etNew    = view.findViewById<EditText>(R.id.etNewPassword)
+        val etOld     = view.findViewById<EditText>(R.id.etOldPassword)
+        val etNew     = view.findViewById<EditText>(R.id.etNewPassword)
         val etConfirm = view.findViewById<EditText>(R.id.etConfirmPassword)
 
         AlertDialog.Builder(ctx)
@@ -211,9 +284,9 @@ class CustomerProfileFragment : Fragment() {
 
                 viewLifecycleOwner.lifecycleScope.launch {
                     try {
-                        ApiClient.adminApi.changePassword(
+                        ApiClient.customerApi.changePassword(
                             ApiClient.bearerToken(),
-                            com.app.mobile.shared.models.ChangePasswordRequest(old, newPass)
+                            ChangePasswordRequest(old, newPass)
                         )
                         Toast.makeText(ctx, "Password updated successfully!", Toast.LENGTH_SHORT).show()
                     } catch (e: HttpException) {
@@ -231,10 +304,17 @@ class CustomerProfileFragment : Fragment() {
             .show()
     }
 
+    private fun prefs() =
+        requireContext().getSharedPreferences("customer_profile_prefs", Context.MODE_PRIVATE)
+
     private fun goToAuth() {
         SessionManager.clearSession(requireContext())
         startActivity(Intent(requireContext(), Auth::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         })
+    }
+
+    companion object {
+        private const val KEY_PHOTO_URL = "profile_photo_url"
     }
 }

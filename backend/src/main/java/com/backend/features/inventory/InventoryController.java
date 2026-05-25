@@ -98,6 +98,25 @@ public class InventoryController {
         }
     }
 
+    @PatchMapping("/items/{id}/status")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ItemResponse> updateItemStatus(
+            @PathVariable String id,
+            @RequestBody java.util.Map<String, String> body) {
+        try {
+            String status = body.get("status");
+            if (status == null || status.isBlank()) {
+                return ResponseEntity.badRequest().build();
+            }
+            ItemResponse result = inventoryService.updateItemStatus(id, status, body.get("maintenanceEndDate"));
+            sseService.broadcast("INVENTORY_UPDATE");
+            return ResponseEntity.ok(result);
+        } catch (RuntimeException e) {
+            log.error("Update status error: {}", e.getMessage());
+            return ResponseEntity.notFound().build();
+        }
+    }
+
     // ── Promotions (public GET, ADMIN write) ─────────────────
 
     @GetMapping("/promotions")

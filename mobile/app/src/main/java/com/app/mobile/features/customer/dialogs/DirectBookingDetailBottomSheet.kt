@@ -14,7 +14,7 @@ import com.app.mobile.shared.api.ApiClient
 import com.app.mobile.shared.models.DirectBooking
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.google.android.material.button.MaterialButton
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.launch    
 import retrofit2.HttpException
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -23,6 +23,7 @@ class DirectBookingDetailBottomSheet : BottomSheetDialogFragment() {
 
     private lateinit var booking: DirectBooking
     var onCancelled: (() -> Unit)? = null
+    var onRescheduled: (() -> Unit)? = null
 
     companion object {
         fun newInstance(booking: DirectBooking): DirectBookingDetailBottomSheet {
@@ -36,18 +37,19 @@ class DirectBookingDetailBottomSheet : BottomSheetDialogFragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        val tvStatus    = view.findViewById<TextView>(R.id.tvStatus)
-        val tvItemName  = view.findViewById<TextView>(R.id.tvItemName)
-        val tvDates     = view.findViewById<TextView>(R.id.tvDates)
-        val tvSize      = view.findViewById<TextView>(R.id.tvSize)
-        val tvBasePrice = view.findViewById<TextView>(R.id.tvBasePrice)
-        val rowDiscount = view.findViewById<LinearLayout>(R.id.rowDiscount)
-        val tvDiscount  = view.findViewById<TextView>(R.id.tvDiscount)
-        val tvTotal     = view.findViewById<TextView>(R.id.tvTotal)
-        val labelNotes  = view.findViewById<TextView>(R.id.labelNotes)
-        val tvNotes     = view.findViewById<TextView>(R.id.tvNotes)
-        val btnCancel   = view.findViewById<MaterialButton>(R.id.btnCancel)
-        val btnClose    = view.findViewById<MaterialButton>(R.id.btnClose)
+        val tvStatus     = view.findViewById<TextView>(R.id.tvStatus)
+        val tvItemName   = view.findViewById<TextView>(R.id.tvItemName)
+        val tvDates      = view.findViewById<TextView>(R.id.tvDates)
+        val tvSize       = view.findViewById<TextView>(R.id.tvSize)
+        val tvBasePrice  = view.findViewById<TextView>(R.id.tvBasePrice)
+        val rowDiscount  = view.findViewById<LinearLayout>(R.id.rowDiscount)
+        val tvDiscount   = view.findViewById<TextView>(R.id.tvDiscount)
+        val tvTotal      = view.findViewById<TextView>(R.id.tvTotal)
+        val labelNotes   = view.findViewById<TextView>(R.id.labelNotes)
+        val tvNotes      = view.findViewById<TextView>(R.id.tvNotes)
+        val btnEditDates = view.findViewById<MaterialButton>(R.id.btnEditDates)
+        val btnCancel    = view.findViewById<MaterialButton>(R.id.btnCancel)
+        val btnClose     = view.findViewById<MaterialButton>(R.id.btnClose)
 
         tvItemName.text = booking.itemName
         tvDates.text    = "${formatDate(booking.startDate)} → ${formatDate(booking.endDate)} · ${booking.totalDays} day${if (booking.totalDays != 1) "s" else ""}"
@@ -79,7 +81,20 @@ class DirectBookingDetailBottomSheet : BottomSheetDialogFragment() {
         tvStatus.setBackgroundColor(bg)
         tvStatus.setTextColor(fg)
 
-        val canCancel = booking.bookingStatus.uppercase() in listOf("PENDING", "APPROVED")
+        val statusUp = booking.bookingStatus.uppercase()
+        val canEditDates = statusUp in listOf("PENDING", "APPROVED", "ACTIVE LEASE", "ACTIVE")
+        btnEditDates.visibility = if (canEditDates) View.VISIBLE else View.GONE
+
+        btnEditDates.setOnClickListener {
+            val dialog = EditDirectDatesDialog.newInstance(booking)
+            dialog.onRescheduled = {
+                onRescheduled?.invoke()
+                dismiss()
+            }
+            dialog.show(childFragmentManager, "edit_direct_dates")
+        }
+
+        val canCancel = statusUp in listOf("PENDING", "APPROVED")
         btnCancel.visibility = if (canCancel) View.VISIBLE else View.GONE
 
         btnCancel.setOnClickListener {

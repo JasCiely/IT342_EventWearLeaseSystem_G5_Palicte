@@ -11,7 +11,6 @@ import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.app.mobile.R
-import com.app.mobile.databinding.FragmentMoreBinding
 import com.app.mobile.features.auth.activities.Auth
 import com.app.mobile.features.auth.repositories.AuthRepository
 import com.app.mobile.shared.api.ApiClient
@@ -20,6 +19,7 @@ import com.app.mobile.shared.models.UpdateProfileRequest
 import com.app.mobile.shared.sse.SseClient
 import com.app.mobile.shared.utils.SessionManager
 import com.bumptech.glide.Glide
+import com.google.android.material.button.MaterialButton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -30,69 +30,109 @@ import retrofit2.HttpException
 
 class MoreFragment : Fragment() {
 
-    private var _binding: FragmentMoreBinding? = null
-    private val binding get() = _binding!!
+    private lateinit var avatarContainer: FrameLayout
+    private lateinit var tvInitials: TextView
+    private lateinit var ivProfilePhoto: ImageView
+    private lateinit var tvAdminName: TextView
+    private lateinit var tvAdminEmail: TextView
+    private lateinit var tvAdminRole: TextView
+    private lateinit var tvFirstName: TextView
+    private lateinit var tvLastName: TextView
+    private lateinit var tvEmailField: TextView
+    private lateinit var tvPhone: TextView
+    private lateinit var btnEditProfile: TextView
+    private lateinit var cardCustomers: LinearLayout
+    private lateinit var btnChangePassword: MaterialButton
+    private lateinit var btnLogout: MaterialButton
 
     private val pickImage = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         uri ?: return@registerForActivityResult
         uploadPhoto(uri)
     }
 
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
-        _binding = FragmentMoreBinding.inflate(inflater, container, false)
-        return binding.root
-    }
+    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View =
+        inflater.inflate(R.layout.fragment_more, container, false)
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        avatarContainer   = view.findViewById(R.id.avatarContainer)
+        tvInitials        = view.findViewById(R.id.tvInitials)
+        ivProfilePhoto    = view.findViewById(R.id.ivProfilePhoto)
+        tvAdminName       = view.findViewById(R.id.tvAdminName)
+        tvAdminEmail      = view.findViewById(R.id.tvAdminEmail)
+        tvAdminRole       = view.findViewById(R.id.tvAdminRole)
+        tvFirstName       = view.findViewById(R.id.tvFirstName)
+        tvLastName        = view.findViewById(R.id.tvLastName)
+        tvEmailField      = view.findViewById(R.id.tvEmailField)
+        tvPhone           = view.findViewById(R.id.tvPhone)
+        btnEditProfile    = view.findViewById(R.id.btnEditProfile)
+        cardCustomers     = view.findViewById(R.id.cardCustomers)
+        btnChangePassword = view.findViewById(R.id.btnChangePassword)
+        btnLogout         = view.findViewById(R.id.btnLogout)
+
+        populateFromSession()
         loadProfile()
 
-        binding.avatarContainer.setOnClickListener { pickImage.launch("image/*") }
-        binding.btnSaveProfile.setOnClickListener { saveProfile() }
-        binding.btnChangePassword.setOnClickListener { showChangePasswordDialog() }
-        binding.cardCustomers.setOnClickListener { navigateTo(CustomersFragment()) }
+        avatarContainer.setOnClickListener { pickImage.launch("image/*") }
+        btnEditProfile.setOnClickListener { showEditProfileDialog() }
+        cardCustomers.setOnClickListener { navigateTo(CustomersFragment()) }
+        btnChangePassword.setOnClickListener { showChangePasswordDialog() }
 
-        binding.btnLogout.setOnClickListener {
+        btnLogout.setOnClickListener {
             AlertDialog.Builder(requireContext())
-                .setTitle("Logout")
-                .setMessage("Are you sure you want to log out?")
-                .setPositiveButton("Logout") { _, _ -> performLogout() }
+                .setTitle("Sign Out")
+                .setMessage("Are you sure you want to sign out?")
+                .setPositiveButton("Sign Out") { _, _ -> performLogout() }
                 .setNegativeButton("Cancel", null)
                 .show()
         }
     }
 
-    // ── Profile load ─────────────────────────────────────────────────────────
+    private fun populateFromSession() {
+        val ctx       = requireContext()
+        val firstName = SessionManager.getFirstName(ctx) ?: ""
+        val lastName  = SessionManager.getLastName(ctx) ?: ""
+        val email     = SessionManager.getEmail(ctx) ?: ""
+        val role      = SessionManager.getRole(ctx) ?: "ADMIN"
+
+        tvInitials.text   = "${firstName.firstOrNull() ?: ""}${lastName.firstOrNull() ?: ""}".uppercase()
+        tvAdminName.text  = "$firstName $lastName".trim()
+        tvAdminEmail.text = email
+        tvAdminRole.text  = role
+        tvFirstName.text  = firstName
+        tvLastName.text   = lastName
+        tvEmailField.text = email
+
+        prefs().getString(KEY_PHOTO_URL, null)?.let { showPhotoFromUrl(it) }
+    }
 
     private fun loadProfile() {
-        val ctx = requireContext()
-        // Instant fill from session cache
-        binding.etFirstName.setText(SessionManager.getFirstName(ctx) ?: "")
-        binding.etLastName.setText(SessionManager.getLastName(ctx) ?: "")
-        binding.etEmail.setText(SessionManager.getEmail(ctx) ?: "")
-        binding.etPhone.setText(SessionManager.getPhone(ctx) ?: "")
-        applyHeader(
-            SessionManager.getFirstName(ctx) ?: "Admin",
-            SessionManager.getLastName(ctx) ?: "",
-            SessionManager.getEmail(ctx) ?: "",
-            SessionManager.getRole(ctx) ?: "ADMIN"
-        )
-
-        // Show saved photo URL immediately (from previous session)
-        prefs().getString(KEY_PHOTO_URL, null)?.let { showPhotoFromUrl(it) }
-
-        // Refresh from API in background
         viewLifecycleOwner.lifecycleScope.launch {
             try {
                 val profile = ApiClient.adminApi.getProfile(ApiClient.bearerToken())
-                binding.etFirstName.setText(profile.firstName)
-                binding.etLastName.setText(profile.lastName)
-                binding.etEmail.setText(profile.email)
-                binding.etPhone.setText(profile.phone ?: "")
-                applyHeader(profile.firstName, profile.lastName, profile.email, profile.role)
+                val ctx     = requireContext()
 
-                // Load photo from backend if available
+                tvInitials.text   = profile.initials
+                tvAdminName.text  = profile.fullName
+                tvAdminEmail.text = profile.email
+                tvAdminRole.text  = profile.role
+                tvFirstName.text  = profile.firstName
+                tvLastName.text   = profile.lastName
+                tvEmailField.text = profile.email
+                tvPhone.text      = profile.phone?.takeIf { it.isNotBlank() } ?: "—"
+
+                SessionManager.saveUser(
+                    context   = ctx,
+                    token     = SessionManager.getToken(ctx) ?: "",
+                    userId    = profile.id,
+                    firstName = profile.firstName,
+                    lastName  = profile.lastName,
+                    email     = profile.email,
+                    role      = profile.role,
+                    phone     = profile.phone ?: ""
+                )
+
                 profile.profilePhotoUrl?.let { url ->
                     prefs().edit().putString(KEY_PHOTO_URL, url).apply()
                     showPhotoFromUrl(url)
@@ -101,72 +141,25 @@ class MoreFragment : Fragment() {
         }
     }
 
-    private fun applyHeader(firstName: String, lastName: String, email: String, role: String) {
-        binding.tvAdminName.text  = "$firstName $lastName".trim()
-        binding.tvAdminEmail.text = email
-        binding.tvAdminRole.text  = role
-        // Only update initials if no photo is showing
-        if (binding.ivProfilePhoto.visibility != View.VISIBLE) {
-            binding.tvInitials.text = "${firstName.firstOrNull() ?: ""}${lastName.firstOrNull() ?: ""}".uppercase()
-        }
-    }
-
-    // ── Profile save ─────────────────────────────────────────────────────────
-
-    private fun saveProfile() {
-        val firstName = binding.etFirstName.text.toString().trim()
-        val lastName  = binding.etLastName.text.toString().trim()
-        val email     = binding.etEmail.text.toString().trim()
-        val phone     = binding.etPhone.text.toString().trim().ifEmpty { null }
-
-        if (firstName.isEmpty() || lastName.isEmpty() || email.isEmpty()) {
-            toast("First name, last name, and email are required"); return
-        }
-
-        viewLifecycleOwner.lifecycleScope.launch {
-            try {
-                val updated = ApiClient.adminApi.updateProfile(
-                    ApiClient.bearerToken(),
-                    UpdateProfileRequest(firstName, lastName, email, phone)
-                )
-                val ctx = requireContext()
-                SessionManager.saveUser(
-                    context   = ctx,
-                    token     = SessionManager.getToken(ctx) ?: "",
-                    firstName = updated.firstName,
-                    lastName  = updated.lastName,
-                    email     = updated.email,
-                    role      = updated.role,
-                    userId    = SessionManager.getUserId(ctx) ?: "",
-                    phone     = updated.phone ?: ""
-                )
-                applyHeader(updated.firstName, updated.lastName, updated.email, updated.role)
-                toast("Profile updated successfully")
-            } catch (e: HttpException) {
-                toast(if (e.code() == 401) "Session expired" else getString(R.string.error_network))
-            } catch (_: Exception) { toast(getString(R.string.error_network)) }
-        }
-    }
-
-    // ── Photo upload ──────────────────────────────────────────────────────────
-
     private fun uploadPhoto(uri: Uri) {
         viewLifecycleOwner.lifecycleScope.launch {
             try {
-                val mimeType = requireContext().contentResolver.getType(uri) ?: "image/jpeg"
+                val ctx      = requireContext()
+                val mimeType = ctx.contentResolver.getType(uri) ?: "image/jpeg"
                 val ext = when (mimeType) {
                     "image/png"  -> "png"
                     "image/webp" -> "webp"
-                    "image/gif"  -> "gif"
                     else         -> "jpg"
                 }
                 val bytes = withContext(Dispatchers.IO) {
-                    requireContext().contentResolver.openInputStream(uri)?.use { it.readBytes() }
-                } ?: run { toast("Could not read image"); return@launch }
+                    ctx.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                } ?: run {
+                    toast("Could not read image")
+                    return@launch
+                }
 
-                val body = bytes.toRequestBody(mimeType.toMediaType())
-                val part = MultipartBody.Part.createFormData("photo", "photo.$ext", body)
-
+                val body    = bytes.toRequestBody(mimeType.toMediaType())
+                val part    = MultipartBody.Part.createFormData("photo", "photo.$ext", body)
                 val updated = ApiClient.adminApi.uploadProfilePhoto(ApiClient.bearerToken(), part)
 
                 updated.profilePhotoUrl?.let { url ->
@@ -176,52 +169,118 @@ class MoreFragment : Fragment() {
                 toast("Photo updated")
             } catch (e: HttpException) {
                 toast(if (e.code() == 401) "Session expired" else "Upload failed")
-            } catch (_: Exception) { toast("Could not upload photo") }
+            } catch (_: Exception) {
+                toast("Could not upload photo")
+            }
         }
     }
 
     private fun showPhotoFromUrl(url: String) {
-        if (!isAdded || _binding == null) return
+        if (!isAdded) return
         Glide.with(this)
             .load(url)
             .circleCrop()
-            .into(binding.ivProfilePhoto)
-        binding.ivProfilePhoto.visibility = View.VISIBLE
-        binding.tvInitials.visibility = View.GONE
+            .into(ivProfilePhoto)
+        ivProfilePhoto.visibility = View.VISIBLE
+        tvInitials.visibility     = View.GONE
     }
 
-    // ── Change password ───────────────────────────────────────────────────────
+    private fun showEditProfileDialog() {
+        val ctx  = requireContext()
+        val view = layoutInflater.inflate(R.layout.dialog_edit_profile, null)
+        val etFirstName = view.findViewById<EditText>(R.id.etFirstName)
+        val etLastName  = view.findViewById<EditText>(R.id.etLastName)
+        val etEmail     = view.findViewById<EditText>(R.id.etEmail)
+        val etPhone     = view.findViewById<EditText>(R.id.etPhone)
 
-    private fun showChangePasswordDialog() {
-        val view    = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_change_password, null)
-        val etOld   = view.findViewById<EditText>(R.id.etOldPassword)
-        val etNew   = view.findViewById<EditText>(R.id.etNewPassword)
-        val etConf  = view.findViewById<EditText>(R.id.etConfirmPassword)
+        etFirstName.setText(tvFirstName.text)
+        etLastName.setText(tvLastName.text)
+        etEmail.setText(tvEmailField.text)
+        etPhone.setText(if (tvPhone.text == "—") "" else tvPhone.text)
 
-        AlertDialog.Builder(requireContext())
-            .setTitle("Change Password")
+        AlertDialog.Builder(ctx)
+            .setTitle("Edit Profile")
             .setView(view)
-            .setPositiveButton("Change") { _, _ ->
-                val old  = etOld.text.toString()
-                val new_ = etNew.text.toString()
-                val conf = etConf.text.toString()
-                if (old.isEmpty() || new_.isEmpty()) { toast("Fill all fields"); return@setPositiveButton }
-                if (new_ != conf) { toast("Passwords do not match"); return@setPositiveButton }
-                if (new_.length < 8) { toast("Password must be at least 8 characters"); return@setPositiveButton }
+            .setPositiveButton("Save") { _, _ ->
+                val fn    = etFirstName.text.toString().trim()
+                val ln    = etLastName.text.toString().trim()
+                val email = etEmail.text.toString().trim()
+                val phone = etPhone.text.toString().trim().ifEmpty { null }
+
+                if (fn.isEmpty() || ln.isEmpty() || email.isEmpty()) {
+                    toast("Name and email are required")
+                    return@setPositiveButton
+                }
+
                 viewLifecycleOwner.lifecycleScope.launch {
                     try {
-                        ApiClient.adminApi.changePassword(ApiClient.bearerToken(), ChangePasswordRequest(old, new_))
-                        toast("Password changed successfully")
+                        val updated = ApiClient.adminApi.updateProfile(
+                            ApiClient.bearerToken(),
+                            UpdateProfileRequest(fn, ln, email, phone)
+                        )
+                        SessionManager.saveUser(
+                            context   = ctx,
+                            token     = SessionManager.getToken(ctx) ?: "",
+                            userId    = SessionManager.getUserId(ctx) ?: "",
+                            firstName = updated.firstName,
+                            lastName  = updated.lastName,
+                            email     = updated.email,
+                            role      = updated.role,
+                            phone     = updated.phone ?: ""
+                        )
+                        populateFromSession()
+                        toast("Profile updated!")
                     } catch (e: HttpException) {
-                        toast(if (e.code() == 400) "Current password is incorrect" else getString(R.string.error_network))
-                    } catch (_: Exception) { toast(getString(R.string.error_network)) }
+                        toast(if (e.code() == 401) "Session expired" else "Failed to update profile")
+                    } catch (_: Exception) {
+                        toast("Network error")
+                    }
                 }
             }
             .setNegativeButton("Cancel", null)
             .show()
     }
 
-    // ── Navigation / logout ───────────────────────────────────────────────────
+    private fun showChangePasswordDialog() {
+        val ctx  = requireContext()
+        val view = LayoutInflater.from(ctx).inflate(R.layout.dialog_change_password, null)
+        val etOld     = view.findViewById<EditText>(R.id.etOldPassword)
+        val etNew     = view.findViewById<EditText>(R.id.etNewPassword)
+        val etConfirm = view.findViewById<EditText>(R.id.etConfirmPassword)
+
+        AlertDialog.Builder(ctx)
+            .setTitle("Change Password")
+            .setView(view)
+            .setPositiveButton("Update") { _, _ ->
+                val old     = etOld.text.toString()
+                val newPass = etNew.text.toString()
+                val confirm = etConfirm.text.toString()
+
+                if (old.isEmpty() || newPass.isEmpty()) {
+                    toast("All fields are required"); return@setPositiveButton
+                }
+                if (newPass != confirm) {
+                    toast("Passwords don't match"); return@setPositiveButton
+                }
+                if (newPass.length < 8) {
+                    toast("Password must be at least 8 characters"); return@setPositiveButton
+                }
+
+                viewLifecycleOwner.lifecycleScope.launch {
+                    try {
+                        ApiClient.adminApi.changePassword(ApiClient.bearerToken(), ChangePasswordRequest(old, newPass))
+                        toast("Password updated successfully!")
+                    } catch (e: HttpException) {
+                        when (e.code()) {
+                            400  -> toast("Current password is incorrect")
+                            else -> toast("Failed to update password")
+                        }
+                    } catch (_: Exception) { toast("Network error") }
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
 
     private fun navigateTo(fragment: Fragment) {
         parentFragmentManager.beginTransaction()
@@ -233,9 +292,9 @@ class MoreFragment : Fragment() {
     private fun performLogout() {
         val token = SessionManager.getToken(requireContext())
         AuthRepository.logout(
-            token = token,
+            token     = token,
             onSuccess = { requireActivity().runOnUiThread { doLogout() } },
-            onError = { requireActivity().runOnUiThread { doLogout() } }
+            onError   = { requireActivity().runOnUiThread { doLogout() } }
         )
     }
 
@@ -248,17 +307,11 @@ class MoreFragment : Fragment() {
         requireActivity().finish()
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
     private fun prefs() =
         requireContext().getSharedPreferences("more_prefs", Context.MODE_PRIVATE)
 
-    private fun toast(msg: String) = Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
-
-    override fun onDestroyView() {
-        super.onDestroyView()
-        _binding = null
-    }
+    private fun toast(msg: String) =
+        Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
 
     companion object {
         private const val KEY_PHOTO_URL = "profile_photo_url"

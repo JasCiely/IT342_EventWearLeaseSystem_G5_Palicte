@@ -1,11 +1,12 @@
 package com.app.mobile.features.customer.fragments
 
 import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.view.*
+import android.view.Gravity
 import android.widget.LinearLayout
 import android.widget.TextView
-import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
@@ -15,10 +16,20 @@ import com.app.mobile.features.customer.activities.DashboardActivity
 import com.app.mobile.shared.api.ApiClient
 import com.app.mobile.shared.models.DirectBooking
 import com.app.mobile.shared.models.FittingBooking
+import com.app.mobile.shared.sse.SseClient
 import kotlinx.coroutines.launch
 import retrofit2.HttpException
 
-class CustomerNotificationsFragment : Fragment() {
+class CustomerNotificationsFragment : Fragment(), SseClient.SseListener {
+
+    private data class NotifItem(
+        val type: String,
+        val itemName: String,
+        val status: String,
+        val message: String,
+        val dateLabel: String,
+        val createdAt: String
+    )
 
     private lateinit var swipeRefresh: SwipeRefreshLayout
     private lateinit var notifList: LinearLayout
@@ -35,7 +46,12 @@ class CustomerNotificationsFragment : Fragment() {
         swipeRefresh.setColorSchemeColors(ContextCompat.getColor(requireContext(), R.color.brand_burgundy))
         swipeRefresh.setOnRefreshListener { loadData() }
 
+        SseClient.addListener(this)
         loadData()
+    }
+
+    override fun onEvent(type: String, data: String) {
+        if (type == "BOOKING_UPDATE") loadData()
     }
 
     private fun loadData() {
@@ -54,103 +70,233 @@ class CustomerNotificationsFragment : Fragment() {
 
     private fun buildNotifications(fittings: List<FittingBooking>, directs: List<DirectBooking>) {
         notifList.removeAllViews()
-        val ctx = requireContext()
 
         if (fittings.isEmpty() && directs.isEmpty()) {
-            addNotifCard("No activity yet", "Your booking notifications will appear here.", "#6B7280", "🔔")
+            addEmptyState()
             return
         }
 
-        fittings.sortedByDescending { it.createdAt }.forEach { b ->
-            val (icon, msg) = when (b.status.uppercase()) {
-                "PENDING"   -> "⏳" to "Fitting appointment for \"${b.itemName}\" is pending confirmation."
-                "CONFIRMED" -> "✅" to "Your fitting for \"${b.itemName}\" on ${b.fittingDate} is confirmed!"
-                "COMPLETED" -> "🎉" to "Fitting for \"${b.itemName}\" has been completed."
-                "CANCELLED" -> "❌" to "Your fitting appointment for \"${b.itemName}\" was cancelled."
-                else        -> "📋" to "Fitting update for \"${b.itemName}\": ${b.status}"
+        val items = mutableListOf<NotifItem>()
+
+        fittings.forEach { b ->
+            val msg = when (b.status.uppercase()) {
+                "PENDING"   -> "Fitting appointment for \"${b.itemName}\" is pending confirmation."
+                "CONFIRMED" -> "Your fitting for \"${b.itemName}\" on ${b.fittingDate} is confirmed."
+                "COMPLETED" -> "Fitting for \"${b.itemName}\" has been completed."
+                "CANCELLED" -> "Your fitting appointment for \"${b.itemName}\" was cancelled."
+                else        -> "Fitting update for \"${b.itemName}\": ${b.status}."
             }
-            val accentColor = statusAccent(b.status)
-            addNotifCard("Fitting · ${b.fittingDate}", msg, accentColor, icon)
+            items.add(NotifItem("Fitting", b.itemName, b.status, msg, b.fittingDate, b.createdAt))
         }
 
-        directs.sortedByDescending { it.createdAt }.forEach { b ->
-            val (icon, msg) = when (b.bookingStatus.uppercase()) {
-                "PENDING"   -> "⏳" to "Rental of \"${b.itemName}\" is pending admin approval."
-                "APPROVED"  -> "✅" to "Your rental of \"${b.itemName}\" (${b.startDate}–${b.endDate}) is approved!"
-                "ACTIVE"    -> "🚀" to "Your rental of \"${b.itemName}\" is now active. Return by ${b.endDate}."
-                "RETURNED"  -> "📦" to "\"${b.itemName}\" has been returned. Thank you!"
-                "COMPLETED" -> "🎉" to "Rental of \"${b.itemName}\" completed. Total: ₱${String.format("%.0f", b.finalPrice)}."
-                "CANCELLED" -> "❌" to "Your rental of \"${b.itemName}\" was cancelled."
-                else        -> "📋" to "Rental update for \"${b.itemName}\": ${b.bookingStatus}"
+        directs.forEach { b ->
+            val msg = when (b.bookingStatus.uppercase()) {
+                "PENDING"   -> "Rental of \"${b.itemName}\" is pending admin approval."
+                "APPROVED"  -> "Rental of \"${b.itemName}\" (${b.startDate}–${b.endDate}) has been approved."
+                "ACTIVE"    -> "Your rental of \"${b.itemName}\" is now active. Return by ${b.endDate}."
+                "RETURNED"  -> "\"${b.itemName}\" has been returned. Thank you!"
+                "COMPLETED" -> "Rental of \"${b.itemName}\" completed. Total: ₱${String.format("%.0f", b.finalPrice)}."
+                "CANCELLED" -> "Your rental of \"${b.itemName}\" was cancelled."
+                else        -> "Rental update for \"${b.itemName}\": ${b.bookingStatus}."
             }
-            val accentColor = statusAccent(b.bookingStatus)
-            addNotifCard("Rental · ${b.startDate}–${b.endDate}", msg, accentColor, icon)
+            items.add(NotifItem("Rental", b.itemName, b.bookingStatus, msg, "${b.startDate}–${b.endDate}", b.createdAt))
         }
+
+        // Newest first across all booking types
+        items.sortByDescending { it.createdAt }
+
+        // Tell the activity the user has now seen everything up to this point
+        val newest = items.firstOrNull()?.createdAt ?: ""
+        (activity as? DashboardActivity)?.onAlertsLoaded(newest)
+
+        items.forEach { addNotifCard(it) }
     }
 
-    private fun addNotifCard(title: String, message: String, accentHex: String, icon: String) {
+    private fun addEmptyState() {
         val ctx = requireContext()
-        val card = LinearLayout(ctx).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setBackgroundResource(R.drawable.bg_card_white)
-            elevation = 4f
-            setPadding(0, 0, 16, 0)
-            val lp = LinearLayout.LayoutParams(
+        val dp  = resources.displayMetrics.density
+
+        val container = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity     = Gravity.CENTER
+            setPadding(0, (72 * dp).toInt(), 0, 0)
+            layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            ).also { it.bottomMargin = (10 * resources.displayMetrics.density).toInt() }
-            layoutParams = lp
-        }
-
-        val accent = View(ctx).apply {
-            val lp = LinearLayout.LayoutParams(
-                (4 * resources.displayMetrics.density).toInt(),
-                LinearLayout.LayoutParams.MATCH_PARENT
-            ).also { it.marginEnd = (12 * resources.displayMetrics.density).toInt() }
-            layoutParams = lp
-            try { setBackgroundColor(Color.parseColor(accentHex)) }
-            catch (_: Exception) { setBackgroundColor(Color.parseColor("#6B2D39")) }
+            )
         }
 
         val tvIcon = TextView(ctx).apply {
-            text = icon
-            textSize = 22f
-            setPadding(0, (14 * resources.displayMetrics.density).toInt(), (8 * resources.displayMetrics.density).toInt(), (14 * resources.displayMetrics.density).toInt())
-        }
-
-        val content = LinearLayout(ctx).apply {
-            orientation = LinearLayout.VERTICAL
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            setPadding(0, (14 * resources.displayMetrics.density).toInt(), 0, (14 * resources.displayMetrics.density).toInt())
+            text      = "🔔"
+            textSize  = 38f
+            gravity   = Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
         }
 
         val tvTitle = TextView(ctx).apply {
-            text = title
-            textSize = 12f
-            setTextColor(ContextCompat.getColor(ctx, R.color.brand_text_subtitle))
+            text     = "No alerts yet"
+            textSize = 15f
             paint.isFakeBoldText = true
-        }
-        val tvMsg = TextView(ctx).apply {
-            text = message
-            textSize = 13f
             setTextColor(ContextCompat.getColor(ctx, R.color.brand_text_dark))
-            setPadding(0, (2 * resources.displayMetrics.density).toInt(), 0, 0)
+            gravity  = Gravity.CENTER
+            val lp   = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+            lp.topMargin = (10 * dp).toInt()
+            layoutParams = lp
         }
 
-        content.addView(tvTitle)
+        val tvSub = TextView(ctx).apply {
+            text     = "Booking activity will appear here"
+            textSize = 13f
+            setTextColor(ContextCompat.getColor(ctx, R.color.brand_text_subtitle))
+            gravity  = Gravity.CENTER
+            val lp   = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+            lp.topMargin = (4 * dp).toInt()
+            layoutParams = lp
+        }
+
+        container.addView(tvIcon)
+        container.addView(tvTitle)
+        container.addView(tvSub)
+        notifList.addView(container)
+    }
+
+    private fun addNotifCard(item: NotifItem) {
+        val ctx = requireContext()
+        val dp  = resources.displayMetrics.density
+
+        val card = LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL
+            background  = GradientDrawable().apply {
+                shape         = GradientDrawable.RECTANGLE
+                setColor(Color.WHITE)
+                cornerRadius  = 10 * dp
+            }
+            elevation   = 2 * dp
+            val lp      = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            lp.bottomMargin = (10 * dp).toInt()
+            layoutParams = lp
+        }
+
+        // Left accent bar — rounded only on the left side
+        val accentBar = View(ctx).apply {
+            layoutParams = LinearLayout.LayoutParams((5 * dp).toInt(), LinearLayout.LayoutParams.MATCH_PARENT)
+            background   = GradientDrawable().apply {
+                shape        = GradientDrawable.RECTANGLE
+                setColor(Color.parseColor(accentColor(item.status)))
+                cornerRadii  = floatArrayOf(10 * dp, 10 * dp, 0f, 0f, 0f, 0f, 10 * dp, 10 * dp)
+            }
+        }
+
+        val content = LinearLayout(ctx).apply {
+            orientation  = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            setPadding((12 * dp).toInt(), (12 * dp).toInt(), (12 * dp).toInt(), (12 * dp).toInt())
+        }
+
+        // Row 1: type label (left) + status badge (right)
+        val row1 = LinearLayout(ctx).apply {
+            orientation  = LinearLayout.HORIZONTAL
+            gravity      = Gravity.CENTER_VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        }
+
+        val tvType = TextView(ctx).apply {
+            text         = item.type.uppercase()
+            textSize     = 10f
+            letterSpacing = 0.06f
+            setTextColor(ContextCompat.getColor(ctx, R.color.brand_text_subtitle))
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+
+        row1.addView(tvType)
+        row1.addView(makeStatusBadge(ctx, item.status, dp))
+
+        // Item name
+        val tvItem = TextView(ctx).apply {
+            text         = item.itemName
+            textSize     = 14f
+            paint.isFakeBoldText = true
+            setTextColor(ContextCompat.getColor(ctx, R.color.brand_text_dark))
+            val lp       = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+            lp.topMargin = (5 * dp).toInt()
+            layoutParams = lp
+        }
+
+        // Message
+        val tvMsg = TextView(ctx).apply {
+            text         = item.message
+            textSize     = 12.5f
+            setTextColor(ContextCompat.getColor(ctx, R.color.brand_text_subtitle))
+            setLineSpacing(0f, 1.35f)
+            val lp       = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+            lp.topMargin = (4 * dp).toInt()
+            layoutParams = lp
+        }
+
+        // Date label (right-aligned, muted)
+        val tvDate = TextView(ctx).apply {
+            text         = item.dateLabel
+            textSize     = 11f
+            setTextColor(ContextCompat.getColor(ctx, R.color.input_hint))
+            gravity      = Gravity.END
+            val lp       = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+            lp.topMargin = (6 * dp).toInt()
+            layoutParams = lp
+        }
+
+        content.addView(row1)
+        content.addView(tvItem)
         content.addView(tvMsg)
-        card.addView(accent)
-        card.addView(tvIcon)
+        content.addView(tvDate)
+
+        card.addView(accentBar)
         card.addView(content)
         notifList.addView(card)
     }
 
-    private fun statusAccent(status: String): String = when (status.uppercase()) {
-        "PENDING"   -> "#F59E0B"
-        "CONFIRMED", "APPROVED" -> "#3B82F6"
-        "ACTIVE"    -> "#10B981"
+    private fun makeStatusBadge(ctx: android.content.Context, status: String, dp: Float): TextView {
+        val (bgHex, fgHex) = when (status.uppercase()) {
+            "PENDING"               -> "#FEF3C7" to "#92400E"
+            "CONFIRMED", "APPROVED" -> "#D1FAE5" to "#065F46"
+            "ACTIVE"                -> "#DBEAFE" to "#1E40AF"
+            "COMPLETED", "RETURNED" -> "#EDE9FE" to "#5B21B6"
+            "CANCELLED"             -> "#F3F4F6" to "#6B7280"
+            else                    -> "#F3F4F6" to "#374151"
+        }
+
+        return TextView(ctx).apply {
+            text       = status.lowercase().replaceFirstChar { it.uppercase() }
+            textSize   = 10f
+            setTextColor(Color.parseColor(fgHex))
+            background = GradientDrawable().apply {
+                shape        = GradientDrawable.RECTANGLE
+                setColor(Color.parseColor(bgHex))
+                cornerRadius = 4 * dp
+            }
+            setPadding((6 * dp).toInt(), (2 * dp).toInt(), (6 * dp).toInt(), (3 * dp).toInt())
+        }
+    }
+
+    private fun accentColor(status: String): String = when (status.uppercase()) {
+        "PENDING"               -> "#F59E0B"
+        "CONFIRMED", "APPROVED" -> "#10B981"
+        "ACTIVE"                -> "#3B82F6"
         "COMPLETED", "RETURNED" -> "#8B5CF6"
-        "CANCELLED" -> "#9CA3AF"
-        else        -> "#6B2D39"
+        "CANCELLED"             -> "#D1D5DB"
+        else                    -> "#6B2D39"
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        SseClient.removeListener(this)
     }
 }

@@ -2,6 +2,7 @@ package com.app.mobile.features.customer.activities
 
 import android.content.Intent
 import android.os.Bundle
+import android.view.View
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -9,12 +10,16 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
 import com.app.mobile.R
 import com.app.mobile.features.auth.activities.Auth
 import com.app.mobile.features.customer.fragments.*
+import com.app.mobile.shared.api.ApiClient
+import com.app.mobile.shared.sse.SseClient
 import com.app.mobile.shared.utils.SessionManager
+import kotlinx.coroutines.launch
 
-class DashboardActivity : AppCompatActivity() {
+class DashboardActivity : AppCompatActivity(), SseClient.SseListener {
 
     private lateinit var tvHeaderTitle: TextView
     private lateinit var tvHeaderSubtitle: TextView
@@ -35,7 +40,12 @@ class DashboardActivity : AppCompatActivity() {
     private lateinit var ivNavNotifications: ImageView
     private lateinit var ivNavProfile: ImageView
 
+    private lateinit var tvAlertBadge: TextView
+
     private var activeTab = "Browse"
+
+    // Newest createdAt string from the last badge refresh — kept in memory
+    private var latestAlertTs = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -60,6 +70,8 @@ class DashboardActivity : AppCompatActivity() {
         ivNavNotifications = findViewById(R.id.ivNavNotifications)
         ivNavProfile       = findViewById(R.id.ivNavProfile)
 
+        tvAlertBadge       = findViewById(R.id.tvAlertBadge)
+
         val firstName = SessionManager.getFirstName(this) ?: "U"
         val lastName  = SessionManager.getLastName(this) ?: ""
         tvHeaderInitials.text = "${firstName.firstOrNull() ?: ""}${lastName.firstOrNull() ?: ""}".uppercase()
@@ -70,13 +82,26 @@ class DashboardActivity : AppCompatActivity() {
         navProfile.setOnClickListener       { setActiveTab("Profile") }
 
         if (savedInstanceState == null) setActiveTab("Browse")
+
+        SseClient.connect()
+        SseClient.addListener(this)
+    }
+
+    override fun onEvent(type: String, data: String) {
+        if (type == "BOOKING_UPDATE") refreshAlertBadge()
     }
 
     fun setActiveTab(tab: String) {
         activeTab = tab
 
-        val burgundy  = ContextCompat.getColor(this, R.color.brand_burgundy)
-        val subtle    = ContextCompat.getColor(this, R.color.brand_text_subtitle)
+        // Opening Alerts → mark everything seen and clear the badge immediately
+        if (tab == "Notifications") {
+            saveLastSeenTs(latestAlertTs)
+            showAlertBadge(0)
+        }
+
+        val burgundy = ContextCompat.getColor(this, R.color.brand_burgundy)
+        val subtle   = ContextCompat.getColor(this, R.color.brand_text_subtitle)
 
         listOf(tvNavBrowse, tvNavBookings, tvNavNotifications, tvNavProfile).forEach {
             it.setTextColor(subtle)
@@ -117,6 +142,61 @@ class DashboardActivity : AppCompatActivity() {
 
     fun goToMyBookings() = setActiveTab("MyBookings")
 
+    /**
+     * Called by CustomerNotificationsFragment once it finishes loading.
+     * [newest] is the largest createdAt string from the response.
+     * Saves it as last-seen since the user is actively viewing the tab.
+     */
+    fun onAlertsLoaded(newest: String) {
+        latestAlertTs = newest
+        saveLastSeenTs(newest)
+        showAlertBadge(0)
+    }
+
+    // Fetches alerts in the background and updates the badge count.
+    private fun refreshAlertBadge() {
+        if (!SessionManager.isLoggedIn(this)) return
+        lifecycleScope.launch {
+            try {
+                val fittings = ApiClient.customerApi.getMyFittingBookings(ApiClient.bearerToken())
+                val directs  = ApiClient.customerApi.getAllMyDirectBookings(ApiClient.bearerToken())
+
+                val allTs = fittings.map { it.createdAt } + directs.map { it.createdAt }
+                if (allTs.isEmpty()) {
+                    showAlertBadge(0)
+                    return@launch
+                }
+
+                val newest   = allTs.max()
+                latestAlertTs = newest
+
+                val lastSeen = getLastSeenTs()
+                val unseen   = allTs.count { it > lastSeen }
+
+                if (activeTab != "Notifications") showAlertBadge(unseen)
+            } catch (_: Exception) {}
+        }
+    }
+
+    fun showAlertBadge(count: Int) {
+        if (count <= 0) {
+            tvAlertBadge.visibility = View.GONE
+        } else {
+            tvAlertBadge.text       = if (count > 9) "9+" else count.toString()
+            tvAlertBadge.visibility = View.VISIBLE
+        }
+    }
+
+    private fun saveLastSeenTs(ts: String) {
+        if (ts.isBlank()) return
+        getSharedPreferences("alert_prefs", MODE_PRIVATE)
+            .edit().putString("last_seen_ts", ts).apply()
+    }
+
+    private fun getLastSeenTs(): String =
+        getSharedPreferences("alert_prefs", MODE_PRIVATE)
+            .getString("last_seen_ts", "") ?: ""
+
     fun showSessionExpiredDialog() {
         if (isFinishing || isDestroyed) return
         SessionManager.clearSession(this)
@@ -131,12 +211,20 @@ class DashboardActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         if (!SessionManager.isLoggedIn(this)) goToAuth()
+        else refreshAlertBadge()
     }
 
     private fun goToAuth() {
+        SseClient.disconnect()
         startActivity(Intent(this, Auth::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         })
         finish()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        SseClient.removeListener(this)
+        SseClient.disconnect()
     }
 }

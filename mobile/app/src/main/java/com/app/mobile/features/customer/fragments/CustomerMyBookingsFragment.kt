@@ -19,10 +19,11 @@ import com.app.mobile.features.customer.dialogs.FittingBookingDetailBottomSheet
 import com.app.mobile.shared.api.ApiClient
 import com.app.mobile.shared.models.DirectBooking
 import com.app.mobile.shared.models.FittingBooking
+import com.app.mobile.shared.sse.SseClient
 import kotlinx.coroutines.launch
 import retrofit2.HttpException
 
-class CustomerMyBookingsFragment : Fragment() {
+class CustomerMyBookingsFragment : Fragment(), SseClient.SseListener {
 
     private lateinit var tabFitting: LinearLayout
     private lateinit var tabDirect: LinearLayout
@@ -61,13 +62,15 @@ class CustomerMyBookingsFragment : Fragment() {
 
         fittingAdapter = CustomerFittingBookingAdapter { booking ->
             val sheet = FittingBookingDetailBottomSheet.newInstance(booking)
-            sheet.onCancelled = { loadData() }
+            sheet.onCancelled    = { loadData() }
+            sheet.onRescheduled  = { loadData() }
             sheet.show(childFragmentManager, "fitting_detail")
         }
 
         directAdapter = CustomerDirectBookingAdapter { booking ->
             val sheet = DirectBookingDetailBottomSheet.newInstance(booking)
-            sheet.onCancelled = { loadData() }
+            sheet.onCancelled   = { loadData() }
+            sheet.onRescheduled = { loadData() }
             sheet.show(childFragmentManager, "direct_detail")
         }
 
@@ -80,7 +83,12 @@ class CustomerMyBookingsFragment : Fragment() {
         swipeRefresh.setOnRefreshListener { loadData() }
 
         switchTab("Fitting")
+        SseClient.addListener(this)
         loadData()
+    }
+
+    override fun onEvent(type: String, data: String) {
+        if (type == "BOOKING_UPDATE") loadData()
     }
 
     private fun switchTab(tab: String) {
@@ -128,5 +136,10 @@ class CustomerMyBookingsFragment : Fragment() {
     private fun updateEmpty(isEmpty: Boolean, message: String) {
         layoutEmpty.visibility  = if (isEmpty) View.VISIBLE else View.GONE
         tvEmptySubtext.text     = message
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        SseClient.removeListener(this)
     }
 }

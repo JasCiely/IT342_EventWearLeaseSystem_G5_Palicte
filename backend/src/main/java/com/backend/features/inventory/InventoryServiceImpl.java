@@ -187,6 +187,17 @@ public class InventoryServiceImpl implements InventoryService {
         return toItemResponse(itemRepository.save(item));
     }
 
+    @Override
+    public ItemResponse updateItemStatus(String itemId, String status, String maintenanceEndDate) {
+        Item item = itemRepository.findById(itemId)
+                .orElseThrow(() -> new RuntimeException("Item not found: " + itemId));
+        item.setStatus(status);
+        item.setMaintenanceEndDate(
+            (maintenanceEndDate != null && !maintenanceEndDate.isBlank())
+                ? LocalDate.parse(maintenanceEndDate) : null);
+        return toItemResponse(itemRepository.save(item));
+    }
+
     private ItemResponse toItemResponse(Item item) {
         ItemResponse r = new ItemResponse();
         r.setId(item.getId());

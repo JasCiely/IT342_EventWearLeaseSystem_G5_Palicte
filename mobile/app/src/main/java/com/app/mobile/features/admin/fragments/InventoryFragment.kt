@@ -64,7 +64,7 @@ class InventoryFragment : Fragment(), SseClient.SseListener {
         "Kids Wear"   to listOf("Kids Gown", "Kids Suit", "Kids Casual")
     )
     private val sizeOptions   = listOf("XS", "S", "M", "L", "XL", "XXL", "3XL")
-    private val statusOptions = listOf("Available", "In Maintenance", "Pending Review")
+    private val statusOptions = listOf("Available", "Under Maintenance", "Pending Availability")
 
     private var selectedUris = mutableListOf<Uri>()
     private var tvPhotoCount: TextView? = null
@@ -122,8 +122,8 @@ class InventoryFragment : Fragment(), SseClient.SseListener {
         binding.chipGroupFilter.setOnCheckedStateChangeListener { _, checkedIds ->
             filterStatus = when (checkedIds.firstOrNull()) {
                 R.id.chipFilterAvailable   -> "Available"
-                R.id.chipFilterMaintenance -> "In Maintenance"
-                R.id.chipFilterPending     -> "Pending Review"
+                R.id.chipFilterMaintenance -> "Under Maintenance"
+                R.id.chipFilterPending     -> "Pending Availability"
                 else                       -> ""
             }
             applyFilter()
@@ -268,6 +268,7 @@ class InventoryFragment : Fragment(), SseClient.SseListener {
         val labelDesc      = dialogView.findViewById<TextView>(R.id.idlabelDescription)
         val tvDesc         = dialogView.findViewById<TextView>(R.id.idtvDescription)
         val tvPhotos       = dialogView.findViewById<TextView>(R.id.idtvPhotos)
+        val btnChangeStatus = dialogView.findViewById<MaterialButton>(R.id.idbtnChangeStatus)
         val btnEdit        = dialogView.findViewById<MaterialButton>(R.id.idbtnEdit)
         val btnDelete      = dialogView.findViewById<MaterialButton>(R.id.idbtnDelete)
 
@@ -354,6 +355,25 @@ class InventoryFragment : Fragment(), SseClient.SseListener {
             .setView(dialogView)
             .create()
 
+        btnChangeStatus.setOnClickListener {
+            val currentIdx = statusOptions.indexOfFirst { it.equals(item.status, ignoreCase = true) }.coerceAtLeast(0)
+            var chosenIdx = currentIdx
+            AlertDialog.Builder(requireContext())
+                .setTitle("Change Status")
+                .setSingleChoiceItems(statusOptions.toTypedArray(), currentIdx) { _, idx -> chosenIdx = idx }
+                .setPositiveButton("Apply") { _, _ ->
+                    val newStatus = statusOptions[chosenIdx]
+                    if (newStatus == item.status) return@setPositiveButton
+                    if (newStatus.contains("Maintenance", ignoreCase = true)) {
+                        showMaintenanceDatePicker(item.id, newStatus, dialog)
+                    } else {
+                        doUpdateStatus(item.id, newStatus, null, dialog)
+                    }
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
+        }
+
         btnEdit.setOnClickListener {
             dialog.dismiss()
             showItemFormDialog(item)
@@ -365,6 +385,31 @@ class InventoryFragment : Fragment(), SseClient.SseListener {
         }
 
         dialog.show()
+    }
+
+    private fun showMaintenanceDatePicker(itemId: String, status: String, parentDialog: AlertDialog) {
+        val cal = Calendar.getInstance()
+        DatePickerDialog(requireContext(), { _, y, m, d ->
+            val date = "$y-${"%02d".format(m + 1)}-${"%02d".format(d)}"
+            doUpdateStatus(itemId, status, date, parentDialog)
+        }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show()
+    }
+
+    private fun doUpdateStatus(itemId: String, status: String, maintenanceEndDate: String?, parentDialog: AlertDialog) {
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                ApiClient.adminApi.patchItemStatus(
+                    ApiClient.bearerToken(), itemId,
+                    UpdateStatusRequest(status, maintenanceEndDate)
+                )
+                toast("Status updated to $status")
+                parentDialog.dismiss()
+                loadData()
+            } catch (e: HttpException) {
+                if (e.code() == 401) (activity as? AdminDashboardActivity)?.showSessionExpiredDialog()
+                else toast("Error updating status: ${e.message()}")
+            } catch (_: Exception) { toast(getString(R.string.error_network)) }
+        }
     }
 
     private fun confirmDelete(item: InventoryItem) {

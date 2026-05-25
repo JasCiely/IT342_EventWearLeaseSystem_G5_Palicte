@@ -259,6 +259,21 @@
             android:background="@color/input_stroke"
             android:layout_marginBottom="20dp" />
 
+        <!-- Change Status button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/idbtnChangeStatus"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginBottom="10dp"
+            android:text="Change Status"
+            android:textColor="@color/brand_burgundy"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            app:backgroundTint="#FFF1F3"
+            app:cornerRadius="28dp"
+            app:strokeColor="@color/brand_burgundy"
+            app:strokeWidth="1.5dp" />
+
         <!-- Action buttons: side by side to save vertical space -->
         <LinearLayout
             android:layout_width="match_parent"

@@ -221,6 +221,19 @@
             android:layout_marginBottom="20dp"
             android:visibility="gone" />
 
+        <!-- Edit Dates button (PENDING / APPROVED / ACTIVE LEASE) -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnEditDates"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:backgroundTint="@color/brand_burgundy"
+            android:text="Edit Rental Dates"
+            android:textColor="#FFFFFF"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp"
+            android:visibility="gone"
+            app:cornerRadius="10dp" />
+
         <!-- Cancel -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnCancel"
