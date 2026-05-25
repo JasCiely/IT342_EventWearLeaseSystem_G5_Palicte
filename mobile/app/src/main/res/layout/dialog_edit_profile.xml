@@ -87,7 +87,7 @@
         android:layout_width="match_parent"
         android:layout_height="48dp"
         android:background="@color/brand_cream_bg"
-        android:hint="Phone number"
+        android:hint="+63 9XX XXX XXXX"
         android:textSize="14sp"
         android:paddingStart="12dp"
         android:paddingEnd="12dp"

@@ -156,7 +156,7 @@ data class UserProfile(
 
 data class LoginRequest(val email: String, val password: String)
 data class RegisterRequest(val firstName: String, val lastName: String, val email: String, val password: String, val phone: String?)
-data class ChangePasswordRequest(val oldPassword: String, val newPassword: String)
+data class ChangePasswordRequest(val currentPassword: String, val newPassword: String)
 data class StatusRequest(val active: Boolean)
 data class MessageResponse(val message: String)
 data class StatusResponse(val id: String, val status: String)

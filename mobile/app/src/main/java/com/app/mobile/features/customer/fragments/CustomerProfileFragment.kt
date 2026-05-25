@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.*
 import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
@@ -204,7 +206,25 @@ class CustomerProfileFragment : Fragment() {
         etFirstName.setText(tvFirstName.text)
         etLastName.setText(tvLastName.text)
         etEmail.setText(tvEmailField.text)
-        etPhone.setText(if (tvPhone.text == "—") "" else tvPhone.text)
+        val rawPhone = if (tvPhone.text == "—") "" else tvPhone.text.toString()
+        etPhone.setText(if (rawPhone.isNotEmpty()) formatPhoneDisplay(extractLocalDigits(rawPhone)) else "")
+
+        etPhone.addTextChangedListener(object : TextWatcher {
+            private var isFormatting = false
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                if (isFormatting || s == null) return
+                isFormatting = true
+                val digits    = extractLocalDigits(s.toString())
+                val formatted = formatPhoneDisplay(digits)
+                if (s.toString() != formatted) {
+                    s.replace(0, s.length, formatted)
+                    try { etPhone.setSelection(formatted.length) } catch (_: Exception) {}
+                }
+                isFormatting = false
+            }
+        })
 
         AlertDialog.Builder(ctx)
             .setTitle("Edit Profile")
@@ -219,12 +239,16 @@ class CustomerProfileFragment : Fragment() {
                     Toast.makeText(ctx, "Name and email are required", Toast.LENGTH_SHORT).show()
                     return@setPositiveButton
                 }
+                if (phone != null && !isValidPhilippinePhone(phone)) {
+                    Toast.makeText(ctx, "Invalid phone number. Use +63 followed by 10 digits (e.g. +639XXXXXXXXX)", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
 
                 viewLifecycleOwner.lifecycleScope.launch {
                     try {
                         val updated = ApiClient.customerApi.updateProfile(
                             ApiClient.bearerToken(),
-                            UpdateProfileRequest(fn, ln, email, phone)
+                            UpdateProfileRequest(fn, ln, email, phone?.replace(" ", ""))
                         )
                         SessionManager.saveUser(
                             ctx,
@@ -257,51 +281,92 @@ class CustomerProfileFragment : Fragment() {
     private fun showChangePasswordDialog() {
         val ctx  = requireContext()
         val view = layoutInflater.inflate(R.layout.dialog_change_password, null)
-        val etOld     = view.findViewById<EditText>(R.id.etOldPassword)
-        val etNew     = view.findViewById<EditText>(R.id.etNewPassword)
-        val etConfirm = view.findViewById<EditText>(R.id.etConfirmPassword)
+        val etOld           = view.findViewById<EditText>(R.id.etOldPassword)
+        val etNew           = view.findViewById<EditText>(R.id.etNewPassword)
+        val etConfirm       = view.findViewById<EditText>(R.id.etConfirmPassword)
+        val ivToggleOld     = view.findViewById<ImageView>(R.id.ivToggleOld)
+        val ivToggleNew     = view.findViewById<ImageView>(R.id.ivToggleNew)
+        val ivToggleConfirm = view.findViewById<ImageView>(R.id.ivToggleConfirm)
+        val btnUpdate       = view.findViewById<MaterialButton>(R.id.btnUpdatePassword)
 
-        AlertDialog.Builder(ctx)
+        val dialog = AlertDialog.Builder(ctx)
             .setTitle("Change Password")
             .setView(view)
-            .setPositiveButton("Update") { _, _ ->
-                val old     = etOld.text.toString()
-                val newPass = etNew.text.toString()
-                val confirm = etConfirm.text.toString()
+            .setNegativeButton("Cancel", null)
+            .create()
 
-                if (old.isEmpty() || newPass.isEmpty()) {
-                    Toast.makeText(ctx, "All fields are required", Toast.LENGTH_SHORT).show()
-                    return@setPositiveButton
-                }
-                if (newPass != confirm) {
-                    Toast.makeText(ctx, "Passwords don't match", Toast.LENGTH_SHORT).show()
-                    return@setPositiveButton
-                }
-                if (newPass.length < 8) {
-                    Toast.makeText(ctx, "Password must be at least 8 characters", Toast.LENGTH_SHORT).show()
-                    return@setPositiveButton
-                }
+        fun toggleVis(et: EditText, iv: ImageView) {
+            val hidden = et.transformationMethod is android.text.method.PasswordTransformationMethod
+            et.transformationMethod = if (hidden) android.text.method.HideReturnsTransformationMethod.getInstance()
+                                      else android.text.method.PasswordTransformationMethod.getInstance()
+            iv.setImageResource(if (hidden) R.drawable.ic_visibility else R.drawable.ic_visibility_off)
+            et.setSelection(et.text.length)
+        }
+        ivToggleOld.setOnClickListener     { toggleVis(etOld, ivToggleOld) }
+        ivToggleNew.setOnClickListener     { toggleVis(etNew, ivToggleNew) }
+        ivToggleConfirm.setOnClickListener { toggleVis(etConfirm, ivToggleConfirm) }
 
-                viewLifecycleOwner.lifecycleScope.launch {
-                    try {
-                        ApiClient.customerApi.changePassword(
-                            ApiClient.bearerToken(),
-                            ChangePasswordRequest(old, newPass)
-                        )
-                        Toast.makeText(ctx, "Password updated successfully!", Toast.LENGTH_SHORT).show()
-                    } catch (e: HttpException) {
-                        when (e.code()) {
-                            400  -> Toast.makeText(ctx, "Current password is incorrect", Toast.LENGTH_SHORT).show()
-                            401  -> (activity as? DashboardActivity)?.showSessionExpiredDialog()
-                            else -> Toast.makeText(ctx, "Failed to update password", Toast.LENGTH_SHORT).show()
-                        }
-                    } catch (_: Exception) {
-                        Toast.makeText(ctx, "Network error", Toast.LENGTH_SHORT).show()
+        btnUpdate.setOnClickListener {
+            val old     = etOld.text.toString()
+            val newPass = etNew.text.toString()
+            val confirm = etConfirm.text.toString()
+
+            if (old.isEmpty() || newPass.isEmpty() || confirm.isEmpty()) {
+                Toast.makeText(ctx, "All fields are required", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            if (newPass != confirm) {
+                Toast.makeText(ctx, "Passwords don't match", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            if (newPass.length < 8) {
+                Toast.makeText(ctx, "Password must be at least 8 characters", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            btnUpdate.isEnabled = false
+            viewLifecycleOwner.lifecycleScope.launch {
+                try {
+                    ApiClient.customerApi.changePassword(
+                        ApiClient.bearerToken(),
+                        ChangePasswordRequest(currentPassword = old, newPassword = newPass)
+                    )
+                    dialog.dismiss()
+                    Toast.makeText(ctx, "Password updated successfully!", Toast.LENGTH_SHORT).show()
+                } catch (e: HttpException) {
+                    when (e.code()) {
+                        400  -> Toast.makeText(ctx, "Current password is incorrect", Toast.LENGTH_SHORT).show()
+                        401  -> (activity as? DashboardActivity)?.showSessionExpiredDialog()
+                        else -> Toast.makeText(ctx, "Failed to update password", Toast.LENGTH_SHORT).show()
                     }
+                    btnUpdate.isEnabled = true
+                } catch (_: Exception) {
+                    Toast.makeText(ctx, "Network error", Toast.LENGTH_SHORT).show()
+                    btnUpdate.isEnabled = true
                 }
             }
-            .setNegativeButton("Cancel", null)
-            .show()
+        }
+
+        dialog.show()
+    }
+
+    private fun isValidPhilippinePhone(phone: String) =
+        Regex("^\\+639\\d{9}$").matches(phone.replace(" ", ""))
+
+    private fun formatPhoneDisplay(localDigits: String): String {
+        val d = localDigits.take(10)
+        val body = when {
+            d.length <= 3 -> d
+            d.length <= 6 -> "${d.substring(0, 3)} ${d.substring(3)}"
+            else          -> "${d.substring(0, 3)} ${d.substring(3, 6)} ${d.substring(6)}"
+        }
+        return "+63 $body"
+    }
+
+    private fun extractLocalDigits(raw: String): String {
+        val withoutCountry = if (raw.startsWith("+63")) raw.substring(3) else raw
+        val digits = withoutCountry.filter { it.isDigit() }
+        return if (digits.startsWith("0")) digits.substring(1).take(10) else digits.take(10)
     }
 
     private fun prefs() =

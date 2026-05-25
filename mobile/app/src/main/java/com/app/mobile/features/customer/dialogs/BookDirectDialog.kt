@@ -62,7 +62,8 @@ class BookDirectDialog : DialogFragment() {
         /** Extracts the 10-digit local part from any stored/typed phone string. */
         fun extractLocalDigits(raw: String): String {
             val withoutCountry = if (raw.startsWith("+63")) raw.substring(3) else raw
-            return withoutCountry.filter { it.isDigit() }.take(10)
+            val digits = withoutCountry.filter { it.isDigit() }
+            return if (digits.startsWith("0")) digits.substring(1).take(10) else digits.take(10)
         }
     }
 

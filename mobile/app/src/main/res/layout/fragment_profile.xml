@@ -113,6 +113,7 @@
                         android:layout_marginBottom="4dp" />
                     <EditText android:id="@+id/etPhone" android:layout_width="match_parent" android:layout_height="52dp"
                         android:background="@drawable/bg_input" android:paddingHorizontal="12dp"
+                        android:hint="+63 9XX XXX XXXX"
                         android:textSize="15sp" android:inputType="phone" android:layout_marginBottom="16dp" />
 
                     <com.google.android.material.button.MaterialButton

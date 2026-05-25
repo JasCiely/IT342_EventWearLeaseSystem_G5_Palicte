@@ -100,6 +100,23 @@ class CreateBookingDialogFragment : DialogFragment() {
             binding.etCbPhone.text.clear()
         }
 
+        binding.etCbPhone.addTextChangedListener(object : TextWatcher {
+            private var isFormatting = false
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                if (isFormatting || s == null) return
+                isFormatting = true
+                val digits    = extractLocalDigits(s.toString())
+                val formatted = formatPhoneDisplay(digits)
+                if (s.toString() != formatted) {
+                    s.replace(0, s.length, formatted)
+                    try { binding.etCbPhone.setSelection(formatted.length) } catch (_: Exception) {}
+                }
+                isFormatting = false
+            }
+        })
+
         binding.etItemSearch.addTextChangedListener(object : TextWatcher {
             override fun afterTextChanged(s: Editable?) { filterItems(s.toString()) }
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -321,7 +338,8 @@ class CreateBookingDialogFragment : DialogFragment() {
                         selectedCustomer = cust
                         binding.etCbName.setText(cust.fullName)
                         binding.etCbEmail.setText(cust.email)
-                        binding.etCbPhone.setText(cust.phone ?: "")
+                        val rawPhone = cust.phone ?: ""
+                        binding.etCbPhone.setText(if (rawPhone.isNotEmpty()) formatPhoneDisplay(extractLocalDigits(rawPhone)) else "")
                         binding.tvSelectedCustomer.text      = cust.fullName
                         binding.tvSelectedCustomerEmail.text = cust.email
                         binding.selectedCustomerChip.visibility = View.VISIBLE
@@ -473,7 +491,8 @@ class CreateBookingDialogFragment : DialogFragment() {
         val item  = selectedItem
         if (name.isEmpty())  return "Customer name is required"
         if (email.isEmpty()) return "Customer email is required"
-        if (phone.isEmpty()) return "Customer phone is required"
+        if (phone.isEmpty() || phone == "+63 ") return "Customer phone is required"
+        if (!isValidPhilippinePhone(phone)) return "Invalid phone number. Use +63 followed by 10 digits (e.g. +639XXXXXXXXX)"
         if (item == null)    return "Please select an item"
         val sizes = item.sizes?.filter { it.isNotEmpty() } ?: emptyList()
         if (sizes.size > 1 && selectedSize.isEmpty()) return "Please select a size for this item"
@@ -507,7 +526,7 @@ class CreateBookingDialogFragment : DialogFragment() {
                     val req = CreateFittingBookingRequest(
                         customerEmail  = email,
                         customerName   = name,
-                        customerPhone  = phone,
+                        customerPhone  = phone.replace(" ", ""),
                         itemId         = item.id,
                         itemName       = item.name,
                         fittingDate    = fittingDate,
@@ -527,7 +546,7 @@ class CreateBookingDialogFragment : DialogFragment() {
                     val req       = CreateDirectBookingRequest(
                         customerEmail   = email,
                         customerName    = name,
-                        customerPhone   = phone,
+                        customerPhone   = phone.replace(" ", ""),
                         inventoryItemId = item.id,
                         itemName        = item.name,
                         startDate       = startDate,
@@ -563,6 +582,25 @@ class CreateBookingDialogFragment : DialogFragment() {
         binding.tvCbError.visibility = View.VISIBLE
     }
     private fun clearError() { binding.tvCbError.visibility = View.GONE }
+
+    private fun isValidPhilippinePhone(phone: String) =
+        Regex("^\\+639\\d{9}$").matches(phone.replace(" ", ""))
+
+    private fun formatPhoneDisplay(localDigits: String): String {
+        val d = localDigits.take(10)
+        val body = when {
+            d.length <= 3 -> d
+            d.length <= 6 -> "${d.substring(0, 3)} ${d.substring(3)}"
+            else          -> "${d.substring(0, 3)} ${d.substring(3, 6)} ${d.substring(6)}"
+        }
+        return "+63 $body"
+    }
+
+    private fun extractLocalDigits(raw: String): String {
+        val withoutCountry = if (raw.startsWith("+63")) raw.substring(3) else raw
+        val digits = withoutCountry.filter { it.isDigit() }
+        return if (digits.startsWith("0")) digits.substring(1).take(10) else digits.take(10)
+    }
 
     private fun parseDate(s: String): java.util.Date {
         val p   = s.split("-")
