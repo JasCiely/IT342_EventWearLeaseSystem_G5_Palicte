@@ -1,14 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  CalendarCheck, Clock, CheckCircle,
+  CalendarCheck, Clock,
   Package, PackageCheck, AlertCircle,
   TrendingUp, Users, BarChart2, Bell, ArrowRight,
   Zap, ShoppingBag, Activity, Star,
 } from 'lucide-react';
 import { getAllFittingBookings, getAllDirectBookings, fetchItems } from '../services/inventoryApi';
 import { fetchCustomers } from '../services/customerService';
-import { fetchStaff } from '../services/staffApi';
 import { sseService } from '../../../shared/services/sseService';
 import '../styles/DashboardFragment.css';
 
@@ -55,25 +54,22 @@ const DashboardFragment = () => {
   const [directs, setDirects]         = useState([]);
   const [itemCount, setItemCount]     = useState(0);
   const [customerCount, setCustomerCount] = useState(0);
-  const [staffCount, setStaffCount]   = useState(0);
 
   const adminName = localStorage.getItem('firstName') || 'Admin';
 
   const load = useCallback(async () => {
     setError(null);
     try {
-      const [f, d, items, customers, staff] = await Promise.all([
+      const [f, d, items, customers] = await Promise.all([
         fetchAllPages(getAllFittingBookings),
         fetchAllPages(getAllDirectBookings),
         fetchItems().catch(() => []),
         fetchCustomers({ page: 0, size: 1 }).catch(() => ({ totalElements: 0 })),
-        fetchStaff({ page: 0, size: 1000 }).catch(() => []),
       ]);
       setFittings(Array.isArray(f) ? f : []);
       setDirects(Array.isArray(d) ? d : []);
       setItemCount(Array.isArray(items) ? items.length : 0);
       setCustomerCount(customers?.totalElements ?? 0);
-      setStaffCount(Array.isArray(staff) ? staff.length : 0);
     } catch (err) {
       setError(err.message || 'Failed to load dashboard data.');
     }
@@ -401,11 +397,6 @@ const DashboardFragment = () => {
                 <div className="adf-people-icon adf-pi-customers"><Users size={18} /></div>
                 <span className="adf-people-count">{customerCount}</span>
                 <span className="adf-people-label">Customers</span>
-              </button>
-              <button className="adf-people-item" onClick={() => navigate('/admin/staff')}>
-                <div className="adf-people-icon adf-pi-staff"><CheckCircle size={18} /></div>
-                <span className="adf-people-count">{staffCount}</span>
-                <span className="adf-people-label">Staff</span>
               </button>
               <button className="adf-people-item" onClick={() => navigate('/admin/inventory')}>
                 <div className="adf-people-icon adf-pi-items"><Package size={18} /></div>

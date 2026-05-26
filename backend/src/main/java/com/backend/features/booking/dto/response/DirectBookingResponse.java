@@ -32,4 +32,7 @@ public class DirectBookingResponse {
     private String customerPhone;
     private String preferredSize;
     private boolean extended;
+    private String paymentStatus;
+    private java.time.LocalDateTime paymentDate;
+    private String paymentNotes;
 }

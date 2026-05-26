@@ -216,6 +216,58 @@ object AuthRepository {
         })
     }
 
+    fun changePassword(
+        token: String,
+        currentPassword: String,
+        newPassword: String,
+        onSuccess: () -> Unit,
+        onError: (message: String) -> Unit
+    ) {
+        val body = JSONObject().apply {
+            put("currentPassword", currentPassword)
+            put("newPassword", newPassword)
+        }.toString().toRequestBody(JSON_TYPE)
+
+        val request = Request.Builder()
+            .url("${ApiClient.BASE_URL}/api/auth/change-password")
+            .post(body)
+            .addHeader("Content-Type", "application/json")
+            .addHeader("Authorization", "Bearer $token")
+            .build()
+
+        ApiClient.http.newCall(request).enqueue(object : Callback {
+            override fun onFailure(call: Call, e: java.io.IOException) {
+                onError(MSG_NETWORK_ERROR)
+            }
+
+            override fun onResponse(call: Call, response: Response) {
+                val responseBody = response.body?.string()
+                if (response.isSuccessful) {
+                    onSuccess()
+                } else {
+                    val msg = try {
+                        val json = JSONObject(responseBody ?: "")
+                        when {
+                            response.code == 401 -> {
+                                val m = json.optString("message", "").lowercase()
+                                if (m.contains("current") || m.contains("incorrect") || m.contains("password"))
+                                    "Current password is incorrect"
+                                else
+                                    "Session expired. Please log in again."
+                            }
+                            json.has("validationErrors") -> {
+                                val errs = json.getJSONObject("validationErrors")
+                                errs.getString(errs.keys().next())
+                            }
+                            else -> json.optString("message", "Failed to change password. Please try again.")
+                        }
+                    } catch (e: Exception) { "Failed to change password. Please try again." }
+                    onError(msg)
+                }
+            }
+        })
+    }
+
     fun resetPassword(
         email: String,
         otp: String,

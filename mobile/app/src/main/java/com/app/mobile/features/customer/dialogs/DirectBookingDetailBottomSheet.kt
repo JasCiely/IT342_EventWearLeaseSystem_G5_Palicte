@@ -37,19 +37,20 @@ class DirectBookingDetailBottomSheet : BottomSheetDialogFragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        val tvStatus     = view.findViewById<TextView>(R.id.tvStatus)
-        val tvItemName   = view.findViewById<TextView>(R.id.tvItemName)
-        val tvDates      = view.findViewById<TextView>(R.id.tvDates)
-        val tvSize       = view.findViewById<TextView>(R.id.tvSize)
-        val tvBasePrice  = view.findViewById<TextView>(R.id.tvBasePrice)
-        val rowDiscount  = view.findViewById<LinearLayout>(R.id.rowDiscount)
-        val tvDiscount   = view.findViewById<TextView>(R.id.tvDiscount)
-        val tvTotal      = view.findViewById<TextView>(R.id.tvTotal)
-        val labelNotes   = view.findViewById<TextView>(R.id.labelNotes)
-        val tvNotes      = view.findViewById<TextView>(R.id.tvNotes)
-        val btnEditDates = view.findViewById<MaterialButton>(R.id.btnEditDates)
-        val btnCancel    = view.findViewById<MaterialButton>(R.id.btnCancel)
-        val btnClose     = view.findViewById<MaterialButton>(R.id.btnClose)
+        val tvStatus        = view.findViewById<TextView>(R.id.tvStatus)
+        val tvItemName      = view.findViewById<TextView>(R.id.tvItemName)
+        val tvDates         = view.findViewById<TextView>(R.id.tvDates)
+        val tvSize          = view.findViewById<TextView>(R.id.tvSize)
+        val tvBasePrice     = view.findViewById<TextView>(R.id.tvBasePrice)
+        val rowDiscount     = view.findViewById<LinearLayout>(R.id.rowDiscount)
+        val tvDiscount      = view.findViewById<TextView>(R.id.tvDiscount)
+        val tvTotal         = view.findViewById<TextView>(R.id.tvTotal)
+        val tvPaymentStatus = view.findViewById<TextView>(R.id.tvPaymentStatus)
+        val labelNotes      = view.findViewById<TextView>(R.id.labelNotes)
+        val tvNotes         = view.findViewById<TextView>(R.id.tvNotes)
+        val btnEditDates    = view.findViewById<MaterialButton>(R.id.btnEditDates)
+        val btnCancel       = view.findViewById<MaterialButton>(R.id.btnCancel)
+        val btnClose        = view.findViewById<MaterialButton>(R.id.btnClose)
 
         tvItemName.text = booking.itemName
         tvDates.text    = "${formatDate(booking.startDate)} → ${formatDate(booking.endDate)} · ${booking.totalDays} day${if (booking.totalDays != 1) "s" else ""}"
@@ -61,6 +62,11 @@ class DirectBookingDetailBottomSheet : BottomSheetDialogFragment() {
             rowDiscount.visibility = View.VISIBLE
             tvDiscount.text = "-₱${String.format("%.2f", booking.discountAmount)}"
         }
+
+        val isPaid = booking.paymentStatus?.equals("Paid", ignoreCase = true) == true
+        tvPaymentStatus.text = if (isPaid) "Paid" else "Unpaid"
+        tvPaymentStatus.setBackgroundColor(if (isPaid) Color.parseColor("#DCFCE7") else Color.parseColor("#FEF3C7"))
+        tvPaymentStatus.setTextColor(if (isPaid) Color.parseColor("#15803D") else Color.parseColor("#92400E"))
 
         booking.notes?.takeIf { it.isNotBlank() }?.let {
             labelNotes.visibility = View.VISIBLE

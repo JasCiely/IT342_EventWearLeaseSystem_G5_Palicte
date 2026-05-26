@@ -11,7 +11,17 @@ object SessionManager {
     private const val KEY_LAST_NAME  = "last_name"
     private const val KEY_EMAIL      = "email"
     private const val KEY_ROLE       = "role"
-    private const val KEY_PHONE      = "phone"
+    private const val KEY_PHONE                = "phone"
+    private const val KEY_MUST_CHANGE_PASSWORD = "must_change_password"
+
+    fun setMustChangePassword(context: Context, value: Boolean) {
+        context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE).edit()
+            .putBoolean(KEY_MUST_CHANGE_PASSWORD, value)
+            .apply()
+    }
+
+    fun getMustChangePassword(context: Context): Boolean =
+        context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE).getBoolean(KEY_MUST_CHANGE_PASSWORD, false)
 
     fun saveUser(
         context: Context,

@@ -72,6 +72,15 @@ public class DirectBooking {
     @Column(name = "extended")
     private boolean extended = false;
 
+    @Column(name = "payment_status", nullable = false)
+    private String paymentStatus = "Unpaid";
+
+    @Column(name = "payment_date")
+    private java.time.LocalDateTime paymentDate;
+
+    @Column(name = "payment_notes")
+    private String paymentNotes;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 

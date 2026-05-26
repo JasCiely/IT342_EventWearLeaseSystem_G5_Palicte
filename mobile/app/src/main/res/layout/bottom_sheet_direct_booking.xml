@@ -347,15 +347,34 @@
                 android:alpha="0.5" />
 
             <!-- PAYMENT section -->
-            <TextView
-                android:layout_width="wrap_content"
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="PAYMENT"
-                android:textSize="10sp"
-                android:textColor="@color/brand_text_subtitle"
-                android:letterSpacing="0.12"
-                android:textAllCaps="true"
-                android:layout_marginBottom="12dp" />
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="12dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="PAYMENT"
+                    android:textSize="10sp"
+                    android:textColor="@color/brand_text_subtitle"
+                    android:letterSpacing="0.12"
+                    android:textAllCaps="true" />
+
+                <TextView
+                    android:id="@+id/tvPaymentStatusBadge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="11sp"
+                    android:textStyle="bold"
+                    android:paddingHorizontal="10dp"
+                    android:paddingVertical="4dp"
+                    tools:text="Paid" />
+
+            </LinearLayout>
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -627,6 +646,19 @@
                 tools:visibility="visible" />
 
         </LinearLayout>
+
+        <!-- Mark as Paid (conditional: hidden when already paid or terminal) -->
+        <Button
+            android:id="@+id/btnMarkPaid"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:text="Mark as Paid (Cash)"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#15803D"
+            android:layout_marginBottom="10dp"
+            android:elevation="2dp"
+            android:visibility="gone"
+            tools:visibility="visible" />
 
         <!-- Always visible: Resend Email (full width) -->
         <Button

@@ -694,6 +694,20 @@ public class DirectBookingServiceImpl implements DirectBookingService {
         response.setCustomerPhone(booking.getCustomerPhone());
         response.setPreferredSize(booking.getPreferredSize());
         response.setExtended(booking.isExtended());
+        response.setPaymentStatus(booking.getPaymentStatus());
+        response.setPaymentDate(booking.getPaymentDate());
+        response.setPaymentNotes(booking.getPaymentNotes());
         return response;
+    }
+
+    @Override
+    @Transactional
+    public DirectBookingResponse markPayment(String bookingId, String notes) {
+        DirectBooking booking = directBookingRepository.findById(bookingId)
+                .orElseThrow(() -> new IllegalArgumentException("Booking not found"));
+        booking.setPaymentStatus("Paid");
+        booking.setPaymentDate(java.time.LocalDateTime.now());
+        booking.setPaymentNotes(notes);
+        return mapToResponse(directBookingRepository.save(booking));
     }
 }

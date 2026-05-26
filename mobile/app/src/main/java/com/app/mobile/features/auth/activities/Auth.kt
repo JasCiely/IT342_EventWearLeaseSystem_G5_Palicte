@@ -18,6 +18,7 @@ import androidx.browser.customtabs.CustomTabColorSchemeParams
 import androidx.browser.customtabs.CustomTabsIntent
 import com.app.mobile.R
 import com.app.mobile.features.admin.activities.AdminDashboardActivity
+import com.app.mobile.features.admin.activities.AdminFirstLoginActivity
 import com.app.mobile.features.auth.repositories.AuthRepository
 import com.app.mobile.features.customer.activities.DashboardActivity
 import com.app.mobile.features.guest.activities.GuestDashboardActivity
@@ -173,13 +174,21 @@ class Auth : AppCompatActivity() {
                 else -> {
                     setLoading(btnSignIn, true, "SIGNING IN...", "SIGN IN  →")
                     AuthRepository.login(email, password,
-                        onSuccess = { token, firstName, lastName, respEmail, role, _ ->
+                        onSuccess = { token, firstName, lastName, respEmail, role, mustChangePassword ->
                             runOnUiThread {
                                 SessionManager.saveUser(this, token, firstName, lastName, respEmail, role)
+                                SessionManager.setMustChangePassword(this, mustChangePassword)
                                 clearSignInForm()
-                                toast("Welcome back, $firstName!")
                                 setLoading(btnSignIn, false, "SIGNING IN...", "SIGN IN  →")
-                                goToDashboard()
+                                if (role == "ADMIN" && mustChangePassword) {
+                                    startActivity(Intent(this, AdminFirstLoginActivity::class.java).apply {
+                                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                                    })
+                                    finish()
+                                } else {
+                                    toast("Welcome back, $firstName!")
+                                    goToDashboard()
+                                }
                             }
                         },
                         onError = { msg ->

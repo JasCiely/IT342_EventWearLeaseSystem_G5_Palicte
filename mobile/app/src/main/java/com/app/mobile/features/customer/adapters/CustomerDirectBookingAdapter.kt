@@ -18,13 +18,14 @@ class CustomerDirectBookingAdapter(
 ) : ListAdapter<DirectBooking, CustomerDirectBookingAdapter.VH>(DIFF) {
 
     inner class VH(view: View) : RecyclerView.ViewHolder(view) {
-        val accent: View       = view.findViewById(R.id.statusAccent)
-        val tvItem: TextView   = view.findViewById(R.id.tvItemName)
-        val tvDate: TextView   = view.findViewById(R.id.tvDateInfo)
-        val tvSize: TextView   = view.findViewById(R.id.tvSize)
-        val tvStatus: TextView = view.findViewById(R.id.tvStatus)
-        val tvPrice: TextView  = view.findViewById(R.id.tvPrice)
-        val tvLabel: TextView  = view.findViewById(R.id.tvPriceLabel)
+        val accent: View           = view.findViewById(R.id.statusAccent)
+        val tvItem: TextView       = view.findViewById(R.id.tvItemName)
+        val tvDate: TextView       = view.findViewById(R.id.tvDateInfo)
+        val tvSize: TextView       = view.findViewById(R.id.tvSize)
+        val tvStatus: TextView     = view.findViewById(R.id.tvStatus)
+        val tvPaymentBadge: TextView = view.findViewById(R.id.tvPaymentBadge)
+        val tvPrice: TextView      = view.findViewById(R.id.tvPrice)
+        val tvLabel: TextView      = view.findViewById(R.id.tvPriceLabel)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) =
@@ -51,6 +52,16 @@ class CustomerDirectBookingAdapter(
 
         holder.tvPrice.text = "₱${String.format("%.0f", b.finalPrice)}"
         holder.tvLabel.text = "total"
+
+        val isPaid = b.paymentStatus?.equals("Paid", ignoreCase = true) == true
+        holder.tvPaymentBadge.visibility = View.VISIBLE
+        holder.tvPaymentBadge.text = if (isPaid) "✓ Paid" else "Unpaid"
+        holder.tvPaymentBadge.setBackgroundColor(
+            if (isPaid) Color.parseColor("#DCFCE7") else Color.parseColor("#FEF3C7")
+        )
+        holder.tvPaymentBadge.setTextColor(
+            if (isPaid) Color.parseColor("#15803D") else Color.parseColor("#92400E")
+        )
 
         holder.itemView.setOnClickListener { onClick(b) }
     }

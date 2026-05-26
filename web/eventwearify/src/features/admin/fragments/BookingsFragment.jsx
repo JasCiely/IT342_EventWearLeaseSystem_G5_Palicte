@@ -29,6 +29,7 @@ import {
   markDirectBookingPickedUp,
   checkDirectBookingAvailability,
   markItemAvailable,
+  markDirectBookingPaid,
 } from '../services/inventoryApi';
 import { fetchBookingSettings, saveBookingSettings, getDefaultSettings } from '../services/bookingSettingsApi';
 import { authFetch } from '../../../shared/services/apiClient.js';
@@ -1349,9 +1350,67 @@ function MediaViewer({ file }) {
   return <img src={src} alt="Item" className="bk-media-img" />;
 }
 
+// ─── MarkPaymentModal ─────────────────────────────────────────────────────────
+
+function MarkPaymentModal({ booking, onConfirm, onClose }) {
+  const [notes, setNotes] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const handle = async () => {
+    setSubmitting(true);
+    await onConfirm(notes);
+    setSubmitting(false);
+  };
+
+  return (
+    <div className="inv-overlay" onClick={onClose}>
+      <div className="inv-modal inv-modal-sm" onClick={e => e.stopPropagation()}>
+        <div className="inv-modal-header">
+          <h3><CheckCircle size={15} style={{ marginRight: 6, color: '#15803d' }} />Mark as Paid</h3>
+          <button className="inv-modal-close" onClick={onClose}><X size={15} /></button>
+        </div>
+        <div className="inv-modal-body">
+          <div className="bk-action-context">
+            <div className="bk-action-customer">{booking.customerName}</div>
+            <div className="bk-action-item">{booking.itemName}</div>
+            <div className="bk-action-dates" style={{ fontWeight: 600, color: '#15803d' }}>
+              Amount Due: ₱{(booking.finalPrice || booking.basePrice || 0).toLocaleString()}
+            </div>
+          </div>
+          <div style={{ padding: '0.65rem 0.85rem', background: 'rgba(21,128,61,0.07)', borderRadius: 8, color: '#15803d', fontSize: '0.82rem', marginBottom: '0.75rem' }}>
+            <CheckCircle size={13} style={{ display: 'inline', marginRight: 6 }} />
+            Confirm that cash payment has been received from the customer.
+          </div>
+          <div className="inv-field">
+            <label className="inv-field-label">Notes <span style={{ opacity: 0.5, fontWeight: 400 }}>(optional)</span></label>
+            <textarea
+              className="inv-textarea" rows={2} value={notes}
+              onChange={e => setNotes(e.target.value)}
+              placeholder="Any payment remarks…"
+              disabled={submitting}
+            />
+          </div>
+        </div>
+        <div className="inv-modal-footer">
+          <button className="inv-btn-ghost" onClick={onClose} disabled={submitting}>Cancel</button>
+          <button
+            className="inv-btn-primary"
+            style={{ background: '#15803d' }}
+            onClick={handle}
+            disabled={submitting}
+          >
+            {submitting ? <Loader2 size={13} className="inv-spinner-inline" /> : <CheckCircle size={13} />}
+            Confirm Payment
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── BookingDrawer ────────────────────────────────────────────────────────────
 
-function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, onEditRentalDates, onCompleteNoLease, onProceedToLease, onReturn, onExtend, onPickedUp, onMarkItemAvailable, isFitting, workingHours }) {
+function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, onEditRentalDates, onCompleteNoLease, onProceedToLease, onReturn, onExtend, onPickedUp, onMarkItemAvailable, onPaymentMarked, isFitting, workingHours }) {
   const [itemDetails, setItemDetails] = useState(null);
   const [loadingItem, setLoadingItem] = useState(false);
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
@@ -1359,6 +1418,7 @@ function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, on
   const [markingAvailable, setMarkingAvailable] = useState(false);
   const [emailStatus, setEmailStatus] = useState(null);
   const [emailSending, setEmailSending] = useState(false);
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   // Tracks current time so the Done button enables/disables automatically
   const [now, setNow] = useState(() => new Date());
 
@@ -1699,6 +1759,30 @@ function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, on
                       <div className="bk-ps-row discount"><span>Discount</span><span>-₱{booking.discountAmount.toLocaleString()}</span></div>
                     )}
                     <div className="bk-ps-row total"><span>Total</span><span>₱{(booking.finalPrice || booking.basePrice || 0).toLocaleString()}</span></div>
+                    {!isFitting && (
+                      <div className="bk-ps-row" style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #f0ece8' }}>
+                        <span>Cash Payment</span>
+                        <span style={{
+                          fontWeight: 600,
+                          color: booking.paymentStatus === 'Paid' ? '#15803d' : '#b45309',
+                          background: booking.paymentStatus === 'Paid' ? 'rgba(21,128,61,0.1)' : 'rgba(180,83,9,0.1)',
+                          padding: '2px 8px', borderRadius: 12, fontSize: '0.78rem'
+                        }}>
+                          {booking.paymentStatus || 'Unpaid'}
+                        </span>
+                      </div>
+                    )}
+                    {!isFitting && booking.paymentStatus === 'Paid' && booking.paymentDate && (
+                      <div className="bk-ps-row" style={{ fontSize: '0.75rem', color: '#888' }}>
+                        <span>Paid on</span>
+                        <span>{new Date(booking.paymentDate).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' })}</span>
+                      </div>
+                    )}
+                    {!isFitting && booking.paymentNotes && (
+                      <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.3rem', fontStyle: 'italic' }}>
+                        Note: {booking.paymentNotes}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -1722,7 +1806,32 @@ function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, on
           )}
         </div>
 
+        {paymentModalOpen && (
+          <MarkPaymentModal
+            booking={booking}
+            onClose={() => setPaymentModalOpen(false)}
+            onConfirm={async (notes) => {
+              try {
+                await markDirectBookingPaid(booking.id, notes);
+                setPaymentModalOpen(false);
+                onPaymentMarked && onPaymentMarked();
+              } catch (e) {
+                alert('Failed to mark payment. Please try again.');
+              }
+            }}
+          />
+        )}
+
         <div className="bk-drawer-footer">
+          {!isFitting && booking.paymentStatus !== 'Paid' && !['Cancelled', 'Completed'].includes(booking.status) && (
+            <button
+              className="inv-btn-sm"
+              style={{ background: '#15803d', color: '#fff' }}
+              onClick={() => setPaymentModalOpen(true)}
+            >
+              <CheckCircle size={12} /> Mark as Paid
+            </button>
+          )}
           {canCancel && !hasLeaseStarted && (
             <button
               className="inv-btn-sm danger"
@@ -3040,6 +3149,11 @@ export default function BookingsManagement() {
             const updated = await markItemAvailable(itemId);
             showToastMsg('success', 'Item marked as Available');
             return updated;
+          }}
+          onPaymentMarked={() => {
+            showToastMsg('success', 'Payment marked as received');
+            loadData();
+            setDrawer(null);
           }}
           onClose={() => setDrawer(null)}
           workingHours={workingHours}

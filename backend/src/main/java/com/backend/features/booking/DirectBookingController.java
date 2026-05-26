@@ -195,6 +195,24 @@ public class DirectBookingController {
         }
     }
 
+    @PutMapping("/{bookingId}/payment")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> markPayment(
+            @PathVariable String bookingId,
+            @RequestBody(required = false) Map<String, String> body) {
+        try {
+            String notes = body != null ? body.get("notes") : null;
+            DirectBookingResponse response = directBookingService.markPayment(bookingId, notes);
+            sseService.broadcast("BOOKING_UPDATE");
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            log.error("Error marking payment for booking {}", bookingId, e);
+            return ResponseEntity.internalServerError().body(Map.of("error", "Failed to mark payment"));
+        }
+    }
+
     @GetMapping("/my-all-bookings")
     @PreAuthorize("hasRole('CUSTOMER')")
     public ResponseEntity<List<DirectBookingResponse>> getAllMyDirectBookings(Authentication authentication) {

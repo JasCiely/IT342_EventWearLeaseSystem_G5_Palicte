@@ -61,7 +61,10 @@ data class DirectBooking(
     val preferredSize: String? = null,
     val notes: String?,
     val extended: Boolean = false,
-    val createdAt: String
+    val createdAt: String,
+    val paymentStatus: String? = "Unpaid",
+    val paymentDate: String? = null,
+    val paymentNotes: String? = null
 )
 
 data class InventoryItem(
@@ -190,6 +193,7 @@ data class CreatePromotionRequest(
 data class RescheduleRequest(val fittingDate: String, val fittingTime: String)
 data class ExtendRequest(val newEndDate: String)
 data class UpdateDatesRequest(val startDate: String, val endDate: String)
+data class MarkPaymentRequest(val notes: String? = null)
 
 data class CustomerBookFittingRequest(
     val itemId: String,

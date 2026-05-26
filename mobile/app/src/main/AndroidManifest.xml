@@ -30,6 +30,7 @@
 
         <activity android:name=".features.customer.activities.DashboardActivity" android:exported="false" />
         <activity android:name=".features.admin.activities.AdminDashboardActivity" android:exported="false" />
+        <activity android:name=".features.admin.activities.AdminFirstLoginActivity" android:exported="false" />
         <activity android:name=".features.auth.activities.ForgotPasswordActivity" android:exported="false" />
         <activity android:name=".features.guest.activities.GuestDashboardActivity" android:exported="false" />
 

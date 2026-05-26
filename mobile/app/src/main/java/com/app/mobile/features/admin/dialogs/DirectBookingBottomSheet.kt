@@ -107,6 +107,18 @@ class DirectBookingBottomSheet : BottomSheetDialogFragment() {
                 visibility = View.VISIBLE
             }
         }
+
+        val tvPaymentBadge = v.findViewById<TextView>(R.id.tvPaymentStatusBadge)
+        val isPaid = booking.paymentStatus?.equals("Paid", ignoreCase = true) == true
+        if (isPaid) {
+            tvPaymentBadge.text = "✓ Paid"
+            tvPaymentBadge.setTextColor(ContextCompat.getColor(requireContext(), R.color.status_confirmed_text))
+            tvPaymentBadge.background = ContextCompat.getDrawable(requireContext(), R.drawable.bg_badge_paid)
+        } else {
+            tvPaymentBadge.text = "Unpaid"
+            tvPaymentBadge.setTextColor(ContextCompat.getColor(requireContext(), R.color.status_pending_text))
+            tvPaymentBadge.background = ContextCompat.getDrawable(requireContext(), R.drawable.bg_badge_pending)
+        }
     }
 
     private fun bindActionButtons(v: View) {
@@ -118,6 +130,7 @@ class DirectBookingBottomSheet : BottomSheetDialogFragment() {
         val btnEditInline       = v.findViewById<Button>(R.id.btnEditDatesInline)
         val btnResendEmail      = v.findViewById<Button>(R.id.btnResendEmail)
         val btnCancel           = v.findViewById<Button>(R.id.btnCancel)
+        val btnMarkPaid         = v.findViewById<Button>(R.id.btnMarkPaid)
         val layoutPickupWarning = v.findViewById<View>(R.id.layoutPickupWarning)
 
         val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
@@ -149,6 +162,10 @@ class DirectBookingBottomSheet : BottomSheetDialogFragment() {
         }
         btnResendEmail.visibility = View.VISIBLE
 
+        val terminalStatuses = listOf("Completed", "Cancelled")
+        val isPaid = booking.paymentStatus?.equals("Paid", ignoreCase = true) == true
+        btnMarkPaid.visibility = if (!isPaid && !terminalStatuses.contains(booking.bookingStatus)) View.VISIBLE else View.GONE
+
         btnConfirm.setOnClickListener      { updateStatus("Approved") }
         btnCancel.setOnClickListener       { updateStatus("Cancelled") }
         btnPickup.setOnClickListener       { markPickup() }
@@ -166,6 +183,7 @@ class DirectBookingBottomSheet : BottomSheetDialogFragment() {
             showEditRentalDatesDialog()
         }
         btnResendEmail.setOnClickListener  { resendEmail() }
+        btnMarkPaid.setOnClickListener     { confirmMarkPaid() }
     }
 
     private fun applyStatusBadge(tv: TextView, status: String) {
@@ -244,6 +262,24 @@ class DirectBookingBottomSheet : BottomSheetDialogFragment() {
                 }
             }
             .setNegativeButton("Back", null)
+            .show()
+    }
+
+    private fun confirmMarkPaid() {
+        AlertDialog.Builder(requireContext())
+            .setTitle("Mark as Paid")
+            .setMessage("Confirm that ₱${String.format("%.2f", booking.finalPrice)} cash payment has been received from ${booking.customerName}?")
+            .setPositiveButton("Confirm Paid") { _, _ ->
+                viewLifecycleOwner.lifecycleScope.launch {
+                    try {
+                        ApiClient.adminApi.markPayment(ApiClient.bearerToken(), booking.id, com.app.mobile.shared.models.MarkPaymentRequest())
+                        toast("Payment marked as received")
+                        onReload?.invoke()
+                        dismiss()
+                    } catch (_: Exception) { toast(getString(R.string.error_network)) }
+                }
+            }
+            .setNegativeButton("Cancel", null)
             .show()
     }
 

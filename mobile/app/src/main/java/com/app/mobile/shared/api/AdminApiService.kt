@@ -137,6 +137,13 @@ interface AdminApiService {
         @Path("bookingId") bookingId: String
     ): MessageResponse
 
+    @PUT("api/direct-bookings/{bookingId}/payment")
+    suspend fun markPayment(
+        @Header("Authorization") token: String,
+        @Path("bookingId") bookingId: String,
+        @Body body: MarkPaymentRequest
+    ): DirectBooking
+
     // ── Customer detail ───────────────────────────────────────────────────
     @GET("api/admin/users/{id}")
     suspend fun getUserById(

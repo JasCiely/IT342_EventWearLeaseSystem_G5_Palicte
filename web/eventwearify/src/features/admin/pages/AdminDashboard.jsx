@@ -6,13 +6,11 @@ import CustomersFragment from '../fragments/CustomersFragment';
 import InventoryFragment from '../fragments/InventoryFragment';
 import ProfileFragment from '../fragments/ProfileFragment';
 import BookingsFragment from '../fragments/BookingsFragment';
-import StaffFragment from '../fragments/StaffFragment';
 import {
   CheckCircle,
   LayoutDashboard,
   Package,
   CalendarCheck,
-  Users,
   UserCircle,
   ChevronLeft,
   ChevronRight,
@@ -28,7 +26,6 @@ const NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/admin/dashboard' },
   { key: 'inventory', label: 'Inventory', icon: Package,          path: '/admin/inventory' },
   { key: 'bookings',  label: 'Bookings',  icon: CalendarCheck,    path: '/admin/bookings' },
-  { key: 'staff',     label: 'Staff',     icon: Users,            path: '/admin/staff' },
   { key: 'customers', label: 'Customers', icon: Contact,          path: '/admin/customers' },
   { key: 'profile',   label: 'Profile',   icon: UserCircle,       path: '/admin/profile' },
 ];
@@ -40,7 +37,6 @@ const renderFragment = (key) => {
     case 'customers': return <CustomersFragment />;
     case 'profile':   return <ProfileFragment />;
     case 'bookings':  return <BookingsFragment />;
-    case 'staff':     return <StaffFragment />;
     case 'dashboard': return <DashboardFragment />;
     default:          return <DashboardFragment />;
   }

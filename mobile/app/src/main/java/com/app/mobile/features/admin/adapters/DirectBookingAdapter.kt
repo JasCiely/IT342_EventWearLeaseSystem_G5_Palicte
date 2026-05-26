@@ -2,6 +2,7 @@ package com.app.mobile.features.admin.adapters
 
 import android.graphics.Color
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
@@ -21,6 +22,8 @@ class DirectBookingAdapter(
             b.tvPrice.text     = "₱${String.format("%.2f", item.finalPrice)}"
             b.tvStatus.text    = item.bookingStatus
             if (item.extended) b.tvExtended.text = "Extended" else b.tvExtended.text = ""
+            val isPaid = item.paymentStatus?.equals("Paid", ignoreCase = true) == true
+            b.tvPaidBadge.visibility = if (isPaid) View.VISIBLE else View.GONE
             applyStatusStyle(item.bookingStatus)
             b.root.setOnClickListener { onClick(item) }
         }
