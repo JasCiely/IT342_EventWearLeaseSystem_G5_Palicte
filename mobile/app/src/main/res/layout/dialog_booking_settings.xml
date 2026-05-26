@@ -147,33 +147,6 @@
         <View android:layout_width="match_parent" android:layout_height="1dp"
             android:background="@color/gray_300" android:layout_marginBottom="16dp" />
 
-        <!-- Auto-approve Threshold -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Auto-approve Threshold (₱)"
-            android:textSize="13sp"
-            android:textColor="@color/brand_text_subtitle"
-            android:layout_marginBottom="4dp" />
-
-        <EditText
-            android:id="@+id/etAutoApprove"
-            android:layout_width="match_parent"
-            android:layout_height="52dp"
-            android:background="@drawable/bg_input"
-            android:hint="e.g. 500"
-            android:paddingHorizontal="12dp"
-            android:inputType="numberDecimal"
-            android:layout_marginBottom="4dp" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Bookings at or below this price are auto-approved"
-            android:textSize="11sp"
-            android:textColor="@color/brand_text_subtitle"
-            android:layout_marginBottom="16dp" />
-
         <!-- Fitting Duration -->
         <TextView
             android:layout_width="wrap_content"

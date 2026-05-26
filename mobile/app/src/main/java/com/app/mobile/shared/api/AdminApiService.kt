@@ -3,6 +3,7 @@ package com.app.mobile.shared.api
 import com.app.mobile.shared.models.*
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
+import retrofit2.Response
 import retrofit2.http.*
 
 interface AdminApiService {
@@ -245,7 +246,7 @@ interface AdminApiService {
     suspend fun deleteInventoryItem(
         @Header("Authorization") token: String,
         @Path("id") id: String
-    )
+    ): Response<Void>
 
     @PUT("api/inventory/items/{id}/mark-available")
     suspend fun markItemAvailable(
@@ -281,7 +282,7 @@ interface AdminApiService {
     suspend fun deletePromotion(
         @Header("Authorization") token: String,
         @Path("id") id: String
-    )
+    ): Response<Void>
 
     // ── Attendance ────────────────────────────────────────────────────────
     @POST("api/admin/attendance/record")

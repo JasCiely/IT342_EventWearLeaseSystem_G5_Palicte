@@ -249,6 +249,11 @@
   transform: scale(1.05); /* Reduced from 1.1 */
 }
 
+/* Hide Edge's built-in password reveal button to avoid double eye icon */
+input[type="password"]::-ms-reveal {
+  display: none;
+}
+
 /* Password Eye Button - Compact */
 .eye-btn {
   position: absolute;

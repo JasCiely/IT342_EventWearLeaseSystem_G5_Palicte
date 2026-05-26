@@ -2244,24 +2244,6 @@ function SettingsModal({ settings, onSave, onClose }) {
           )}
 
           <div className="inv-divider" />
-          <div className="inv-field">
-            <label className="inv-field-label">Auto-approve Threshold</label>
-            <div className="bk-auto-approve">
-              <span className="bk-currency-prefix">₱</span>
-              <input
-                type="number"
-                className="inv-input"
-                value={local.autoApproveThreshold}
-                onChange={e => setLocal(p => ({ ...p, autoApproveThreshold: +e.target.value }))}
-                style={{ width: '120px' }}
-              />
-              <span className="bk-auto-approve-hint">and below</span>
-            </div>
-            <div className="bk-settings-summary" style={{ marginTop: 8 }}>
-              <TrendingUp size={14} />
-              <span>Bookings with total price ≤ ₱{local.autoApproveThreshold} will be auto-approved</span>
-            </div>
-          </div>
 
           <div className="inv-field">
             <label className="inv-field-label"><Clock size={12} /> Fitting Duration (minutes)</label>
