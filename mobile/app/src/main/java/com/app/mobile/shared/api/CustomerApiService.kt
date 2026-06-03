@@ -91,8 +91,8 @@ interface CustomerApiService {
     @GET("api/inventory/promotions")
     suspend fun getPromotions(): List<Promotion>
 
-    @GET("api/admin/booking-settings")
-    suspend fun getBookingSettings(@Header("Authorization") token: String): BookingSettings
+    @GET("api/public/booking-settings")
+    suspend fun getBookingSettings(): BookingSettings
 
     @GET("api/direct-bookings/unavailable-dates")
     suspend fun getOccupiedDates(

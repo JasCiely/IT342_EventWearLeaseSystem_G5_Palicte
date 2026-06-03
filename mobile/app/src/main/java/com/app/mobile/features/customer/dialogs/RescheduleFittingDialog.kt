@@ -143,7 +143,7 @@ class RescheduleFittingDialog : DialogFragment() {
     private fun loadBookingSettings() {
         viewLifecycleOwner.lifecycleScope.launch {
             bookingSettings = try {
-                ApiClient.customerApi.getBookingSettings(ApiClient.bearerToken())
+                ApiClient.customerApi.getBookingSettings()
             } catch (_: Exception) { null }
             timeSlots = CalendarPickerDialog.buildTimeSlots(bookingSettings)
         }

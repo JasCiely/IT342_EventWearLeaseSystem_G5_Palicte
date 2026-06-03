@@ -90,7 +90,9 @@ class CalendarPickerDialog : DialogFragment() {
             if (settings == null) {
                 try {
                     settings = ApiClient.adminApi.getBookingSettings(ApiClient.bearerToken())
-                } catch (_: Exception) { }
+                } catch (_: Exception) {
+                    try { settings = ApiClient.customerApi.getBookingSettings() } catch (_: Exception) { }
+                }
             }
             if (timeSlots.isEmpty()) {
                 timeSlots = buildTimeSlots(settings)

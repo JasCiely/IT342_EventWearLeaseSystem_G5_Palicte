@@ -252,10 +252,15 @@ class BookFittingDialog : DialogFragment() {
                     dismiss()
                     (activity as? DashboardActivity)?.goToMyBookings()
                 } catch (e: HttpException) {
+                    val bodyMsg = try {
+                        val raw = e.response()?.errorBody()?.string()
+                        com.google.gson.JsonParser.parseString(raw)
+                            .asJsonObject.get("message")?.asString
+                    } catch (_: Exception) { null }
                     when (e.code()) {
                         401  -> (activity as? DashboardActivity)?.showSessionExpiredDialog()
                         409  -> toast("This slot is no longer available. Please choose another.")
-                        else -> toast("Booking failed: ${e.message()}")
+                        else -> toast(bodyMsg ?: "Booking failed. Please try again.")
                     }
                     btnConfirm.isEnabled = true
                     btnConfirm.text = "Confirm Fitting Booking"
@@ -271,7 +276,7 @@ class BookFittingDialog : DialogFragment() {
     private fun loadBookingSettings() {
         viewLifecycleOwner.lifecycleScope.launch {
             bookingSettings = try {
-                ApiClient.customerApi.getBookingSettings(ApiClient.bearerToken())
+                ApiClient.customerApi.getBookingSettings()
             } catch (_: Exception) { null }
 
             timeSlots = CalendarPickerDialog.buildTimeSlots(bookingSettings)

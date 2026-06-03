@@ -232,7 +232,7 @@ class EditDirectDatesDialog : DialogFragment() {
     private fun loadSettings() {
         viewLifecycleOwner.lifecycleScope.launch {
             try {
-                bookingSettings   = ApiClient.customerApi.getBookingSettings(ApiClient.bearerToken())
+                bookingSettings   = ApiClient.customerApi.getBookingSettings()
                 inventorySettings = ApiClient.customerApi.getInventorySettings(ApiClient.bearerToken())
                 occupiedRanges    = ApiClient.customerApi.getOccupiedDates(
                     ApiClient.bearerToken(), booking.inventoryItemId ?: ""
