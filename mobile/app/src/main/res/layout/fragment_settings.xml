@@ -1,0 +1,379 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/brand_cream_bg">
+
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="@color/brand_burgundy"
+        android:title="Settings"
+        android:titleTextColor="#FFFFFF"
+        app:navigationIcon="@drawable/ic_arrow_back"
+        app:navigationIconTint="#FFFFFF" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <!-- Salary Settings -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp"
+                android:layout_marginBottom="16dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Salary Settings"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/brand_text_dark"
+                        android:layout_marginBottom="16dp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Base Rate (₱/day)"
+                        android:textSize="13sp"
+                        android:textColor="@color/brand_text_subtitle"
+                        android:layout_marginBottom="4dp" />
+
+                    <EditText
+                        android:id="@+id/etBaseRate"
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:background="@drawable/bg_input"
+                        android:hint="e.g. 500.00"
+                        android:inputType="numberDecimal"
+                        android:paddingHorizontal="12dp"
+                        android:textSize="15sp"
+                        android:layout_marginBottom="12dp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Overtime Rate (₱/hour)"
+                        android:textSize="13sp"
+                        android:textColor="@color/brand_text_subtitle"
+                        android:layout_marginBottom="4dp" />
+
+                    <EditText
+                        android:id="@+id/etOvertimeRate"
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:background="@drawable/bg_input"
+                        android:hint="e.g. 80.00"
+                        android:inputType="numberDecimal"
+                        android:paddingHorizontal="12dp"
+                        android:textSize="15sp"
+                        android:layout_marginBottom="16dp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnSaveSalary"
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:text="Save Salary Settings"
+                        app:backgroundTint="@color/brand_burgundy" />
+
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Booking Settings -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp"
+                android:layout_marginBottom="16dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Booking Settings"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/brand_text_dark"
+                        android:layout_marginBottom="16dp" />
+
+                    <!-- Enable Time Restrictions -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_marginBottom="16dp">
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="Enable Time Restrictions"
+                            android:textSize="14sp"
+                            android:textColor="@color/brand_text_dark" />
+                        <com.google.android.material.switchmaterial.SwitchMaterial
+                            android:id="@+id/switchTimeRestrictions"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:checked="true" />
+                    </LinearLayout>
+
+                    <!-- Open / Close time row -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:layout_marginBottom="12dp">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical"
+                            android:layout_marginEnd="8dp">
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Open Time"
+                                android:textSize="13sp"
+                                android:textColor="@color/brand_text_subtitle"
+                                android:layout_marginBottom="4dp" />
+                            <EditText
+                                android:id="@+id/etOpenTime"
+                                android:layout_width="match_parent"
+                                android:layout_height="52dp"
+                                android:background="@drawable/bg_input"
+                                android:paddingHorizontal="12dp"
+                                android:hint="09:00"
+                                android:inputType="none"
+                                android:focusable="false"
+                                android:cursorVisible="false"
+                                android:textSize="15sp" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Close Time"
+                                android:textSize="13sp"
+                                android:textColor="@color/brand_text_subtitle"
+                                android:layout_marginBottom="4dp" />
+                            <EditText
+                                android:id="@+id/etCloseTime"
+                                android:layout_width="match_parent"
+                                android:layout_height="52dp"
+                                android:background="@drawable/bg_input"
+                                android:paddingHorizontal="12dp"
+                                android:hint="17:00"
+                                android:inputType="none"
+                                android:focusable="false"
+                                android:cursorVisible="false"
+                                android:textSize="15sp" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <!-- Working Days -->
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Working Days"
+                        android:textSize="13sp"
+                        android:textColor="@color/brand_text_subtitle"
+                        android:layout_marginBottom="8dp" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:layout_marginBottom="12dp">
+                        <CheckBox android:id="@+id/cbMon" android:layout_width="0dp"
+                            android:layout_height="wrap_content" android:layout_weight="1"
+                            android:text="Mon" android:textSize="12sp" android:checked="true" />
+                        <CheckBox android:id="@+id/cbTue" android:layout_width="0dp"
+                            android:layout_height="wrap_content" android:layout_weight="1"
+                            android:text="Tue" android:textSize="12sp" android:checked="true" />
+                        <CheckBox android:id="@+id/cbWed" android:layout_width="0dp"
+                            android:layout_height="wrap_content" android:layout_weight="1"
+                            android:text="Wed" android:textSize="12sp" android:checked="true" />
+                        <CheckBox android:id="@+id/cbThu" android:layout_width="0dp"
+                            android:layout_height="wrap_content" android:layout_weight="1"
+                            android:text="Thu" android:textSize="12sp" android:checked="true" />
+                        <CheckBox android:id="@+id/cbFri" android:layout_width="0dp"
+                            android:layout_height="wrap_content" android:layout_weight="1"
+                            android:text="Fri" android:textSize="12sp" android:checked="true" />
+                        <CheckBox android:id="@+id/cbSat" android:layout_width="0dp"
+                            android:layout_height="wrap_content" android:layout_weight="1"
+                            android:text="Sat" android:textSize="12sp" android:checked="false" />
+                        <CheckBox android:id="@+id/cbSun" android:layout_width="0dp"
+                            android:layout_height="wrap_content" android:layout_weight="1"
+                            android:text="Sun" android:textSize="12sp" android:checked="false" />
+                    </LinearLayout>
+
+                    <!-- Fitting Duration -->
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Fitting Duration (minutes)"
+                        android:textSize="13sp"
+                        android:textColor="@color/brand_text_subtitle"
+                        android:layout_marginBottom="4dp" />
+                    <EditText
+                        android:id="@+id/etFittingDuration"
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:background="@drawable/bg_input"
+                        android:hint="30"
+                        android:inputType="number"
+                        android:paddingHorizontal="12dp"
+                        android:textSize="15sp"
+                        android:layout_marginBottom="12dp" />
+
+                    <!-- Auto-approve threshold -->
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Auto-Approve Threshold (₱)"
+                        android:textSize="13sp"
+                        android:textColor="@color/brand_text_subtitle"
+                        android:layout_marginBottom="4dp" />
+                    <EditText
+                        android:id="@+id/etAutoApprove"
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:background="@drawable/bg_input"
+                        android:hint="500"
+                        android:inputType="number"
+                        android:paddingHorizontal="12dp"
+                        android:textSize="15sp"
+                        android:layout_marginBottom="16dp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnSaveBooking"
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:text="Save Booking Settings"
+                        app:backgroundTint="@color/brand_burgundy" />
+
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Inventory Settings -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp"
+                android:layout_marginBottom="16dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Inventory Settings"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/brand_text_dark"
+                        android:layout_marginBottom="16dp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Minimum Lease Days"
+                        android:textSize="13sp"
+                        android:textColor="@color/brand_text_subtitle"
+                        android:layout_marginBottom="4dp" />
+                    <EditText
+                        android:id="@+id/etMinLeaseDays"
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:background="@drawable/bg_input"
+                        android:hint="2"
+                        android:inputType="number"
+                        android:paddingHorizontal="12dp"
+                        android:textSize="15sp"
+                        android:layout_marginBottom="12dp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Weekly Discount (₱)"
+                        android:textSize="13sp"
+                        android:textColor="@color/brand_text_subtitle"
+                        android:layout_marginBottom="4dp" />
+                    <EditText
+                        android:id="@+id/etWeeklyDiscount"
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:background="@drawable/bg_input"
+                        android:hint="100.00"
+                        android:inputType="numberDecimal"
+                        android:paddingHorizontal="12dp"
+                        android:textSize="15sp"
+                        android:layout_marginBottom="12dp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Monthly Discount Cap (₱)"
+                        android:textSize="13sp"
+                        android:textColor="@color/brand_text_subtitle"
+                        android:layout_marginBottom="4dp" />
+                    <EditText
+                        android:id="@+id/etMonthlyDiscountCap"
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:background="@drawable/bg_input"
+                        android:hint="300.00"
+                        android:inputType="numberDecimal"
+                        android:paddingHorizontal="12dp"
+                        android:textSize="15sp"
+                        android:layout_marginBottom="16dp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnSaveInventory"
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:text="Save Inventory Settings"
+                        app:backgroundTint="@color/brand_burgundy" />
+
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+        </LinearLayout>
+    </ScrollView>
+
+</LinearLayout>

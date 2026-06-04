@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/brand_cream_bg">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/brand_surface"
+        android:padding="12dp"
+        android:elevation="2dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <EditText
+            android:id="@+id/etSearch"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_input"
+            android:hint="Search bookings…"
+            android:textSize="14sp"
+            android:paddingHorizontal="12dp"
+            android:inputType="text"
+            android:imeOptions="actionSearch"
+            android:singleLine="true" />
+
+        <ImageButton
+            android:id="@+id/btnExport"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginStart="8dp"
+            android:src="@android:drawable/ic_menu_share"
+            android:tint="@color/brand_burgundy"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Export Bookings" />
+
+    </LinearLayout>
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+            android:id="@+id/swipeRefresh"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent">
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/recyclerView"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:paddingVertical="8dp"
+                    android:clipToPadding="false" />
+
+                <TextView
+                    android:id="@+id/tvEmpty"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_centerInParent="true"
+                    android:text="No active bookings"
+                    android:textColor="@color/brand_text_subtitle"
+                    android:textSize="16sp"
+                    android:gravity="center"
+                    android:visibility="gone"
+                    android:padding="32dp" />
+
+            </RelativeLayout>
+
+        </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+
+
+    </FrameLayout>
+
+</LinearLayout>

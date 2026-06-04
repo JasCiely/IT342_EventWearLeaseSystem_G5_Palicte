@@ -1,0 +1,261 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+        <!-- Title -->
+        <TextView
+            android:id="@+id/tvDialogTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Book Fitting"
+            android:textColor="@color/brand_text_dark"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="4dp" />
+
+        <TextView
+            android:id="@+id/tvItemName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textColor="@color/brand_burgundy"
+            android:textSize="14sp"
+            android:layout_marginBottom="20dp" />
+
+        <!-- Fitting Date -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="FITTING DATE"
+            android:textColor="@color/brand_text_subtitle"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.08"
+            android:layout_marginBottom="6dp" />
+
+        <LinearLayout
+            android:id="@+id/btnPickDate"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@color/brand_cream_bg"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:layout_marginBottom="16dp">
+
+            <TextView
+                android:id="@+id/tvSelectedDate"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Tap to select date"
+                android:textColor="@color/brand_text_subtitle"
+                android:textSize="13sp" />
+
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_bookings"
+                app:tint="@color/brand_burgundy" />
+
+        </LinearLayout>
+
+        <!-- Time Slot -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="TIME SLOT"
+            android:textColor="@color/brand_text_subtitle"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.08"
+            android:layout_marginBottom="6dp" />
+
+        <LinearLayout
+            android:id="@+id/btnPickTime"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@color/brand_cream_bg"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:layout_marginBottom="20dp">
+
+            <TextView
+                android:id="@+id/tvSelectedTime"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Select date first"
+                android:textColor="@color/brand_text_subtitle"
+                android:textSize="13sp" />
+
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_bell"
+                app:tint="@color/brand_burgundy" />
+
+        </LinearLayout>
+
+        <!-- Your Information -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="YOUR INFORMATION"
+            android:textColor="@color/brand_text_subtitle"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.08"
+            android:layout_marginBottom="10dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="FULL NAME"
+            android:textColor="@color/brand_text_subtitle"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.06"
+            android:layout_marginBottom="4dp" />
+
+        <EditText
+            android:id="@+id/etFullName"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:background="@color/brand_cream_bg"
+            android:hint="Your full name"
+            android:textSize="13sp"
+            android:padding="12dp"
+            android:inputType="textPersonName|textCapWords"
+            android:singleLine="true"
+            android:layout_marginBottom="10dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="EMAIL"
+            android:textColor="@color/brand_text_subtitle"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.06"
+            android:layout_marginBottom="4dp" />
+
+        <EditText
+            android:id="@+id/etEmail"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:background="@color/brand_cream_bg"
+            android:hint="Your email address"
+            android:textSize="13sp"
+            android:padding="12dp"
+            android:inputType="textEmailAddress"
+            android:singleLine="true"
+            android:layout_marginBottom="10dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="PHONE"
+            android:textColor="@color/brand_text_subtitle"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.06"
+            android:layout_marginBottom="4dp" />
+
+        <EditText
+            android:id="@+id/etPhone"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:background="@color/brand_cream_bg"
+            android:hint="+63 9XX XXX XXXX"
+            android:textSize="13sp"
+            android:padding="12dp"
+            android:inputType="phone"
+            android:singleLine="true"
+            android:layout_marginBottom="20dp" />
+
+        <!-- Preferred Size -->
+        <TextView
+            android:id="@+id/tvSizeLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="PREFERRED SIZE"
+            android:textColor="@color/brand_text_subtitle"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.08"
+            android:layout_marginBottom="6dp"
+            android:visibility="gone" />
+
+        <!-- Spinner: shown when item has 2+ sizes -->
+        <Spinner
+            android:id="@+id/spinnerSize"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:background="@color/brand_cream_bg"
+            android:layout_marginBottom="16dp"
+            android:visibility="gone" />
+
+        <!-- Read-only display: shown when item has exactly 1 size -->
+        <TextView
+            android:id="@+id/tvSingleSize"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:background="@color/brand_cream_bg"
+            android:textSize="13sp"
+            android:gravity="center_vertical"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:textColor="@color/brand_text_dark"
+            android:layout_marginBottom="16dp"
+            android:visibility="gone" />
+
+        <!-- Special Requests -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="SPECIAL REQUESTS (OPTIONAL)"
+            android:textColor="@color/brand_text_subtitle"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.08"
+            android:layout_marginBottom="6dp" />
+
+        <EditText
+            android:id="@+id/etNotes"
+            android:layout_width="match_parent"
+            android:layout_height="80dp"
+            android:background="@color/brand_cream_bg"
+            android:hint="Any special requests or questions?"
+            android:textSize="13sp"
+            android:gravity="top|start"
+            android:padding="12dp"
+            android:inputType="textMultiLine"
+            android:layout_marginBottom="20dp" />
+
+        <!-- Confirm Button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnConfirm"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:backgroundTint="@color/brand_burgundy"
+            android:text="Confirm Fitting Booking"
+            android:textColor="#FFFFFF"
+            android:textStyle="bold"
+            app:cornerRadius="10dp" />
+
+    </LinearLayout>
+
+</ScrollView>

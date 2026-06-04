@@ -30,4 +30,6 @@ public interface InventoryService {
     String getItemName(String itemId);
 
     ItemResponse markItemAvailable(String itemId);
+
+    ItemResponse updateItemStatus(String itemId, String status, String maintenanceEndDate);
 }

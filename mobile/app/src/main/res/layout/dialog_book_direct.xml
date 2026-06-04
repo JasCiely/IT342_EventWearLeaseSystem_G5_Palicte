@@ -1,0 +1,380 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+        <!-- Title -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Book Direct Rental"
+            android:textColor="@color/brand_text_dark"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="4dp" />
+
+        <TextView
+            android:id="@+id/tvItemName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textColor="@color/brand_burgundy"
+            android:textSize="14sp"
+            android:layout_marginBottom="20dp" />
+
+        <!-- Start Date -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="START DATE"
+            android:textColor="@color/brand_text_subtitle"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.08"
+            android:layout_marginBottom="6dp" />
+
+        <LinearLayout
+            android:id="@+id/btnPickStart"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@color/brand_cream_bg"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:layout_marginBottom="16dp">
+
+            <TextView
+                android:id="@+id/tvStartDate"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Tap to select start date"
+                android:textColor="@color/brand_text_subtitle"
+                android:textSize="13sp" />
+
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_bookings"
+                app:tint="@color/brand_burgundy" />
+
+        </LinearLayout>
+
+        <!-- End Date -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="END DATE"
+            android:textColor="@color/brand_text_subtitle"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.08"
+            android:layout_marginBottom="6dp" />
+
+        <LinearLayout
+            android:id="@+id/btnPickEnd"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@color/brand_cream_bg"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:layout_marginBottom="20dp">
+
+            <TextView
+                android:id="@+id/tvEndDate"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Select start date first"
+                android:textColor="@color/brand_text_subtitle"
+                android:textSize="13sp" />
+
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_bookings"
+                app:tint="@color/brand_burgundy" />
+
+        </LinearLayout>
+
+        <!-- Your Information -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="YOUR INFORMATION"
+            android:textColor="@color/brand_text_subtitle"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.08"
+            android:layout_marginBottom="10dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="FULL NAME"
+            android:textColor="@color/brand_text_subtitle"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.06"
+            android:layout_marginBottom="4dp" />
+
+        <EditText
+            android:id="@+id/etFullName"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:background="@color/brand_cream_bg"
+            android:hint="Your full name"
+            android:textSize="13sp"
+            android:padding="12dp"
+            android:inputType="textPersonName|textCapWords"
+            android:singleLine="true"
+            android:layout_marginBottom="10dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="EMAIL"
+            android:textColor="@color/brand_text_subtitle"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.06"
+            android:layout_marginBottom="4dp" />
+
+        <EditText
+            android:id="@+id/etEmail"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:background="@color/brand_cream_bg"
+            android:hint="Your email address"
+            android:textSize="13sp"
+            android:padding="12dp"
+            android:inputType="textEmailAddress"
+            android:singleLine="true"
+            android:layout_marginBottom="10dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="PHONE"
+            android:textColor="@color/brand_text_subtitle"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.06"
+            android:layout_marginBottom="4dp" />
+
+        <EditText
+            android:id="@+id/etPhone"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:background="@color/brand_cream_bg"
+            android:hint="+63 9XX XXX XXXX"
+            android:textSize="13sp"
+            android:padding="12dp"
+            android:inputType="phone"
+            android:singleLine="true"
+            android:layout_marginBottom="20dp" />
+
+        <!-- Preferred Size -->
+        <TextView
+            android:id="@+id/tvSizeLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="PREFERRED SIZE"
+            android:textColor="@color/brand_text_subtitle"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.08"
+            android:layout_marginBottom="6dp"
+            android:visibility="gone" />
+
+        <!-- Spinner: shown when item has 2+ sizes -->
+        <Spinner
+            android:id="@+id/spinnerSize"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:background="@color/brand_cream_bg"
+            android:layout_marginBottom="16dp"
+            android:visibility="gone" />
+
+        <!-- Read-only display: shown when item has exactly 1 size -->
+        <TextView
+            android:id="@+id/tvSingleSize"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:background="@color/brand_cream_bg"
+            android:textSize="13sp"
+            android:gravity="center_vertical"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:textColor="@color/brand_text_dark"
+            android:layout_marginBottom="16dp"
+            android:visibility="gone" />
+
+        <!-- Special Instructions -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="SPECIAL INSTRUCTIONS (OPTIONAL)"
+            android:textColor="@color/brand_text_subtitle"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.08"
+            android:layout_marginBottom="6dp" />
+
+        <EditText
+            android:id="@+id/etNotes"
+            android:layout_width="match_parent"
+            android:layout_height="80dp"
+            android:background="@color/brand_cream_bg"
+            android:hint="Any specific notes or requirements…"
+            android:textSize="13sp"
+            android:gravity="top|start"
+            android:padding="12dp"
+            android:inputType="textMultiLine"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Price Summary Card -->
+        <LinearLayout
+            android:id="@+id/cardPriceSummary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@color/brand_cream_bg"
+            android:orientation="vertical"
+            android:padding="16dp"
+            android:layout_marginBottom="20dp"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="PRICE SUMMARY"
+                android:textColor="@color/brand_text_subtitle"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.08"
+                android:layout_marginBottom="10dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="4dp">
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Duration"
+                    android:textColor="@color/brand_text_subtitle"
+                    android:textSize="13sp" />
+                <TextView
+                    android:id="@+id/tvDuration"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="— days"
+                    android:textColor="@color/brand_text_dark"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="4dp">
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Base Price"
+                    android:textColor="@color/brand_text_subtitle"
+                    android:textSize="13sp" />
+                <TextView
+                    android:id="@+id/tvBasePrice"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="₱0.00"
+                    android:textColor="@color/brand_text_dark"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/rowDiscount"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="4dp"
+                android:visibility="gone">
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Discount"
+                    android:textColor="#15803d"
+                    android:textSize="13sp" />
+                <TextView
+                    android:id="@+id/tvDiscount"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="-₱0"
+                    android:textColor="#15803d"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/input_stroke"
+                android:layout_marginTop="6dp"
+                android:layout_marginBottom="8dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Total"
+                    android:textColor="@color/brand_text_dark"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+                <TextView
+                    android:id="@+id/tvTotal"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="₱0.00"
+                    android:textColor="@color/brand_burgundy"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <!-- Confirm Button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnConfirm"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:backgroundTint="@color/brand_burgundy"
+            android:text="Confirm Rental Booking"
+            android:textColor="#FFFFFF"
+            android:textStyle="bold"
+            app:cornerRadius="10dp" />
+
+    </LinearLayout>
+
+</ScrollView>

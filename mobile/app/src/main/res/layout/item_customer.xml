@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginHorizontal="@dimen/spacing_md"
+    android:layout_marginVertical="@dimen/spacing_sm"
+    app:cardCornerRadius="@dimen/corner_radius_lg"
+    app:cardElevation="@dimen/elevation_sm"
+    android:foreground="?attr/selectableItemBackground">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="@dimen/spacing_lg"
+        android:gravity="center_vertical"
+        android:minHeight="@dimen/card_min_height">
+
+        <!-- Avatar -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/avatarFrame"
+            android:layout_width="@dimen/avatar_size_lg"
+            android:layout_height="@dimen/avatar_size_lg"
+            android:layout_marginEnd="@dimen/spacing_lg"
+            app:cardCornerRadius="@dimen/corner_radius_full"
+            app:cardElevation="0dp">
+            <TextView
+                android:id="@+id/tvInitials"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:textSize="@dimen/text_title_large"
+                android:textStyle="bold"
+                android:textColor="#FFFFFF" />
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Customer Info -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvName"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="@dimen/text_title_medium"
+                android:textStyle="bold"
+                android:textColor="@color/brand_text_dark" />
+
+            <TextView
+                android:id="@+id/tvEmail"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="@dimen/text_body_small"
+                android:textColor="@color/brand_text_subtitle"
+                android:layout_marginTop="@dimen/spacing_xs"
+                android:maxLines="1"
+                android:ellipsize="end" />
+
+            <TextView
+                android:id="@+id/tvPhone"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="@dimen/text_label_small"
+                android:textColor="@color/brand_text_subtitle"
+                android:layout_marginTop="@dimen/spacing_xs"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/tvJoined"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="@dimen/text_label_small"
+                android:textColor="@color/brand_text_subtitle"
+                android:layout_marginTop="@dimen/spacing_xs"
+                android:alpha="0.7" />
+
+        </LinearLayout>
+
+        <!-- Status Badge -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/spacing_lg"
+            app:cardCornerRadius="@dimen/corner_radius_md"
+            app:cardElevation="0dp">
+            <TextView
+                android:id="@+id/tvStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="@dimen/text_label_small"
+                android:textStyle="bold"
+                android:paddingHorizontal="@dimen/spacing_md"
+                android:paddingVertical="@dimen/spacing_sm"
+                android:gravity="center" />
+        </com.google.android.material.card.MaterialCardView>
+
+    </LinearLayout>
+</com.google.android.material.card.MaterialCardView>

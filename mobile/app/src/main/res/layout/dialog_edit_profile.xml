@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="20dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="FIRST NAME"
+        android:textColor="@color/brand_text_subtitle"
+        android:textSize="11sp"
+        android:textStyle="bold"
+        android:letterSpacing="0.08"
+        android:layout_marginBottom="6dp" />
+
+    <EditText
+        android:id="@+id/etFirstName"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:background="@color/brand_cream_bg"
+        android:hint="First name"
+        android:textSize="14sp"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:inputType="textPersonName|textCapWords"
+        android:layout_marginBottom="16dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="LAST NAME"
+        android:textColor="@color/brand_text_subtitle"
+        android:textSize="11sp"
+        android:textStyle="bold"
+        android:letterSpacing="0.08"
+        android:layout_marginBottom="6dp" />
+
+    <EditText
+        android:id="@+id/etLastName"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:background="@color/brand_cream_bg"
+        android:hint="Last name"
+        android:textSize="14sp"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:inputType="textPersonName|textCapWords"
+        android:layout_marginBottom="16dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="EMAIL"
+        android:textColor="@color/brand_text_subtitle"
+        android:textSize="11sp"
+        android:textStyle="bold"
+        android:letterSpacing="0.08"
+        android:layout_marginBottom="6dp" />
+
+    <EditText
+        android:id="@+id/etEmail"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:background="@color/brand_cream_bg"
+        android:hint="Email address"
+        android:textSize="14sp"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:inputType="textEmailAddress"
+        android:layout_marginBottom="16dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="PHONE (OPTIONAL)"
+        android:textColor="@color/brand_text_subtitle"
+        android:textSize="11sp"
+        android:textStyle="bold"
+        android:letterSpacing="0.08"
+        android:layout_marginBottom="6dp" />
+
+    <EditText
+        android:id="@+id/etPhone"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:background="@color/brand_cream_bg"
+        android:hint="+63 9XX XXX XXXX"
+        android:textSize="14sp"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:inputType="phone" />
+
+</LinearLayout>

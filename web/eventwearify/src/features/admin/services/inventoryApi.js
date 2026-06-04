@@ -40,4 +40,5 @@ export {
   updateDirectBookingDates,
   markDirectBookingPickedUp,
   undoDirectBookingPickup,
+  markDirectBookingPaid,
 } from '../../../shared/services/bookingApi.js';

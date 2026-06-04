@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Configure leasing rules and discounts for rentals."
+            android:textSize="12sp"
+            android:textColor="@color/brand_text_subtitle"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Min Lease Days -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Minimum Lease Duration (days)"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:textColor="@color/brand_text_dark"
+            android:layout_marginBottom="4dp" />
+        <EditText
+            android:id="@+id/etMinLeaseDays"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:background="@drawable/bg_input"
+            android:hint="e.g. 2"
+            android:paddingHorizontal="12dp"
+            android:inputType="number"
+            android:layout_marginBottom="4dp" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Customers must lease for at least this many days"
+            android:textSize="11sp"
+            android:textColor="@color/brand_text_subtitle"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Weekly Discount -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Weekly Discount (₱)"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:textColor="@color/brand_text_dark"
+            android:layout_marginBottom="4dp" />
+        <EditText
+            android:id="@+id/etWeeklyDiscount"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:background="@drawable/bg_input"
+            android:hint="e.g. 100"
+            android:paddingHorizontal="12dp"
+            android:inputType="numberDecimal"
+            android:layout_marginBottom="4dp" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Discount applied per week of lease duration"
+            android:textSize="11sp"
+            android:textColor="@color/brand_text_subtitle"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Monthly Discount Cap -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Monthly Discount Cap (₱)"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:textColor="@color/brand_text_dark"
+            android:layout_marginBottom="4dp" />
+        <EditText
+            android:id="@+id/etMonthlyDiscountCap"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:background="@drawable/bg_input"
+            android:hint="e.g. 300"
+            android:paddingHorizontal="12dp"
+            android:inputType="numberDecimal"
+            android:layout_marginBottom="4dp" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Maximum discount for monthly leases (overrides weekly)"
+            android:textSize="11sp"
+            android:textColor="@color/brand_text_subtitle"
+            android:layout_marginBottom="8dp" />
+
+    </LinearLayout>
+</ScrollView>

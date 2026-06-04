@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:padding="20dp">
+
+        <!-- Context info -->
+        <com.google.android.material.card.MaterialCardView
+            xmlns:app="http://schemas.android.com/apk/res-auto"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            app:cardCornerRadius="8dp" app:cardElevation="0dp"
+            android:layout_marginBottom="16dp">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="vertical" android:padding="12dp"
+                android:background="#FFF5F7">
+                <TextView android:id="@+id/ftlCustomerName"
+                    android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:textSize="15sp" android:textStyle="bold" android:textColor="@color/brand_text_dark" />
+                <TextView android:id="@+id/ftlItemName"
+                    android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:textSize="13sp" android:textColor="@color/brand_text_subtitle"
+                    android:layout_marginTop="2dp" />
+                <TextView android:id="@+id/ftlFittingInfo"
+                    android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:textSize="12sp" android:textColor="@color/brand_text_subtitle"
+                    android:layout_marginTop="4dp" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Daily Rate -->
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="DAILY RENTAL RATE" android:textSize="11sp" android:textStyle="bold"
+            android:textColor="@color/brand_text_subtitle" android:layout_marginBottom="4dp" />
+        <TextView android:id="@+id/ftlDailyRate"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:textSize="22sp" android:textStyle="bold" android:textColor="@color/brand_burgundy"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Pickup Date -->
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="Pickup Date *" android:textSize="13sp" android:textColor="#718096"
+            android:layout_marginBottom="4dp" />
+        <EditText android:id="@+id/etPickupDate"
+            android:layout_width="match_parent" android:layout_height="52dp"
+            android:background="@drawable/bg_input" android:paddingHorizontal="12dp"
+            android:hint="YYYY-MM-DD" android:inputType="none"
+            android:focusable="false" android:cursorVisible="false"
+            android:layout_marginBottom="12dp" />
+
+        <!-- Return Date -->
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="Return Date *" android:textSize="13sp" android:textColor="#718096"
+            android:layout_marginBottom="4dp" />
+        <EditText android:id="@+id/etReturnDate"
+            android:layout_width="match_parent" android:layout_height="52dp"
+            android:background="@drawable/bg_input" android:paddingHorizontal="12dp"
+            android:hint="YYYY-MM-DD" android:inputType="none"
+            android:focusable="false" android:cursorVisible="false"
+            android:layout_marginBottom="12dp" />
+
+        <!-- Availability indicator -->
+        <TextView android:id="@+id/ftlAvailability"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:textSize="13sp" android:padding="10dp"
+            android:layout_marginBottom="8dp"
+            android:visibility="gone" />
+
+        <!-- Date error -->
+        <TextView android:id="@+id/ftlDateError"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:textSize="13sp" android:textColor="@color/error_red"
+            android:layout_marginBottom="8dp"
+            android:visibility="gone" />
+
+        <!-- Price Summary -->
+        <com.google.android.material.card.MaterialCardView
+            xmlns:app="http://schemas.android.com/apk/res-auto"
+            android:id="@+id/ftlPriceSummary"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            app:cardCornerRadius="8dp" app:cardElevation="0dp"
+            android:layout_marginBottom="12dp"
+            android:visibility="gone">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="vertical" android:padding="12dp"
+                android:background="@color/gray_100">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="horizontal" android:layout_marginBottom="4dp">
+                    <TextView android:id="@+id/ftlDaysCalc"
+                        android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_weight="1" android:textSize="13sp"
+                        android:textColor="@color/brand_text_subtitle" />
+                    <TextView android:id="@+id/ftlSubtotal"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:textSize="13sp" android:textColor="@color/brand_text_subtitle" />
+                </LinearLayout>
+                <LinearLayout android:id="@+id/ftlDiscountRow"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="horizontal" android:layout_marginBottom="4dp"
+                    android:visibility="gone">
+                    <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_weight="1" android:text="Weekly Discount"
+                        android:textSize="13sp" android:textColor="#059669" />
+                    <TextView android:id="@+id/ftlDiscountVal"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:textSize="13sp" android:textColor="#059669" />
+                </LinearLayout>
+                <View android:layout_width="match_parent" android:layout_height="1dp"
+                    android:background="@color/input_stroke" android:layout_marginBottom="8dp" />
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+                    <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_weight="1" android:text="Total Amount"
+                        android:textSize="14sp" android:textStyle="bold" android:textColor="@color/brand_text_dark" />
+                    <TextView android:id="@+id/ftlTotal"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:textSize="16sp" android:textStyle="bold"
+                        android:textColor="@color/brand_burgundy" />
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Notes -->
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="Notes (Optional)" android:textSize="13sp" android:textColor="#718096"
+            android:layout_marginBottom="4dp" />
+        <EditText android:id="@+id/etFtlNotes"
+            android:layout_width="match_parent" android:layout_height="80dp"
+            android:background="@drawable/bg_input" android:paddingHorizontal="12dp"
+            android:inputType="textMultiLine" android:gravity="top|start"
+            android:layout_marginBottom="4dp" />
+
+    </LinearLayout>
+</ScrollView>

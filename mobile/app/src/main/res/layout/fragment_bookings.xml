@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/brand_cream_bg">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <!-- ─── Header with Title ─── -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@color/brand_burgundy"
+            android:paddingHorizontal="@dimen/spacing_lg"
+            android:paddingVertical="@dimen/spacing_md"
+            android:elevation="@dimen/elevation_md"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Bookings"
+                    android:textColor="#FFFFFF"
+                    android:textSize="@dimen/text_headline_large"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Manage fitting appointments and direct rentals"
+                    android:textColor="#FFFFFF"
+                    android:textSize="@dimen/text_body_small"
+                    android:alpha="0.8"
+                    android:layout_marginTop="@dimen/spacing_xs" />
+
+            </LinearLayout>
+
+            <ImageButton
+                android:id="@+id/btnSettings"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:src="@android:drawable/ic_menu_manage"
+                android:tint="#FFFFFF"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Booking Settings" />
+
+        </LinearLayout>
+
+        <!-- ─── Modern TabLayout ─── -->
+        <com.google.android.material.tabs.TabLayout
+            android:id="@+id/tabLayout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@color/brand_surface"
+            app:tabSelectedTextColor="@color/brand_burgundy"
+            app:tabTextColor="@color/brand_text_subtitle"
+            app:tabIndicatorColor="@color/brand_burgundy"
+            app:tabIndicatorHeight="@dimen/border_width_thick"
+            app:tabMode="fixed"
+            app:elevation="@dimen/elevation_sm" />
+
+        <!-- ─── ViewPager2 with Bookings ─── -->
+        <androidx.viewpager2.widget.ViewPager2
+            android:id="@+id/viewPager"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+    </LinearLayout>
+
+    <!-- ─── Archive FAB (above the + FAB) ─── -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabArchived"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_marginEnd="@dimen/spacing_lg"
+        android:layout_marginBottom="80dp"
+        android:contentDescription="View archived bookings"
+        app:backgroundTint="@color/brand_burgundy"
+        app:srcCompat="@android:drawable/ic_menu_recent_history"
+        app:tint="#FFFFFF"
+        app:elevation="@dimen/elevation_lg"
+        app:pressedTranslationZ="@dimen/elevation_xl"
+        android:visibility="gone" />
+
+    <!-- ─── Modern FAB with Label ─── -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabNewBooking"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_margin="@dimen/spacing_lg"
+        android:contentDescription="Create New Booking"
+        app:backgroundTint="@color/brand_burgundy"
+        app:srcCompat="@android:drawable/ic_input_add"
+        app:tint="#FFFFFF"
+        app:elevation="@dimen/elevation_lg"
+        app:pressedTranslationZ="@dimen/elevation_xl" />
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

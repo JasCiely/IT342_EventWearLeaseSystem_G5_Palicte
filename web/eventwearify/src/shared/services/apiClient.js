@@ -53,6 +53,10 @@
         throw new Error('Session expired. Please login again.');
       }
 
+      if (response.status === 204) {
+        return null;
+      }
+
       const contentType = response.headers.get('content-type');
       if (contentType && contentType.includes('application/json')) {
         const data = await response.json();
@@ -62,10 +66,11 @@
         return data;
       } else {
         const text = await response.text();
-        console.error('Non-JSON response:', text.substring(0, 200));
         if (!response.ok) {
+          console.error('Non-JSON response:', text.substring(0, 200));
           throw new Error(`Server error (${response.status}). Please check if backend is running.`);
         }
+        if (!text) return null;
         try {
           return JSON.parse(text);
         } catch {

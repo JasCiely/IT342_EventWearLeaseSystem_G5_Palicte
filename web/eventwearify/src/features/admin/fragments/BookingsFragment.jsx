@@ -29,10 +29,12 @@ import {
   markDirectBookingPickedUp,
   checkDirectBookingAvailability,
   markItemAvailable,
+  markDirectBookingPaid,
 } from '../services/inventoryApi';
 import { fetchBookingSettings, saveBookingSettings, getDefaultSettings } from '../services/bookingSettingsApi';
 import { authFetch } from '../../../shared/services/apiClient.js';
 import { sseService } from '../../../shared/services/sseService';
+import { calculateLeasePricing } from '../../../shared/constants/sharedData';
 import FittingToLeaseModal from './FittingToLeaseModal';
 import CreateBookingModal from './CreateBookingModal';
 
@@ -560,6 +562,12 @@ function ExtendLeaseModal({ booking, onConfirm, onClose, bookingSettings }) {
     return () => { cancelled = true; };
   }, [booking.inventoryItemId, booking.id]);
 
+  const pricePreview = useMemo(() => {
+    if (!newEndDate || !booking.basePrice || !booking.totalDays) return null;
+    const dailyRate = booking.basePrice / booking.totalDays;
+    return calculateLeasePricing(dailyRate, booking.startDate, newEndDate);
+  }, [newEndDate, booking.basePrice, booking.totalDays, booking.startDate]);
+
   const handle = async () => {
     if (!newEndDate) return;
     setSubmitting(true);
@@ -611,6 +619,26 @@ function ExtendLeaseModal({ booking, onConfirm, onClose, bookingSettings }) {
               label="new end date"
             />
           </div>
+
+          {pricePreview && (
+            <div style={{ marginTop: '0.75rem', background: '#faf9f7', border: '1px solid #e5e3df', borderRadius: 8, padding: '0.65rem 0.85rem', fontSize: '0.8rem' }}>
+              <div style={{ fontWeight: 600, color: '#444', marginBottom: '0.4rem' }}>Updated Pricing</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#666', marginBottom: '0.2rem' }}>
+                <span>Base Price ({pricePreview.totalDays} days)</span>
+                <span>₱{pricePreview.basePrice.toLocaleString()}</span>
+              </div>
+              {pricePreview.discount > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#059669', marginBottom: '0.2rem' }}>
+                  <span>Discount ({pricePreview.weeks} week{pricePreview.weeks !== 1 ? 's' : ''})</span>
+                  <span>-₱{pricePreview.discount.toLocaleString()}</span>
+                </div>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, color: '#222', borderTop: '1px solid #e5e3df', paddingTop: '0.3rem', marginTop: '0.3rem' }}>
+                <span>Total</span>
+                <span>₱{pricePreview.finalPrice.toLocaleString()}</span>
+              </div>
+            </div>
+          )}
         </div>
         <div className="inv-modal-footer">
           <button className="inv-btn-ghost" onClick={onClose} disabled={submitting}>Cancel</button>
@@ -1322,9 +1350,67 @@ function MediaViewer({ file }) {
   return <img src={src} alt="Item" className="bk-media-img" />;
 }
 
+// ─── MarkPaymentModal ─────────────────────────────────────────────────────────
+
+function MarkPaymentModal({ booking, onConfirm, onClose }) {
+  const [notes, setNotes] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const handle = async () => {
+    setSubmitting(true);
+    await onConfirm(notes);
+    setSubmitting(false);
+  };
+
+  return (
+    <div className="inv-overlay" onClick={onClose}>
+      <div className="inv-modal inv-modal-sm" onClick={e => e.stopPropagation()}>
+        <div className="inv-modal-header">
+          <h3><CheckCircle size={15} style={{ marginRight: 6, color: '#15803d' }} />Mark as Paid</h3>
+          <button className="inv-modal-close" onClick={onClose}><X size={15} /></button>
+        </div>
+        <div className="inv-modal-body">
+          <div className="bk-action-context">
+            <div className="bk-action-customer">{booking.customerName}</div>
+            <div className="bk-action-item">{booking.itemName}</div>
+            <div className="bk-action-dates" style={{ fontWeight: 600, color: '#15803d' }}>
+              Amount Due: ₱{(booking.finalPrice || booking.basePrice || 0).toLocaleString()}
+            </div>
+          </div>
+          <div style={{ padding: '0.65rem 0.85rem', background: 'rgba(21,128,61,0.07)', borderRadius: 8, color: '#15803d', fontSize: '0.82rem', marginBottom: '0.75rem' }}>
+            <CheckCircle size={13} style={{ display: 'inline', marginRight: 6 }} />
+            Confirm that cash payment has been received from the customer.
+          </div>
+          <div className="inv-field">
+            <label className="inv-field-label">Notes <span style={{ opacity: 0.5, fontWeight: 400 }}>(optional)</span></label>
+            <textarea
+              className="inv-textarea" rows={2} value={notes}
+              onChange={e => setNotes(e.target.value)}
+              placeholder="Any payment remarks…"
+              disabled={submitting}
+            />
+          </div>
+        </div>
+        <div className="inv-modal-footer">
+          <button className="inv-btn-ghost" onClick={onClose} disabled={submitting}>Cancel</button>
+          <button
+            className="inv-btn-primary"
+            style={{ background: '#15803d' }}
+            onClick={handle}
+            disabled={submitting}
+          >
+            {submitting ? <Loader2 size={13} className="inv-spinner-inline" /> : <CheckCircle size={13} />}
+            Confirm Payment
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── BookingDrawer ────────────────────────────────────────────────────────────
 
-function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, onEditRentalDates, onCompleteNoLease, onProceedToLease, onReturn, onExtend, onPickedUp, onMarkItemAvailable, isFitting, workingHours }) {
+function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, onEditRentalDates, onCompleteNoLease, onProceedToLease, onReturn, onExtend, onPickedUp, onMarkItemAvailable, onPaymentMarked, isFitting, workingHours }) {
   const [itemDetails, setItemDetails] = useState(null);
   const [loadingItem, setLoadingItem] = useState(false);
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
@@ -1332,6 +1418,7 @@ function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, on
   const [markingAvailable, setMarkingAvailable] = useState(false);
   const [emailStatus, setEmailStatus] = useState(null);
   const [emailSending, setEmailSending] = useState(false);
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   // Tracks current time so the Done button enables/disables automatically
   const [now, setNow] = useState(() => new Date());
 
@@ -1440,10 +1527,15 @@ function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, on
           <div>
             <div className="bk-drawer-id">#{(booking.id || booking.bookingId || '').slice(-8)}</div>
             <div className="bk-drawer-customer">{booking.customerName}</div>
-            <div style={{ marginTop: 4, display: 'flex', gap: 6, alignItems: 'center' }}>
+            <div style={{ marginTop: 4, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
               <span className="inv-badge" style={{ background: isFitting ? 'rgba(107,45,57,0.08)' : 'rgba(29,78,216,0.08)', color: isFitting ? '#6b2d39' : '#1d4ed8', fontSize: '0.68rem' }}>
                 {isFitting ? <><Scissors size={10} /> Fitting</> : <><PackageCheck size={10} /> Direct Rental</>}
               </span>
+              {!isFitting && booking.extended && (
+                <span className="inv-badge" style={{ background: 'rgba(59,130,246,0.1)', color: '#1d4ed8', fontSize: '0.68rem' }}>
+                  <CalendarIcon size={10} /> Extended
+                </span>
+              )}
             </div>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
@@ -1667,6 +1759,30 @@ function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, on
                       <div className="bk-ps-row discount"><span>Discount</span><span>-₱{booking.discountAmount.toLocaleString()}</span></div>
                     )}
                     <div className="bk-ps-row total"><span>Total</span><span>₱{(booking.finalPrice || booking.basePrice || 0).toLocaleString()}</span></div>
+                    {!isFitting && (
+                      <div className="bk-ps-row" style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #f0ece8' }}>
+                        <span>Cash Payment</span>
+                        <span style={{
+                          fontWeight: 600,
+                          color: booking.paymentStatus === 'Paid' ? '#15803d' : '#b45309',
+                          background: booking.paymentStatus === 'Paid' ? 'rgba(21,128,61,0.1)' : 'rgba(180,83,9,0.1)',
+                          padding: '2px 8px', borderRadius: 12, fontSize: '0.78rem'
+                        }}>
+                          {booking.paymentStatus || 'Unpaid'}
+                        </span>
+                      </div>
+                    )}
+                    {!isFitting && booking.paymentStatus === 'Paid' && booking.paymentDate && (
+                      <div className="bk-ps-row" style={{ fontSize: '0.75rem', color: '#888' }}>
+                        <span>Paid on</span>
+                        <span>{new Date(booking.paymentDate).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' })}</span>
+                      </div>
+                    )}
+                    {!isFitting && booking.paymentNotes && (
+                      <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.3rem', fontStyle: 'italic' }}>
+                        Note: {booking.paymentNotes}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -1690,7 +1806,32 @@ function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, on
           )}
         </div>
 
+        {paymentModalOpen && (
+          <MarkPaymentModal
+            booking={booking}
+            onClose={() => setPaymentModalOpen(false)}
+            onConfirm={async (notes) => {
+              try {
+                await markDirectBookingPaid(booking.id, notes);
+                setPaymentModalOpen(false);
+                onPaymentMarked && onPaymentMarked();
+              } catch (e) {
+                alert('Failed to mark payment. Please try again.');
+              }
+            }}
+          />
+        )}
+
         <div className="bk-drawer-footer">
+          {!isFitting && booking.paymentStatus !== 'Paid' && !['Cancelled', 'Completed'].includes(booking.status) && (
+            <button
+              className="inv-btn-sm"
+              style={{ background: '#15803d', color: '#fff' }}
+              onClick={() => setPaymentModalOpen(true)}
+            >
+              <CheckCircle size={12} /> Mark as Paid
+            </button>
+          )}
           {canCancel && !hasLeaseStarted && (
             <button
               className="inv-btn-sm danger"
@@ -1751,24 +1892,29 @@ function BookingDrawer({ booking, onAction, onCancel, onClose, onEditFitting, on
           )}
 
           {/* Active Lease: two dedicated action buttons replace the single next-action pattern */}
-          {!isFitting && booking.status === 'Active Lease' && (
-            <>
-              <button
-                className="inv-btn-primary"
-                style={{ background: '#0d9488' }}
-                onClick={() => onReturn(booking)}
-              >
-                <RotateCcw size={13} /> Returned <ChevronRight size={13} />
-              </button>
-              <button
-                className="inv-btn-primary"
-                style={{ background: '#6b2d39' }}
-                onClick={() => onExtend(booking)}
-              >
-                <CalendarIcon size={13} /> Extend <ChevronRight size={13} />
-              </button>
-            </>
-          )}
+          {!isFitting && booking.status === 'Active Lease' && (() => {
+            const isReturnableToday = booking.endDate && now.toISOString().split('T')[0] >= booking.endDate;
+            return (
+              <>
+                <button
+                  className="inv-btn-primary"
+                  style={{ background: '#0d9488', opacity: isReturnableToday ? 1 : 0.4, cursor: isReturnableToday ? 'pointer' : 'not-allowed' }}
+                  onClick={() => onReturn(booking)}
+                  disabled={!isReturnableToday}
+                  title={!isReturnableToday ? `Return available from ${booking.endDate}` : undefined}
+                >
+                  <RotateCcw size={13} /> Returned <ChevronRight size={13} />
+                </button>
+                <button
+                  className="inv-btn-primary"
+                  style={{ background: '#6b2d39' }}
+                  onClick={() => onExtend(booking)}
+                >
+                  <CalendarIcon size={13} /> Extend <ChevronRight size={13} />
+                </button>
+              </>
+            );
+          })()}
 
           {/* Completed: show maintenance status and admin override */}
           {!isFitting && booking.status === 'Completed' && itemDetails && (
@@ -1858,6 +2004,11 @@ function BookingCard({ booking, isFitting, onOpen, onAction, onReturn, onExtend,
                 <PackageCheck size={9} /> Lease Created
               </span>
             )}
+            {!isFitting && booking.extended && (
+              <span className="bk-overdue-badge" style={{ background: 'rgba(59,130,246,0.1)', color: '#1d4ed8' }}>
+                <CalendarIcon size={9} /> Extended
+              </span>
+            )}
           </div>
           <div className="bk-card-item">{booking.itemName}</div>
           <div className="bk-card-meta">
@@ -1880,13 +2031,20 @@ function BookingCard({ booking, isFitting, onOpen, onAction, onReturn, onExtend,
         ) : null}
         {!isFitting && booking.status === 'Active Lease' ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            <button
-              className="inv-btn-sm"
-              style={{ background: '#0d9488', fontSize: '0.68rem' }}
-              onClick={e => { e.stopPropagation(); onReturn(booking); }}
-            >
-              <RotateCcw size={10} /> Returned
-            </button>
+            {(() => {
+              const isReturnableToday = booking.endDate && new Date().toISOString().split('T')[0] >= booking.endDate;
+              return (
+                <button
+                  className="inv-btn-sm"
+                  style={{ background: '#0d9488', fontSize: '0.68rem', opacity: isReturnableToday ? 1 : 0.4, cursor: isReturnableToday ? 'pointer' : 'not-allowed' }}
+                  onClick={e => { e.stopPropagation(); if (isReturnableToday) onReturn(booking); }}
+                  disabled={!isReturnableToday}
+                  title={!isReturnableToday ? `Return available from ${booking.endDate}` : undefined}
+                >
+                  <RotateCcw size={10} /> Returned
+                </button>
+              );
+            })()}
             <button
               className="inv-btn-sm"
               style={{ background: '#6b2d39', fontSize: '0.68rem' }}
@@ -2086,24 +2244,6 @@ function SettingsModal({ settings, onSave, onClose }) {
           )}
 
           <div className="inv-divider" />
-          <div className="inv-field">
-            <label className="inv-field-label">Auto-approve Threshold</label>
-            <div className="bk-auto-approve">
-              <span className="bk-currency-prefix">₱</span>
-              <input
-                type="number"
-                className="inv-input"
-                value={local.autoApproveThreshold}
-                onChange={e => setLocal(p => ({ ...p, autoApproveThreshold: +e.target.value }))}
-                style={{ width: '120px' }}
-              />
-              <span className="bk-auto-approve-hint">and below</span>
-            </div>
-            <div className="bk-settings-summary" style={{ marginTop: 8 }}>
-              <TrendingUp size={14} />
-              <span>Bookings with total price ≤ ₱{local.autoApproveThreshold} will be auto-approved</span>
-            </div>
-          </div>
 
           <div className="inv-field">
             <label className="inv-field-label"><Clock size={12} /> Fitting Duration (minutes)</label>
@@ -2514,12 +2654,12 @@ export default function BookingsManagement() {
       const updated = await extendLease(extendModal.id, newEndDate);
       setDirectBookings(prev => prev.map(b =>
         b.id === extendModal.id
-          ? { ...b, endDate: updated.endDate || newEndDate, totalDays: updated.totalDays }
+          ? { ...b, endDate: updated.endDate || newEndDate, totalDays: updated.totalDays, basePrice: updated.basePrice, discountAmount: updated.discountAmount, finalPrice: updated.finalPrice }
           : b
       ));
       if (drawer?.id === extendModal.id) {
         setDrawer(prev => prev
-          ? { ...prev, endDate: updated.endDate || newEndDate, totalDays: updated.totalDays }
+          ? { ...prev, endDate: updated.endDate || newEndDate, totalDays: updated.totalDays, basePrice: updated.basePrice, discountAmount: updated.discountAmount, finalPrice: updated.finalPrice }
           : null);
       }
       showToastMsg('success', `Lease extended to ${newEndDate}`);
@@ -2991,6 +3131,11 @@ export default function BookingsManagement() {
             const updated = await markItemAvailable(itemId);
             showToastMsg('success', 'Item marked as Available');
             return updated;
+          }}
+          onPaymentMarked={() => {
+            showToastMsg('success', 'Payment marked as received');
+            loadData();
+            setDrawer(null);
           }}
           onClose={() => setDrawer(null)}
           workingHours={workingHours}

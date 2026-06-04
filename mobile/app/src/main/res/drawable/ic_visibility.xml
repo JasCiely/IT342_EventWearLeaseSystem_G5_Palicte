@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <!-- Eye outline -->
+    <path
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#000000"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M1,12 C1,12 5,5 12,5 C19,5 23,12 23,12 C23,12 19,19 12,19 C5,19 1,12 1,12 Z" />
+
+    <!-- Pupil -->
+    <path
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#000000"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M12,15 C13.66,15 15,13.66 15,12 C15,10.34 13.66,9 12,9 C10.34,9 9,10.34 9,12 C9,13.66 10.34,15 12,15 Z" />
+
+</vector>

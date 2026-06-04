@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/brand_cream_bg">
+
+    <!-- Drag handle -->
+    <View
+        android:layout_width="40dp"
+        android:layout_height="4dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="4dp"
+        android:background="#CCCCCC" />
+
+    <!-- Title row -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="12dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Attendance History"
+            android:textSize="17sp"
+            android:textStyle="bold"
+            android:textColor="@color/brand_text_dark" />
+
+        <ImageButton
+            android:id="@+id/btnClose"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:src="@android:drawable/ic_menu_close_clear_cancel"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Close" />
+    </LinearLayout>
+
+    <!-- Divider -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#E5E7EB" />
+
+    <!-- Date filter row -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="10dp">
+
+        <EditText
+            android:id="@+id/etDateFilter"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_input"
+            android:hint="Filter by date (YYYY-MM-DD)"
+            android:paddingHorizontal="10dp"
+            android:textSize="13sp"
+            android:inputType="date"
+            android:singleLine="true"
+            android:layout_marginEnd="8dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnUnlockLock"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:text="Unlock Today"
+            android:textSize="12sp"
+            android:paddingHorizontal="12dp"
+            app:backgroundTint="@color/brand_burgundy" />
+
+    </LinearLayout>
+
+    <!-- Edit mode active banner -->
+    <LinearLayout
+        android:id="@+id/layoutEditModeBanner"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="#F0FDF4"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="8dp"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="✓ "
+            android:textSize="13sp"
+            android:textColor="#15803d" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Edit mode active — changes sync instantly to Days Worked &amp; Status."
+            android:textSize="12sp"
+            android:textColor="#15803d" />
+    </LinearLayout>
+
+    <!-- Divider -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#E5E7EB" />
+
+    <!-- Record count -->
+    <TextView
+        android:id="@+id/tvHistoryCount"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text=""
+        android:textSize="11sp"
+        android:textColor="@color/brand_text_subtitle"
+        android:paddingHorizontal="16dp"
+        android:paddingTop="6dp" />
+
+    <!-- Records list -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvHistory"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:paddingBottom="16dp"
+        android:clipToPadding="false" />
+
+    <!-- Empty state -->
+    <TextView
+        android:id="@+id/tvHistoryEmpty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="No attendance records found."
+        android:textSize="14sp"
+        android:textColor="@color/brand_text_subtitle"
+        android:gravity="center"
+        android:visibility="gone"
+        android:padding="40dp" />
+
+</LinearLayout>

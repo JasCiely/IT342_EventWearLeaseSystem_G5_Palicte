@@ -5,7 +5,9 @@ import com.backend.features.booking.dto.request.DirectBookingRequest;
 import com.backend.features.booking.dto.response.DirectBookingResponse;
 import com.backend.features.booking.settings.BookingTimeSettingsService;
 import com.backend.features.booking.settings.dto.BookingTimeSettingsDto;
+import com.backend.features.inventory.InventorySettingsService;
 import com.backend.features.inventory.ItemRepository;
+import com.backend.features.inventory.dto.response.InventorySettingsResponse;
 import com.backend.shared.entity.DirectBooking;
 import com.backend.shared.entity.Item;
 import com.backend.shared.email.EmailService;
@@ -39,6 +41,7 @@ public class DirectBookingServiceImpl implements DirectBookingService {
     private final EmailService emailService;
     private final UserRepository userRepository;
     private final BookingTimeSettingsService settingsService;
+    private final InventorySettingsService inventorySettingsService;
 
     // ── Public customer-facing creation (enforces 2-day advance booking rule) ──
 
@@ -343,8 +346,28 @@ public class DirectBookingServiceImpl implements DirectBookingService {
         }
 
         LocalDate oldEndDate = booking.getEndDate();
+        int newTotalDays = (int) ChronoUnit.DAYS.between(booking.getStartDate(), newEndDate) + 1;
+
+        // Recalculate base price using daily rate, then re-derive discount from new duration
+        if (booking.getBasePrice() != null && booking.getTotalDays() != null && booking.getTotalDays() > 0) {
+            BigDecimal dailyRate = booking.getBasePrice()
+                    .divide(BigDecimal.valueOf(booking.getTotalDays()), 4, RoundingMode.HALF_UP);
+            BigDecimal newBasePrice = dailyRate.multiply(BigDecimal.valueOf(newTotalDays))
+                    .setScale(2, RoundingMode.HALF_UP);
+
+            InventorySettingsResponse settings = inventorySettingsService.getSettings();
+            int weeks = newTotalDays / 7;
+            BigDecimal weeklyDiscountAmount = BigDecimal.valueOf((long) weeks * settings.getWeeklyDiscount());
+            BigDecimal monthlyDiscountCap = BigDecimal.valueOf(settings.getMonthlyDiscountCap());
+            BigDecimal newDiscount = weeklyDiscountAmount.min(monthlyDiscountCap);
+
+            booking.setBasePrice(newBasePrice);
+            booking.setDiscountAmount(newDiscount);
+            booking.setFinalPrice(newBasePrice.subtract(newDiscount).setScale(2, RoundingMode.HALF_UP));
+        }
+
         booking.setEndDate(newEndDate);
-        booking.setTotalDays((int) ChronoUnit.DAYS.between(booking.getStartDate(), newEndDate) + 1);
+        booking.setTotalDays(newTotalDays);
         booking.setExtended(true);
 
         DirectBooking updated = directBookingRepository.save(booking);
@@ -671,6 +694,20 @@ public class DirectBookingServiceImpl implements DirectBookingService {
         response.setCustomerPhone(booking.getCustomerPhone());
         response.setPreferredSize(booking.getPreferredSize());
         response.setExtended(booking.isExtended());
+        response.setPaymentStatus(booking.getPaymentStatus());
+        response.setPaymentDate(booking.getPaymentDate());
+        response.setPaymentNotes(booking.getPaymentNotes());
         return response;
+    }
+
+    @Override
+    @Transactional
+    public DirectBookingResponse markPayment(String bookingId, String notes) {
+        DirectBooking booking = directBookingRepository.findById(bookingId)
+                .orElseThrow(() -> new IllegalArgumentException("Booking not found"));
+        booking.setPaymentStatus("Paid");
+        booking.setPaymentDate(java.time.LocalDateTime.now());
+        booking.setPaymentNotes(notes);
+        return mapToResponse(directBookingRepository.save(booking));
     }
 }

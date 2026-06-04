@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <!-- Booking context (customer / item / current end date) -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@drawable/bg_card_white"
+        android:padding="12dp"
+        android:layout_marginBottom="12dp">
+
+        <TextView
+            android:id="@+id/tvExtendCustomer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:textColor="@color/brand_text_dark" />
+
+        <TextView
+            android:id="@+id/tvExtendItem"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="13sp"
+            android:textColor="@color/brand_text_subtitle"
+            android:layout_marginTop="2dp" />
+
+        <TextView
+            android:id="@+id/tvExtendCurrentEnd"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="12sp"
+            android:textColor="@color/brand_text_subtitle"
+            android:layout_marginTop="4dp" />
+
+    </LinearLayout>
+
+    <!-- Availability info banner (loading → conflict warning / all-clear) -->
+    <TextView
+        android:id="@+id/tvExtendInfo"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Checking availability…"
+        android:textSize="12sp"
+        android:padding="10dp"
+        android:layout_marginBottom="12dp" />
+
+    <!-- New end date picker -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="New End Date"
+        android:textSize="12sp"
+        android:textColor="@color/brand_text_subtitle"
+        android:layout_marginBottom="4dp" />
+
+    <EditText
+        android:id="@+id/etNewEndDate"
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:background="@drawable/bg_input"
+        android:hint="Select a date"
+        android:paddingHorizontal="12dp"
+        android:textSize="14sp"
+        android:focusable="false"
+        android:cursorVisible="false"
+        android:inputType="none"
+        android:layout_marginBottom="12dp" />
+
+    <!-- Price preview (visible once a date is selected) -->
+    <LinearLayout
+        android:id="@+id/layoutExtendPriceSummary"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@drawable/bg_card_white"
+        android:padding="12dp"
+        android:visibility="gone">
+
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:layout_marginBottom="4dp">
+            <TextView android:id="@+id/tvExtendDaysCalc" android:layout_width="0dp"
+                android:layout_height="wrap_content" android:layout_weight="1"
+                android:textSize="13sp" android:textColor="@color/brand_text_subtitle" />
+            <TextView android:id="@+id/tvExtendSubtotal" android:layout_width="wrap_content"
+                android:layout_height="wrap_content" android:textSize="13sp"
+                android:textColor="@color/brand_text_subtitle" />
+        </LinearLayout>
+
+        <LinearLayout android:id="@+id/layoutExtendDiscountRow"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:layout_marginBottom="4dp"
+            android:visibility="gone">
+            <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:text="Weekly Discount"
+                android:textSize="13sp" android:textColor="#059669" />
+            <TextView android:id="@+id/tvExtendDiscountVal" android:layout_width="wrap_content"
+                android:layout_height="wrap_content" android:textSize="13sp"
+                android:textColor="#059669" />
+        </LinearLayout>
+
+        <View android:layout_width="match_parent" android:layout_height="1dp"
+            android:background="@color/gray_300" android:layout_marginVertical="8dp" />
+
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:text="New Total"
+                android:textSize="14sp" android:textStyle="bold" android:textColor="@color/brand_text_dark" />
+            <TextView android:id="@+id/tvExtendTotal" android:layout_width="wrap_content"
+                android:layout_height="wrap_content" android:textSize="14sp"
+                android:textStyle="bold" android:textColor="@color/brand_burgundy" />
+        </LinearLayout>
+
+    </LinearLayout>
+
+</LinearLayout>

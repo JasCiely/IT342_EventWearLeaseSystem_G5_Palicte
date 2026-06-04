@@ -872,6 +872,21 @@ function BookingDetailModal({ booking, onClose }) {
                 <section className="bdm-grid-section">
                   <h4 className="bdm-label">Price Details</h4>
                   <div className="bdm-notes-box"><Package size={14} className="notes-icon" /><p>₱{Number(booking.finalPrice).toLocaleString()}</p></div>
+                  <div style={{ marginTop: '0.6rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ fontSize: '0.8rem', color: '#888' }}>Cash Payment:</span>
+                    <span style={{
+                      fontSize: '0.78rem', fontWeight: 700, padding: '3px 10px', borderRadius: '12px',
+                      background: booking.paymentStatus === 'Paid' ? 'rgba(21,128,61,0.12)' : 'rgba(180,83,9,0.12)',
+                      color: booking.paymentStatus === 'Paid' ? '#15803d' : '#b45309',
+                    }}>
+                      {booking.paymentStatus === 'Paid' ? '✓ Paid' : 'Unpaid'}
+                    </span>
+                    {booking.paymentStatus === 'Paid' && booking.paymentDate && (
+                      <span style={{ fontSize: '0.72rem', color: '#aaa' }}>
+                        on {new Date(booking.paymentDate).toLocaleDateString('en-PH', { dateStyle: 'medium' })}
+                      </span>
+                    )}
+                  </div>
                 </section>
               )}
               {booking.notes && (
@@ -1052,6 +1067,20 @@ const BookingsView = () => {
                   <span className={getStatusClass(booking.status, booking.type)}>
                     {mapStatus(booking.status, booking.type)}
                   </span>
+                  {booking.type === 'direct' && (
+                    <span style={{
+                      display: 'inline-block',
+                      marginTop: '4px',
+                      fontSize: '0.7rem',
+                      fontWeight: 700,
+                      padding: '2px 8px',
+                      borderRadius: '10px',
+                      background: booking.paymentStatus === 'Paid' ? 'rgba(21,128,61,0.12)' : 'rgba(180,83,9,0.12)',
+                      color: booking.paymentStatus === 'Paid' ? '#15803d' : '#b45309',
+                    }}>
+                      {booking.paymentStatus === 'Paid' ? '✓ Paid' : 'Unpaid'}
+                    </span>
+                  )}
                 </td>
                 <td data-label="Action">
                   <div className="action-buttons">

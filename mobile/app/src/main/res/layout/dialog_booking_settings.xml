@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <!-- Enable Time Restrictions toggle row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="16dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Enable Time Restrictions"
+                android:textSize="14sp"
+                android:textColor="@color/brand_text_dark" />
+
+            <androidx.appcompat.widget.SwitchCompat
+                android:id="@+id/switchTimeRestrictions"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+
+        </LinearLayout>
+
+        <!-- Time-restricted settings (shown when switch is on) -->
+        <LinearLayout
+            android:id="@+id/layoutTimeSettings"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <!-- Shop Hours -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Shop Hours"
+                android:textSize="13sp"
+                android:textColor="@color/brand_text_subtitle"
+                android:layout_marginBottom="6dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="16dp">
+
+                <Spinner
+                    android:id="@+id/spinnerOpenHour"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_input"
+                    android:paddingHorizontal="8dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text=" → "
+                    android:textSize="14sp"
+                    android:textColor="@color/brand_text_subtitle"
+                    android:paddingHorizontal="8dp" />
+
+                <Spinner
+                    android:id="@+id/spinnerCloseHour"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_input"
+                    android:paddingHorizontal="8dp" />
+
+            </LinearLayout>
+
+            <!-- Working Days -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Working Days"
+                android:textSize="13sp"
+                android:textColor="@color/brand_text_subtitle"
+                android:layout_marginBottom="8dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:weightSum="7"
+                android:layout_marginBottom="16dp">
+
+                <TextView android:id="@+id/daySun" android:layout_width="0dp"
+                    android:layout_height="36dp" android:layout_weight="1"
+                    android:text="Su" android:gravity="center" android:textSize="12sp"
+                    android:background="@drawable/bg_button_outline"
+                    android:layout_marginHorizontal="2dp" android:textColor="@color/brand_text_dark" />
+
+                <TextView android:id="@+id/dayMon" android:layout_width="0dp"
+                    android:layout_height="36dp" android:layout_weight="1"
+                    android:text="Mo" android:gravity="center" android:textSize="12sp"
+                    android:background="@drawable/bg_button_primary"
+                    android:layout_marginHorizontal="2dp" android:textColor="#FFFFFF" />
+
+                <TextView android:id="@+id/dayTue" android:layout_width="0dp"
+                    android:layout_height="36dp" android:layout_weight="1"
+                    android:text="Tu" android:gravity="center" android:textSize="12sp"
+                    android:background="@drawable/bg_button_primary"
+                    android:layout_marginHorizontal="2dp" android:textColor="#FFFFFF" />
+
+                <TextView android:id="@+id/dayWed" android:layout_width="0dp"
+                    android:layout_height="36dp" android:layout_weight="1"
+                    android:text="We" android:gravity="center" android:textSize="12sp"
+                    android:background="@drawable/bg_button_primary"
+                    android:layout_marginHorizontal="2dp" android:textColor="#FFFFFF" />
+
+                <TextView android:id="@+id/dayThu" android:layout_width="0dp"
+                    android:layout_height="36dp" android:layout_weight="1"
+                    android:text="Th" android:gravity="center" android:textSize="12sp"
+                    android:background="@drawable/bg_button_primary"
+                    android:layout_marginHorizontal="2dp" android:textColor="#FFFFFF" />
+
+                <TextView android:id="@+id/dayFri" android:layout_width="0dp"
+                    android:layout_height="36dp" android:layout_weight="1"
+                    android:text="Fr" android:gravity="center" android:textSize="12sp"
+                    android:background="@drawable/bg_button_primary"
+                    android:layout_marginHorizontal="2dp" android:textColor="#FFFFFF" />
+
+                <TextView android:id="@+id/daySat" android:layout_width="0dp"
+                    android:layout_height="36dp" android:layout_weight="1"
+                    android:text="Sa" android:gravity="center" android:textSize="12sp"
+                    android:background="@drawable/bg_button_outline"
+                    android:layout_marginHorizontal="2dp" android:textColor="@color/brand_text_dark" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <!-- Divider -->
+        <View android:layout_width="match_parent" android:layout_height="1dp"
+            android:background="@color/gray_300" android:layout_marginBottom="16dp" />
+
+        <!-- Fitting Duration -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Fitting Duration (minutes)"
+            android:textSize="13sp"
+            android:textColor="@color/brand_text_subtitle"
+            android:layout_marginBottom="4dp" />
+
+        <EditText
+            android:id="@+id/etFittingDuration"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:background="@drawable/bg_input"
+            android:hint="e.g. 30"
+            android:paddingHorizontal="12dp"
+            android:inputType="number" />
+
+    </LinearLayout>
+
+</ScrollView>

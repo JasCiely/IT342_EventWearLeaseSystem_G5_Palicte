@@ -344,6 +344,20 @@ export const markDirectBookingPickedUp = async (bookingId) => {
   }
 };
 
+export const markDirectBookingPaid = async (bookingId, notes) => {
+  try {
+    const response = await authFetch(`/direct-bookings/${bookingId}/payment`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ notes: notes || null }),
+    });
+    return response;
+  } catch (error) {
+    console.error('Error marking payment:', error);
+    throw error;
+  }
+};
+
 // Reverts an Active Lease booking back to Approved (admin correction for auto-activated records).
 export const undoDirectBookingPickup = async (bookingId) => {
   try {

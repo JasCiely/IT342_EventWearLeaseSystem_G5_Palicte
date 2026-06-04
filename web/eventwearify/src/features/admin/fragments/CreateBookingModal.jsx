@@ -4,7 +4,7 @@ import {
   Calendar, ChevronLeft, ChevronRight, ChevronDown,
 } from 'lucide-react';
 import { fetchCustomers } from '../services/customerService';
-import { fetchItems } from '../../../shared/services/inventoryApi';
+import { fetchItems, fetchInventorySettings } from '../../../shared/services/inventoryApi';
 import {
   checkDirectBookingAvailability,
   getBookedFittingSlots,
@@ -15,6 +15,20 @@ import { useBookingSettings } from '../../../shared/hooks/useBookingSettings';
 import '../../customer/styles/BrowseOutfitsFragment.css';
 
 const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL'];
+
+function formatPhone(raw) {
+  if (!raw) return '';
+  let digits = raw.replace(/\D/g, '');
+  // Normalize to 10-digit local number (9XXXXXXXXX)
+  if (digits.startsWith('63')) digits = digits.slice(2);
+  else if (digits.startsWith('0')) digits = digits.slice(1);
+  digits = digits.slice(0, 10);
+  if (!digits) return '';
+  // Format as +63 9XX-XXX-XXXX
+  if (digits.length <= 3) return `+63 ${digits}`;
+  if (digits.length <= 6) return `+63 ${digits.slice(0, 3)}-${digits.slice(3)}`;
+  return `+63 ${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
 
 // ── Calendar / time-slot helpers ──────────────────────────────────────────────
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -344,14 +358,20 @@ function CreateBookingModal({ onSuccess, onClose }) {
   const [checkingAvail, setCheckingAvail] = useState(false);
   const [occupiedRanges, setOccupiedRanges] = useState([]);
 
+  // Inventory settings (for discount calculation)
+  const [invSettings, setInvSettings] = useState(null);
+
   // Submit state
   const [submitting, setSubmitting] = useState(false);
   const [error, setError]           = useState('');
 
-  // Load items on mount
+  // Load items and inventory settings on mount
   useEffect(() => {
     fetchItems()
       .then(all => setItems(all.filter(i => i.status === 'Available')))
+      .catch(console.error);
+    fetchInventorySettings()
+      .then(setInvSettings)
       .catch(console.error);
   }, []);
 
@@ -417,7 +437,7 @@ function CreateBookingModal({ onSuccess, onClose }) {
     setSelectedCustomer(c);
     setCustomerName(`${c.firstName} ${c.lastName}`);
     setCustomerEmail(c.email);
-    setCustomerPhone(c.phone || '');
+    setCustomerPhone(c.phone ? formatPhone(c.phone) : '');
     setCustomerSearch('');
     setSuggestions([]);
   };
@@ -468,6 +488,10 @@ function CreateBookingModal({ onSuccess, onClose }) {
     ? Math.max(1, Math.ceil((new Date(endDate) - new Date(startDate)) / 86400000) + 1)
     : 0;
   const basePrice = selectedItem?.price ? selectedItem.price * totalDays : 0;
+  const weeks = Math.floor(totalDays / 7);
+  const rawDiscount = weeks * (invSettings?.weeklyDiscount ?? 100);
+  const discountAmount = Math.min(rawDiscount, invSettings?.monthlyDiscountCap ?? 300);
+  const finalPrice = Math.max(0, basePrice - discountAmount);
 
   const dateIsFullyBooked = !!fittingDate && !loadingFittingSlots &&
     timeSlots.length > 0 && timeSlots.every(t => bookedFittingSlots.includes(t));
@@ -481,6 +505,10 @@ function CreateBookingModal({ onSuccess, onClose }) {
     if (!customerName.trim())  return 'Customer name is required';
     if (!customerEmail.trim()) return 'Customer email is required';
     if (!customerPhone.trim()) return 'Customer phone is required';
+    let phoneDigits = customerPhone.replace(/\D/g, '');
+    if (phoneDigits.startsWith('63')) phoneDigits = phoneDigits.slice(2);
+    else if (phoneDigits.startsWith('0')) phoneDigits = phoneDigits.slice(1);
+    if (phoneDigits.length !== 10 || !phoneDigits.startsWith('9')) return 'Enter a valid PH mobile number (+63 9XX-XXX-XXXX)';
     if (!selectedItemId)       return 'Please select an item';
     if (selectedItem) {
       const szArr = Array.isArray(selectedItem.sizes) ? selectedItem.sizes.filter(Boolean) : (selectedItem.size ? [selectedItem.size] : []);
@@ -532,8 +560,8 @@ function CreateBookingModal({ onSuccess, onClose }) {
             startDate,
             endDate,
             basePrice,
-            discountAmount: 0,
-            finalPrice: basePrice,
+            discountAmount,
+            finalPrice,
             notes: notes || null,
             preferredSize: preferredSize || null,
           }),
@@ -560,10 +588,10 @@ function CreateBookingModal({ onSuccess, onClose }) {
   };
 
   return (
-    <div className="inv-overlay" onClick={onClose}>
+    <div className="inv-overlay" style={{ overflowY: 'auto', alignItems: 'flex-start', paddingTop: '2rem', paddingBottom: '2rem' }} onClick={onClose}>
       <div
         className="inv-modal"
-        style={{ maxWidth: 520, maxHeight: '92vh', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}
+        style={{ maxWidth: 680, width: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column' }}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
@@ -599,7 +627,7 @@ function CreateBookingModal({ onSuccess, onClose }) {
         </div>
 
         {/* Body */}
-        <div className="inv-modal-body" style={{ flex: 1 }}>
+        <div className="inv-modal-body">
 
           {/* ── Customer search ── */}
           <div style={{ marginBottom: '1rem', position: 'relative' }}>
@@ -613,9 +641,6 @@ function CreateBookingModal({ onSuccess, onClose }) {
                 }}>
                   <div>
                     <div style={{ fontWeight: 600, fontSize: 13 }}>{selectedCustomer.firstName} {selectedCustomer.lastName}</div>
-                    <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
-                      {selectedCustomer.email}{selectedCustomer.phone ? ` • ${selectedCustomer.phone}` : ''}
-                    </div>
                   </div>
                   <button
                     type="button"
@@ -657,7 +682,6 @@ function CreateBookingModal({ onSuccess, onClose }) {
                         }}
                       >
                         <div style={{ fontWeight: 600 }}>{c.firstName} {c.lastName}</div>
-                        <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>{c.email}{c.phone ? ` • ${c.phone}` : ''}</div>
                       </button>
                     ))}
                   </div>
@@ -673,7 +697,13 @@ function CreateBookingModal({ onSuccess, onClose }) {
             </div>
             <div className="inv-field">
               <label style={labelStyle}>Phone *</label>
-              <input className="inv-input" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} placeholder="Phone number" />
+              <input
+                className="inv-input"
+                value={customerPhone}
+                onChange={e => setCustomerPhone(formatPhone(e.target.value))}
+                placeholder="+63 9XX-XXX-XXXX"
+                inputMode="numeric"
+              />
             </div>
           </div>
 
@@ -895,9 +925,15 @@ function CreateBookingModal({ onSuccess, onClose }) {
                     <span>₱{Number(selectedItem.price).toLocaleString()} × {totalDays} day{totalDays !== 1 ? 's' : ''}</span>
                     <span>₱{basePrice.toLocaleString()}</span>
                   </div>
+                  {discountAmount > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#15803d', marginBottom: 6 }}>
+                      <span>Weekly discount ({weeks} week{weeks !== 1 ? 's' : ''})</span>
+                      <span>−₱{discountAmount.toLocaleString()}</span>
+                    </div>
+                  )}
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, borderTop: '1px solid #e5e7eb', paddingTop: 6 }}>
                     <span>Total</span>
-                    <span style={{ color: '#c4717f' }}>₱{basePrice.toLocaleString()}</span>
+                    <span style={{ color: '#c4717f' }}>₱{finalPrice.toLocaleString()}</span>
                   </div>
                 </div>
               )}

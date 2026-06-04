@@ -213,7 +213,6 @@ export const BOOKING_STATUS_META = {
 };
 
 // ── Booking-related Constants ─────────────────────────────────
-export const STAFF_LIST      = ['Maria Santos', 'Jose Reyes', 'Ana dela Cruz', 'Mark Bautista', 'Admin'];
 export const PAYMENT_METHODS = ['Cash', 'GCash', 'Bank Transfer', 'Credit Card'];
 
 // ── Date Helpers ──────────────────────────────────────────────

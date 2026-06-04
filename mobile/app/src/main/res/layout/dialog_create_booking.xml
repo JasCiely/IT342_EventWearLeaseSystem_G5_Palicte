@@ -1,0 +1,313 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/brand_surface">
+
+    <!-- Header -->
+    <LinearLayout android:layout_width="match_parent" android:layout_height="56dp"
+        android:orientation="horizontal" android:gravity="center_vertical"
+        android:paddingHorizontal="16dp" android:background="@color/brand_burgundy">
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_weight="1" android:text="New Booking"
+            android:textSize="18sp" android:textStyle="bold" android:textColor="#FFFFFF" />
+        <ImageButton android:id="@+id/cbBtnClose"
+            android:layout_width="40dp" android:layout_height="40dp"
+            android:src="@drawable/ic_close"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:tint="#FFFFFF"
+            android:contentDescription="Close" />
+    </LinearLayout>
+
+    <!-- Tab bar -->
+    <LinearLayout android:layout_width="match_parent" android:layout_height="48dp"
+        android:orientation="horizontal" android:background="@color/brand_surface"
+        android:elevation="2dp">
+
+        <TextView android:id="@+id/tabFitting"
+            android:layout_width="0dp" android:layout_height="match_parent"
+            android:layout_weight="1" android:gravity="center"
+            android:text="Fitting Appointment"
+            android:textSize="13sp" android:textColor="@color/brand_burgundy"
+            android:textStyle="bold"
+            android:background="@color/brand_surface"
+            android:paddingBottom="2dp"
+            android:clickable="true" android:focusable="true"
+            android:foreground="?attr/selectableItemBackground" />
+
+        <TextView android:id="@+id/tabDirect"
+            android:layout_width="0dp" android:layout_height="match_parent"
+            android:layout_weight="1" android:gravity="center"
+            android:text="Direct Rental"
+            android:textSize="13sp" android:textColor="@color/brand_text_subtitle"
+            android:background="@color/brand_surface"
+            android:paddingBottom="2dp"
+            android:clickable="true" android:focusable="true"
+            android:foreground="?attr/selectableItemBackground" />
+    </LinearLayout>
+
+    <!-- Tab Indicator -->
+    <LinearLayout android:layout_width="match_parent" android:layout_height="3dp"
+        android:orientation="horizontal">
+        <View android:id="@+id/cbTabIndicatorLeft"
+            android:layout_width="0dp" android:layout_height="match_parent"
+            android:layout_weight="1" android:background="@color/brand_burgundy" />
+        <View android:id="@+id/cbTabIndicatorRight"
+            android:layout_width="0dp" android:layout_height="match_parent"
+            android:layout_weight="1" android:background="@color/brand_surface" />
+    </LinearLayout>
+
+    <!-- Scrollable body -->
+    <ScrollView android:layout_width="match_parent" android:layout_height="0dp"
+        android:layout_weight="1">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="vertical" android:padding="16dp">
+
+            <!-- Customer search -->
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Search Customer" android:textSize="13sp"
+                android:textColor="#718096" android:layout_marginBottom="4dp" />
+            <EditText android:id="@+id/etCustomerSearch"
+                android:layout_width="match_parent" android:layout_height="52dp"
+                android:background="@drawable/bg_input" android:paddingHorizontal="12dp"
+                android:hint="Search by name or email…" android:inputType="text"
+                android:singleLine="true" android:layout_marginBottom="4dp" />
+
+            <!-- Customer suggestions -->
+            <LinearLayout android:id="@+id/customerSuggestions"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="vertical" android:visibility="gone"
+                android:background="@color/brand_surface" android:elevation="4dp"
+                android:layout_marginBottom="8dp" />
+
+            <!-- Selected customer chip -->
+            <LinearLayout android:id="@+id/selectedCustomerChip"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="horizontal" android:gravity="center_vertical"
+                android:background="#FFF5F7" android:padding="10dp"
+                android:layout_marginBottom="12dp" android:visibility="gone">
+                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+                    android:layout_weight="1" android:orientation="vertical">
+                    <TextView android:id="@+id/tvSelectedCustomer"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:textSize="14sp" android:textStyle="bold"
+                        android:textColor="@color/brand_text_dark" />
+                    <TextView android:id="@+id/tvSelectedCustomerEmail"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:textSize="12sp" android:textColor="@color/brand_text_subtitle" />
+                </LinearLayout>
+                <Button android:id="@+id/btnChangeCustomer"
+                    android:layout_width="wrap_content" android:layout_height="32dp"
+                    android:text="Change" android:textSize="12sp"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:textColor="@color/brand_text_subtitle" />
+            </LinearLayout>
+
+            <!-- Full Name -->
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Full Name *" android:textSize="13sp"
+                android:textColor="#718096" android:layout_marginBottom="4dp" />
+            <EditText android:id="@+id/etCbName"
+                android:layout_width="match_parent" android:layout_height="52dp"
+                android:background="@drawable/bg_input" android:paddingHorizontal="12dp"
+                android:hint="Customer full name" android:inputType="textPersonName"
+                android:layout_marginBottom="10dp" />
+
+            <!-- Phone -->
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Phone *" android:textSize="13sp"
+                android:textColor="#718096" android:layout_marginBottom="4dp" />
+            <EditText android:id="@+id/etCbPhone"
+                android:layout_width="match_parent" android:layout_height="52dp"
+                android:background="@drawable/bg_input" android:paddingHorizontal="12dp"
+                android:hint="+63 9XX XXX XXXX" android:inputType="phone"
+                android:layout_marginBottom="10dp" />
+
+            <!-- Email -->
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Email *" android:textSize="13sp"
+                android:textColor="#718096" android:layout_marginBottom="4dp" />
+            <EditText android:id="@+id/etCbEmail"
+                android:layout_width="match_parent" android:layout_height="52dp"
+                android:background="@drawable/bg_input" android:paddingHorizontal="12dp"
+                android:hint="customer@email.com" android:inputType="textEmailAddress"
+                android:layout_marginBottom="12dp" />
+
+            <!-- Item search -->
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Item *" android:textSize="13sp"
+                android:textColor="#718096" android:layout_marginBottom="4dp" />
+            <EditText android:id="@+id/etItemSearch"
+                android:layout_width="match_parent" android:layout_height="52dp"
+                android:background="@drawable/bg_input" android:paddingHorizontal="12dp"
+                android:hint="Search item by name…" android:inputType="text"
+                android:singleLine="true" android:layout_marginBottom="4dp" />
+
+            <!-- Item suggestions -->
+            <LinearLayout android:id="@+id/itemSuggestions"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="vertical" android:visibility="gone"
+                android:background="@color/brand_surface" android:elevation="4dp"
+                android:layout_marginBottom="8dp" />
+
+            <!-- Size selector (hidden until item selected with multiple sizes) -->
+            <TextView android:id="@+id/cbSizeLabel"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Size *" android:textSize="13sp"
+                android:textColor="#718096" android:layout_marginBottom="4dp"
+                android:visibility="gone" />
+            <Spinner android:id="@+id/cbSizeSpinner"
+                android:layout_width="match_parent" android:layout_height="52dp"
+                android:background="@drawable/bg_input" android:paddingHorizontal="12dp"
+                android:layout_marginBottom="12dp" android:visibility="gone" />
+
+            <!-- ─── Fitting-specific fields ─── -->
+            <LinearLayout android:id="@+id/sectionFitting"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="vertical" android:visibility="visible">
+
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="Fitting Date *" android:textSize="13sp"
+                    android:textColor="#718096" android:layout_marginBottom="4dp" />
+                <EditText android:id="@+id/etFittingDate"
+                    android:layout_width="match_parent" android:layout_height="52dp"
+                    android:background="@drawable/bg_input" android:paddingHorizontal="12dp"
+                    android:hint="YYYY-MM-DD" android:inputType="none"
+                    android:focusable="false" android:cursorVisible="false"
+                    android:layout_marginBottom="10dp" />
+
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="Time Slot *" android:textSize="13sp"
+                    android:textColor="#718096" android:layout_marginBottom="4dp" />
+                <EditText android:id="@+id/etFittingTime"
+                    android:layout_width="match_parent" android:layout_height="52dp"
+                    android:background="@drawable/bg_input" android:paddingHorizontal="12dp"
+                    android:hint="Select a date first"
+                    android:inputType="none"
+                    android:focusable="false" android:cursorVisible="false"
+                    android:layout_marginBottom="12dp" />
+            </LinearLayout>
+
+            <!-- ─── Direct rental-specific fields ─── -->
+            <LinearLayout android:id="@+id/sectionDirect"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="vertical" android:visibility="gone">
+
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="Start Date *" android:textSize="13sp"
+                    android:textColor="#718096" android:layout_marginBottom="4dp" />
+                <EditText android:id="@+id/etStartDate"
+                    android:layout_width="match_parent" android:layout_height="52dp"
+                    android:background="@drawable/bg_input" android:paddingHorizontal="12dp"
+                    android:hint="YYYY-MM-DD" android:inputType="none"
+                    android:focusable="false" android:cursorVisible="false"
+                    android:layout_marginBottom="10dp" />
+
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="End Date *" android:textSize="13sp"
+                    android:textColor="#718096" android:layout_marginBottom="4dp" />
+                <EditText android:id="@+id/etEndDate"
+                    android:layout_width="match_parent" android:layout_height="52dp"
+                    android:background="@drawable/bg_input" android:paddingHorizontal="12dp"
+                    android:hint="YYYY-MM-DD" android:inputType="none"
+                    android:focusable="false" android:cursorVisible="false"
+                    android:layout_marginBottom="10dp" />
+
+                <!-- Availability indicator -->
+                <TextView android:id="@+id/cbAvailability"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:textSize="13sp" android:padding="10dp"
+                    android:layout_marginBottom="8dp" android:visibility="gone" />
+
+                <!-- Price summary -->
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cbPriceSummary"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    app:cardCornerRadius="8dp" app:cardElevation="0dp"
+                    android:layout_marginBottom="12dp" android:visibility="gone">
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:orientation="vertical" android:padding="12dp"
+                        android:background="@color/gray_100">
+                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                            android:orientation="horizontal" android:layout_marginBottom="4dp">
+                            <TextView android:id="@+id/cbDaysCalc"
+                                android:layout_width="0dp" android:layout_height="wrap_content"
+                                android:layout_weight="1" android:textSize="13sp"
+                                android:textColor="@color/brand_text_subtitle" />
+                            <TextView android:id="@+id/cbPriceVal"
+                                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:textSize="13sp" android:textColor="@color/brand_text_subtitle" />
+                        </LinearLayout>
+                        <LinearLayout android:id="@+id/cbDiscountRow"
+                            android:layout_width="match_parent" android:layout_height="wrap_content"
+                            android:orientation="horizontal" android:layout_marginBottom="8dp"
+                            android:visibility="gone">
+                            <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                                android:layout_weight="1" android:text="Weekly Discount"
+                                android:textSize="13sp" android:textColor="#059669" />
+                            <TextView android:id="@+id/cbDiscountVal"
+                                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:textSize="13sp" android:textColor="#059669" />
+                        </LinearLayout>
+                        <View android:layout_width="match_parent" android:layout_height="1dp"
+                            android:background="@color/input_stroke" android:layout_marginBottom="8dp" />
+                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                            android:orientation="horizontal">
+                            <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                                android:layout_weight="1" android:text="Total"
+                                android:textSize="14sp" android:textStyle="bold"
+                                android:textColor="@color/brand_text_dark" />
+                            <TextView android:id="@+id/cbTotal"
+                                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:textSize="16sp" android:textStyle="bold"
+                                android:textColor="@color/brand_burgundy" />
+                        </LinearLayout>
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+            </LinearLayout>
+
+            <!-- Notes -->
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Notes (Optional)" android:textSize="13sp"
+                android:textColor="#718096" android:layout_marginBottom="4dp" />
+            <EditText android:id="@+id/etCbNotes"
+                android:layout_width="match_parent" android:layout_height="80dp"
+                android:background="@drawable/bg_input" android:paddingHorizontal="12dp"
+                android:inputType="textMultiLine" android:gravity="top|start"
+                android:layout_marginBottom="8dp" />
+
+            <!-- Error -->
+            <TextView android:id="@+id/tvCbError"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:textSize="13sp" android:textColor="@color/error_red"
+                android:padding="10dp" android:visibility="gone"
+                android:background="#FFEEEE" />
+
+        </LinearLayout>
+    </ScrollView>
+
+    <!-- Footer -->
+    <LinearLayout android:layout_width="match_parent" android:layout_height="60dp"
+        android:orientation="horizontal" android:gravity="center_vertical"
+        android:paddingHorizontal="16dp" android:elevation="4dp"
+        android:background="@color/brand_surface">
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/cbBtnCancel"
+            android:layout_width="wrap_content" android:layout_height="48dp"
+            android:text="Cancel" android:textSize="14sp"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            app:strokeColor="@color/brand_burgundy"
+            android:textColor="@color/brand_burgundy"
+            android:layout_marginEnd="8dp" />
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/cbBtnSubmit"
+            android:layout_width="0dp" android:layout_height="48dp"
+            android:layout_weight="1"
+            android:text="Create Fitting Booking"
+            android:textSize="14sp"
+            app:backgroundTint="@color/brand_burgundy" />
+    </LinearLayout>
+
+</LinearLayout>

@@ -1,0 +1,309 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/brand_cream_bg"
+    android:fillViewport="true"
+    android:scrollbars="none">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingHorizontal="20dp"
+        android:paddingTop="16dp"
+        android:paddingBottom="32dp">
+
+        <!-- Name -->
+        <TextView
+            android:id="@+id/lblName"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:text="Name *"
+            android:textColor="@color/brand_text_dark"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <EditText
+            android:id="@+id/etItemName"
+            android:layout_width="0dp"
+            android:layout_height="52dp"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/bg_input"
+            android:inputType="text"
+            android:paddingHorizontal="16dp"
+            android:textSize="14sp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/lblName" />
+
+        <!-- Category -->
+        <TextView
+            android:id="@+id/lblCategory"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="Category *"
+            android:textColor="@color/brand_text_dark"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/etItemName" />
+
+        <Spinner
+            android:id="@+id/spinnerCategory"
+            android:layout_width="0dp"
+            android:layout_height="52dp"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/bg_input"
+            android:paddingHorizontal="16dp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/lblCategory" />
+
+        <!-- Subtype -->
+        <TextView
+            android:id="@+id/lblSubtype"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="Subtype"
+            android:textColor="@color/brand_text_dark"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/spinnerCategory" />
+
+        <Spinner
+            android:id="@+id/spinnerSubtype"
+            android:layout_width="0dp"
+            android:layout_height="52dp"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/bg_input"
+            android:paddingHorizontal="16dp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/lblSubtype" />
+
+        <!-- Custom Subtype -->
+        <EditText
+            android:id="@+id/etCustomSubtype"
+            android:layout_width="0dp"
+            android:layout_height="52dp"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/bg_input"
+            android:hint="Enter custom subtype…"
+            android:inputType="text"
+            android:paddingHorizontal="16dp"
+            android:textSize="14sp"
+            android:visibility="gone"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/spinnerSubtype" />
+
+        <!-- Sizes -->
+        <TextView
+            android:id="@+id/lblSizes"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="Sizes (tap to select)"
+            android:textColor="@color/brand_text_dark"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/etCustomSubtype" />
+
+        <LinearLayout
+            android:id="@+id/sizeChipsRow"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="horizontal"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/lblSizes" />
+
+        <!-- Price -->
+        <TextView
+            android:id="@+id/lblPrice"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="Price per Day (₱) *"
+            android:textColor="@color/brand_text_dark"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/sizeChipsRow" />
+
+        <EditText
+            android:id="@+id/etPrice"
+            android:layout_width="0dp"
+            android:layout_height="52dp"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/bg_input"
+            android:inputType="numberDecimal"
+            android:paddingHorizontal="16dp"
+            android:textSize="14sp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/lblPrice" />
+
+        <!-- Status -->
+        <TextView
+            android:id="@+id/lblStatus"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="Status *"
+            android:textColor="@color/brand_text_dark"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/etPrice" />
+
+        <Spinner
+            android:id="@+id/spinnerStatus"
+            android:layout_width="0dp"
+            android:layout_height="52dp"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/bg_input"
+            android:paddingHorizontal="16dp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/lblStatus" />
+
+        <!-- Age Range -->
+        <TextView
+            android:id="@+id/lblAgeRange"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="Age Range (Optional)"
+            android:textColor="@color/brand_text_dark"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/spinnerStatus" />
+
+        <EditText
+            android:id="@+id/etAgeRange"
+            android:layout_width="0dp"
+            android:layout_height="52dp"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/bg_input"
+            android:hint="e.g. Adult, Kids, All Ages"
+            android:inputType="text"
+            android:paddingHorizontal="16dp"
+            android:textSize="14sp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/lblAgeRange" />
+
+        <!-- Description -->
+        <TextView
+            android:id="@+id/lblDescription"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="Description (Optional)"
+            android:textColor="@color/brand_text_dark"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/etAgeRange" />
+
+        <EditText
+            android:id="@+id/etDescription"
+            android:layout_width="0dp"
+            android:layout_height="96dp"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/bg_input"
+            android:gravity="top|start"
+            android:inputType="textMultiLine"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="12dp"
+            android:textSize="14sp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/lblDescription" />
+
+        <!-- Photos -->
+        <TextView
+            android:id="@+id/lblPhotos"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="Photos (Optional)"
+            android:textColor="@color/brand_text_dark"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/etDescription" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnSelectPhotos"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_marginTop="8dp"
+            android:text="Select Photos from Gallery"
+            android:textColor="@color/brand_burgundy"
+            android:textSize="13sp"
+            app:cornerRadius="12dp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/lblPhotos"
+            app:strokeColor="@color/brand_burgundy"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+
+        <TextView
+            android:id="@+id/tvPhotoCount"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="No photos selected"
+            android:textColor="@color/brand_text_subtitle"
+            android:textSize="12sp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/btnSelectPhotos" />
+
+        <!-- Photo thumbnail preview strip -->
+        <HorizontalScrollView
+            android:id="@+id/hsvPhotoPreview"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:scrollbars="none"
+            android:visibility="gone"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/tvPhotoCount">
+
+            <LinearLayout
+                android:id="@+id/llPhotoPreview"
+                android:layout_width="wrap_content"
+                android:layout_height="88dp"
+                android:orientation="horizontal"
+                android:paddingVertical="4dp" />
+        </HorizontalScrollView>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnSaveItem"
+            android:layout_width="0dp"
+            android:layout_height="56dp"
+            android:layout_marginTop="24dp"
+            android:backgroundTint="@color/brand_burgundy"
+            android:text="SAVE ITEM"
+            android:textColor="#FFFFFF"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            app:cornerRadius="12dp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/hsvPhotoPreview" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+</ScrollView>

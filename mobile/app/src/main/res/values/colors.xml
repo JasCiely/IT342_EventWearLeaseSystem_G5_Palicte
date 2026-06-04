@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="gray_100">#F7F7F7</color>
+    <color name="gray_300">#E0E0E0</color>
+    <color name="gray_500">#9E9E9E</color>
+    <color name="gray_600">#757575</color>
+    <color name="gray_700">#616161</color>
+
+    <!-- Brand palette — exact match to web -->
+    <color name="brand_burgundy">#6B2D39</color>
+    <color name="brand_burgundy_dark">#5A2530</color>
+    <color name="brand_burgundy_light">#8B3A48</color>
+    <color name="brand_gold">#D4A573</color>
+    <color name="brand_gold_light">#E8D5B0</color>
+    <color name="brand_cream_bg">#F8F7F5</color>
+    <color name="brand_surface">#FFFFFF</color>
+    <color name="brand_text_dark">#2D3748</color>
+    <color name="brand_text_subtitle">#718096</color>
+    <color name="input_stroke">#E2E8F0</color>
+    <color name="input_hint">#A0AEC0</color>
+    <color name="input_focus">#6B2D39</color>
+    <color name="tab_bg">#F5F5F7</color>
+    <color name="error_red">#EF4444</color>
+    <color name="success_green">#10B981</color>
+    <color name="warning_amber">#F59E0B</color>
+    <color name="info_blue">#3B82F6</color>
+
+    <!-- Status badge colors -->
+    <color name="status_pending_bg">#FEF3C7</color>
+    <color name="status_pending_text">#92400E</color>
+    <color name="status_confirmed_bg">#D1FAE5</color>
+    <color name="status_confirmed_text">#065F46</color>
+    <color name="status_cancelled_bg">#FEE2E2</color>
+    <color name="status_cancelled_text">#991B1B</color>
+    <color name="status_active_bg">#DBEAFE</color>
+    <color name="status_active_text">#1E40AF</color>
+    <color name="status_completed_bg">#EDE9FE</color>
+    <color name="status_completed_text">#5B21B6</color>
+    <color name="status_returned_bg">#E0F2FE</color>
+    <color name="status_returned_text">#0369A1</color>
+    <color name="status_converted_bg">#EDE9FE</color>
+    <color name="status_converted_text">#5B21B6</color>
+
+    <!-- KPI accent colors -->
+    <color name="kpi_purple">#7C3AED</color>
+    <color name="kpi_teal">#0E7490</color>
+    <color name="kpi_green">#15803D</color>
+    <color name="progress_track">#F0EEEC</color>
+
+</resources>

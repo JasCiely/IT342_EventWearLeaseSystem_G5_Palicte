@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/brand_cream_bg">
+
+    <!-- Tab Bar -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:background="@drawable/bg_card_white"
+        android:elevation="2dp"
+        android:orientation="horizontal">
+
+        <LinearLayout
+            android:id="@+id/tabFitting"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvTabFitting"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Fitting"
+                android:textColor="@color/brand_burgundy"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <View
+                android:id="@+id/indicatorFitting"
+                android:layout_width="40dp"
+                android:layout_height="3dp"
+                android:layout_marginTop="4dp"
+                android:background="@color/brand_burgundy" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/tabDirect"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvTabDirect"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Direct Rental"
+                android:textColor="@color/brand_text_subtitle"
+                android:textSize="14sp" />
+
+            <View
+                android:id="@+id/indicatorDirect"
+                android:layout_width="40dp"
+                android:layout_height="3dp"
+                android:layout_marginTop="4dp"
+                android:background="@android:color/transparent" />
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!-- Content Area (FrameLayout so empty state can overlay) -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+            android:id="@+id/swipeRefresh"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/recyclerView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:paddingTop="8dp"
+                android:paddingBottom="8dp"
+                android:clipToPadding="false" />
+
+        </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+
+        <!-- Empty state overlays the list -->
+        <LinearLayout
+            android:id="@+id/layoutEmpty"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:background="@color/brand_cream_bg"
+            android:padding="40dp"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="No bookings yet"
+                android:textColor="@color/brand_text_dark"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="8dp" />
+
+            <TextView
+                android:id="@+id/tvEmptySubtext"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Browse our collection and book your first outfit!"
+                android:textColor="@color/brand_text_subtitle"
+                android:textSize="13sp"
+                android:gravity="center" />
+
+        </LinearLayout>
+
+    </FrameLayout>
+
+</LinearLayout>

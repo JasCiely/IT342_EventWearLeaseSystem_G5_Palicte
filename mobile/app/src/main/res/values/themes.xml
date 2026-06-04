@@ -1,0 +1,168 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Base.Theme.Mobile" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/brand_burgundy</item>
+        <item name="colorPrimaryVariant">@color/brand_burgundy_dark</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorSecondary">@color/brand_gold</item>
+        <item name="colorOnSecondary">@color/brand_text_dark</item>
+        <item name="android:colorBackground">@color/brand_cream_bg</item>
+        <item name="colorSurface">@color/brand_surface</item>
+        <item name="colorOnSurface">@color/brand_text_dark</item>
+        <item name="colorError">@color/error_red</item>
+        <item name="android:windowBackground">@color/brand_cream_bg</item>
+    </style>
+
+    <style name="Theme.Mobile" parent="Base.Theme.Mobile" />
+
+    <style name="FullScreenDialogStyle" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <item name="android:windowIsFloating">false</item>
+        <item name="android:windowBackground">@color/brand_surface</item>
+        <item name="android:windowAnimationStyle">@style/Animation.AppCompat.Dialog</item>
+        <item name="colorPrimary">@color/brand_burgundy</item>
+        <item name="colorPrimaryVariant">@color/brand_burgundy_dark</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorSurface">@color/brand_surface</item>
+        <item name="colorOnSurface">@color/brand_text_dark</item>
+    </style>
+
+    <style name="StatusBadge" parent="Widget.MaterialComponents.TextView">
+        <item name="android:textSize">11sp</item>
+        <item name="android:paddingStart">8dp</item>
+        <item name="android:paddingEnd">8dp</item>
+        <item name="android:paddingTop">3dp</item>
+        <item name="android:paddingBottom">3dp</item>
+    </style>
+
+    <!-- ═══ Material 3 Component Styles ═══ -->
+
+    <!-- MaterialButton - Primary -->
+    <style name="Widget.App.Button.Primary" parent="Widget.Material3.Button">
+        <item name="android:textColor">@color/white</item>
+        <item name="backgroundTint">@color/brand_burgundy</item>
+        <item name="android:textSize">@dimen/text_label_large</item>
+        <item name="cornerRadius">@dimen/corner_radius_lg</item>
+    </style>
+
+    <!-- MaterialButton - Secondary (Outline) -->
+    <style name="Widget.App.Button.Secondary" parent="Widget.Material3.Button">
+        <item name="strokeColor">@color/brand_gold</item>
+        <item name="android:textColor">@color/brand_burgundy</item>
+        <item name="cornerRadius">@dimen/corner_radius_lg</item>
+    </style>
+
+    <!-- Elevated Card -->
+    <style name="Widget.App.CardView" parent="Widget.MaterialComponents.CardView">
+        <item name="cardCornerRadius">@dimen/corner_radius_lg</item>
+        <item name="cardElevation">@dimen/elevation_md</item>
+        <item name="cardBackgroundColor">@color/brand_surface</item>
+    </style>
+
+    <!-- Toolbar Modern -->
+    <style name="Widget.App.Toolbar" parent="Widget.AppCompat.Toolbar">
+        <item name="android:background">@color/brand_burgundy</item>
+        <item name="android:elevation">@dimen/elevation_md</item>
+        <item name="elevation">@dimen/elevation_md</item>
+        <item name="titleTextColor">@color/white</item>
+        <item name="subtitleTextColor">@color/white</item>
+        <item name="android:textColorPrimary">@color/white</item>
+    </style>
+
+    <!-- EditText Modern -->
+    <style name="Widget.App.EditTextOutlined" parent="Widget.Material3.TextInputEditText.OutlinedBox">
+        <item name="android:textColor">@color/brand_text_dark</item>
+        <item name="android:textColorHint">@color/input_hint</item>
+        <item name="android:textSize">@dimen/text_body_medium</item>
+    </style>
+
+    <!-- Spinner Modern -->
+    <style name="Widget.App.Spinner" parent="Widget.AppCompat.Spinner">
+        <item name="android:textColor">@color/brand_text_dark</item>
+        <item name="android:textSize">@dimen/text_body_medium</item>
+    </style>
+
+    <!-- Checkbox Modern -->
+    <style name="Widget.App.CheckBox" parent="Widget.Material3.CompoundButton.CheckBox">
+        <item name="buttonTint">@color/brand_burgundy</item>
+        <item name="android:textColor">@color/brand_text_dark</item>
+        <item name="android:textSize">@dimen/text_body_medium</item>
+    </style>
+
+    <!-- ═══ Text Style Hierarchy ═══ -->
+
+    <!-- Base Text Styles (for generic reference) -->
+    <style name="Text.Headline" parent="">
+        <item name="android:textSize">@dimen/text_headline_large</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/brand_text_dark</item>
+    </style>
+
+    <style name="Text.Title" parent="">
+        <item name="android:textSize">@dimen/text_title_medium</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/brand_text_dark</item>
+    </style>
+
+    <style name="Text.Body" parent="">
+        <item name="android:textSize">@dimen/text_body_medium</item>
+        <item name="android:textColor">@color/brand_text_dark</item>
+    </style>
+
+    <style name="Text.Label" parent="">
+        <item name="android:textSize">@dimen/text_label_medium</item>
+        <item name="android:textColor">@color/brand_text_subtitle</item>
+    </style>
+
+    <!-- Headline Variants -->
+    <style name="Text.Headline.Large" parent="Text.Headline">
+        <item name="android:textSize">@dimen/text_headline_large</item>
+    </style>
+
+    <style name="Text.Headline.Medium">
+        <item name="android:textSize">@dimen/text_headline_medium</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/brand_text_dark</item>
+    </style>
+
+    <!-- Title Variants -->
+    <style name="Text.Title.Large" parent="Text.Title">
+        <item name="android:textSize">@dimen/text_title_large</item>
+    </style>
+
+    <style name="Text.Title.Medium" parent="Text.Title">
+        <item name="android:textSize">@dimen/text_title_medium</item>
+    </style>
+
+    <style name="Text.Title.Small">
+        <item name="android:textSize">@dimen/text_title_small</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/brand_text_dark</item>
+    </style>
+
+    <!-- Body Variants -->
+    <style name="Text.Body.Large" parent="Text.Body">
+        <item name="android:textSize">@dimen/text_body_large</item>
+    </style>
+
+    <style name="Text.Body.Medium" parent="Text.Body">
+        <item name="android:textSize">@dimen/text_body_medium</item>
+    </style>
+
+    <style name="Text.Body.Small" parent="Text.Body">
+        <item name="android:textSize">@dimen/text_body_small</item>
+        <item name="android:textColor">@color/brand_text_subtitle</item>
+    </style>
+
+    <!-- Label Variants -->
+    <style name="Text.Label.Large" parent="Text.Label">
+        <item name="android:textSize">@dimen/text_label_large</item>
+    </style>
+
+    <style name="Text.Label.Medium" parent="Text.Label">
+        <item name="android:textSize">@dimen/text_label_medium</item>
+    </style>
+
+    <style name="Text.Label.Small" parent="Text.Label">
+        <item name="android:textSize">@dimen/text_label_small</item>
+    </style>
+
+</resources>

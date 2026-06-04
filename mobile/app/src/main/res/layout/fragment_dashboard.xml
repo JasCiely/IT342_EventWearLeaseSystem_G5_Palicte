@@ -1,0 +1,940 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/brand_cream_bg">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- ════ HEADER ════ -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@color/brand_burgundy"
+            android:orientation="vertical"
+            android:paddingStart="20dp"
+            android:paddingEnd="20dp"
+            android:paddingTop="20dp"
+            android:paddingBottom="28dp"
+            android:elevation="4dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/app_name"
+                android:textColor="#FFFFFF"
+                android:alpha="0.65"
+                android:textSize="11sp"
+                android:letterSpacing="0.12"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvWelcome"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Welcome, Admin"
+                android:textColor="#FFFFFF"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:layout_marginTop="4dp" />
+
+            <TextView
+                android:id="@+id/tvDate"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#FFFFFF"
+                android:alpha="0.75"
+                android:textSize="12sp"
+                android:layout_marginTop="2dp" />
+        </LinearLayout>
+
+        <!-- ════ KPI OVERVIEW ════ -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/dashboard_overview"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.04"
+            android:textColor="@color/brand_text_dark"
+            android:layout_marginStart="20dp"
+            android:layout_marginEnd="20dp"
+            android:layout_marginTop="18dp"
+            android:layout_marginBottom="8dp" />
+
+        <GridLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:columnCount="2"
+            android:rowCount="3"
+            android:layout_marginStart="10dp"
+            android:layout_marginEnd="10dp"
+            android:columnOrderPreserved="false">
+
+            <!-- Total Bookings -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_columnWeight="1"
+                android:layout_margin="5dp"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp"
+                app:cardBackgroundColor="@color/brand_surface">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="vertical">
+                    <View android:layout_width="match_parent" android:layout_height="3dp"
+                        android:background="@color/brand_burgundy" />
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:orientation="vertical" android:padding="12dp">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="@string/dashboard_total_bookings"
+                            android:textSize="10sp" android:textColor="@color/brand_text_subtitle"
+                            android:textAllCaps="true" android:letterSpacing="0.05" />
+                        <TextView android:id="@+id/tvKpiTotalBookings"
+                            android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="--" android:textSize="28sp" android:textStyle="bold"
+                            android:textColor="@color/brand_burgundy" android:layout_marginTop="2dp" />
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Active Bookings -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_columnWeight="1"
+                android:layout_margin="5dp"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp"
+                app:cardBackgroundColor="@color/brand_surface">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="vertical">
+                    <View android:layout_width="match_parent" android:layout_height="3dp"
+                        android:background="@color/kpi_green" />
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:orientation="vertical" android:padding="12dp">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="@string/dashboard_active_bookings"
+                            android:textSize="10sp" android:textColor="@color/brand_text_subtitle"
+                            android:textAllCaps="true" android:letterSpacing="0.05" />
+                        <TextView android:id="@+id/tvKpiActiveBookings"
+                            android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="--" android:textSize="28sp" android:textStyle="bold"
+                            android:textColor="@color/kpi_green" android:layout_marginTop="2dp" />
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Active Leases -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_columnWeight="1"
+                android:layout_margin="5dp"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp"
+                app:cardBackgroundColor="@color/brand_surface">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="vertical">
+                    <View android:layout_width="match_parent" android:layout_height="3dp"
+                        android:background="@color/kpi_purple" />
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:orientation="vertical" android:padding="12dp">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="@string/dashboard_active_leases"
+                            android:textSize="10sp" android:textColor="@color/brand_text_subtitle"
+                            android:textAllCaps="true" android:letterSpacing="0.05" />
+                        <TextView android:id="@+id/tvKpiActiveLeases"
+                            android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="--" android:textSize="28sp" android:textStyle="bold"
+                            android:textColor="@color/kpi_purple" android:layout_marginTop="2dp" />
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Pending Pickups -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_columnWeight="1"
+                android:layout_margin="5dp"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp"
+                app:cardBackgroundColor="@color/brand_surface">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="vertical">
+                    <View android:layout_width="match_parent" android:layout_height="3dp"
+                        android:background="@color/warning_amber" />
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:orientation="vertical" android:padding="12dp">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="@string/dashboard_pending_pickups"
+                            android:textSize="10sp" android:textColor="@color/brand_text_subtitle"
+                            android:textAllCaps="true" android:letterSpacing="0.05" />
+                        <TextView android:id="@+id/tvKpiPendingPickups"
+                            android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="--" android:textSize="28sp" android:textStyle="bold"
+                            android:textColor="@color/warning_amber" android:layout_marginTop="2dp" />
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Inventory Items -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_columnWeight="1"
+                android:layout_margin="5dp"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp"
+                app:cardBackgroundColor="@color/brand_surface">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="vertical">
+                    <View android:layout_width="match_parent" android:layout_height="3dp"
+                        android:background="@color/kpi_teal" />
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:orientation="vertical" android:padding="12dp">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="@string/dashboard_total_items"
+                            android:textSize="10sp" android:textColor="@color/brand_text_subtitle"
+                            android:textAllCaps="true" android:letterSpacing="0.05" />
+                        <TextView android:id="@+id/tvKpiInventoryItems"
+                            android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="--" android:textSize="28sp" android:textStyle="bold"
+                            android:textColor="@color/kpi_teal" android:layout_marginTop="2dp" />
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Customers -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_columnWeight="1"
+                android:layout_margin="5dp"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp"
+                app:cardBackgroundColor="@color/brand_surface">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="vertical">
+                    <View android:layout_width="match_parent" android:layout_height="3dp"
+                        android:background="@color/info_blue" />
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:orientation="vertical" android:padding="12dp">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="@string/dashboard_customers"
+                            android:textSize="10sp" android:textColor="@color/brand_text_subtitle"
+                            android:textAllCaps="true" android:letterSpacing="0.05" />
+                        <TextView android:id="@+id/tvKpiCustomers"
+                            android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="--" android:textSize="28sp" android:textStyle="bold"
+                            android:textColor="@color/info_blue" android:layout_marginTop="2dp" />
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+        </GridLayout>
+
+        <!-- ════ ALERTS ════ -->
+        <LinearLayout
+            android:id="@+id/layoutAlerts"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginStart="14dp"
+            android:layout_marginEnd="14dp"
+            android:layout_marginTop="10dp"
+            android:visibility="gone">
+
+            <!-- Pending Approvals Alert -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/layoutAlertPending"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="6dp"
+                app:cardCornerRadius="10dp"
+                app:cardElevation="0dp"
+                app:cardBackgroundColor="#FFFBF0"
+                app:strokeColor="#FED7AA"
+                app:strokeWidth="1dp"
+                android:visibility="gone">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="horizontal" android:gravity="center_vertical"
+                    android:paddingHorizontal="14dp" android:paddingVertical="10dp">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="⚠" android:textSize="14sp"
+                        android:textColor="#92400E" android:layout_marginEnd="8dp" />
+                    <TextView android:id="@+id/tvAlertPendingCount"
+                        android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:textColor="#92400E" android:textSize="13sp" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Overdue Leases Alert -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/layoutAlertOverdue"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardCornerRadius="10dp"
+                app:cardElevation="0dp"
+                app:cardBackgroundColor="#FFF5F5"
+                app:strokeColor="#FECACA"
+                app:strokeWidth="1dp"
+                android:visibility="gone">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="horizontal" android:gravity="center_vertical"
+                    android:paddingHorizontal="14dp" android:paddingVertical="10dp">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="🔴" android:textSize="13sp"
+                        android:textColor="#7F1D1D" android:layout_marginEnd="8dp" />
+                    <TextView android:id="@+id/tvAlertOverdueCount"
+                        android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:textColor="#7F1D1D" android:textSize="13sp" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+        </LinearLayout>
+
+        <!-- ════ DIRECT BOOKING PIPELINE ════ -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginStart="20dp"
+            android:layout_marginEnd="20dp"
+            android:layout_marginTop="18dp"
+            android:layout_marginBottom="8dp">
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/dashboard_pipeline_title"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.04"
+                android:textColor="@color/brand_text_dark" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Direct Bookings"
+                android:textSize="11sp"
+                android:textColor="@color/brand_text_subtitle" />
+        </LinearLayout>
+
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:scrollbars="none"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp">
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="84dp" android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    app:cardCornerRadius="12dp" app:cardElevation="2dp"
+                    app:cardBackgroundColor="@color/status_pending_bg">
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:orientation="vertical" android:padding="12dp">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="Pending" android:textSize="9sp"
+                            android:textColor="@color/status_pending_text" android:textStyle="bold"
+                            android:textAllCaps="true" android:letterSpacing="0.05" />
+                        <TextView android:id="@+id/tvPipelinePending"
+                            android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="--" android:textSize="24sp" android:textStyle="bold"
+                            android:textColor="@color/status_pending_text" android:layout_marginTop="2dp" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:layout_gravity="center_vertical"
+                    android:text="›" android:textSize="20sp"
+                    android:textColor="@color/brand_text_subtitle"
+                    android:layout_marginEnd="6dp" />
+
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="84dp" android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    app:cardCornerRadius="12dp" app:cardElevation="2dp"
+                    app:cardBackgroundColor="@color/status_confirmed_bg">
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:orientation="vertical" android:padding="12dp">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="Approved" android:textSize="9sp"
+                            android:textColor="@color/status_confirmed_text" android:textStyle="bold"
+                            android:textAllCaps="true" android:letterSpacing="0.05" />
+                        <TextView android:id="@+id/tvPipelineApproved"
+                            android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="--" android:textSize="24sp" android:textStyle="bold"
+                            android:textColor="@color/status_confirmed_text" android:layout_marginTop="2dp" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:layout_gravity="center_vertical"
+                    android:text="›" android:textSize="20sp"
+                    android:textColor="@color/brand_text_subtitle"
+                    android:layout_marginEnd="6dp" />
+
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="84dp" android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    app:cardCornerRadius="12dp" app:cardElevation="2dp"
+                    app:cardBackgroundColor="@color/status_active_bg">
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:orientation="vertical" android:padding="12dp">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="Active" android:textSize="9sp"
+                            android:textColor="@color/status_active_text" android:textStyle="bold"
+                            android:textAllCaps="true" android:letterSpacing="0.05" />
+                        <TextView android:id="@+id/tvPipelineActive"
+                            android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="--" android:textSize="24sp" android:textStyle="bold"
+                            android:textColor="@color/status_active_text" android:layout_marginTop="2dp" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:layout_gravity="center_vertical"
+                    android:text="›" android:textSize="20sp"
+                    android:textColor="@color/brand_text_subtitle"
+                    android:layout_marginEnd="6dp" />
+
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="84dp" android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    app:cardCornerRadius="12dp" app:cardElevation="2dp"
+                    app:cardBackgroundColor="@color/status_returned_bg">
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:orientation="vertical" android:padding="12dp">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="Returned" android:textSize="9sp"
+                            android:textColor="@color/status_returned_text" android:textStyle="bold"
+                            android:textAllCaps="true" android:letterSpacing="0.05" />
+                        <TextView android:id="@+id/tvPipelineReturned"
+                            android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="--" android:textSize="24sp" android:textStyle="bold"
+                            android:textColor="@color/status_returned_text" android:layout_marginTop="2dp" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:layout_gravity="center_vertical"
+                    android:text="›" android:textSize="20sp"
+                    android:textColor="@color/brand_text_subtitle"
+                    android:layout_marginEnd="6dp" />
+
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="84dp" android:layout_height="wrap_content"
+                    app:cardCornerRadius="12dp" app:cardElevation="2dp"
+                    app:cardBackgroundColor="@color/status_completed_bg">
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:orientation="vertical" android:padding="12dp">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="Done" android:textSize="9sp"
+                            android:textColor="@color/status_completed_text" android:textStyle="bold"
+                            android:textAllCaps="true" android:letterSpacing="0.05" />
+                        <TextView android:id="@+id/tvPipelineCompleted"
+                            android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="--" android:textSize="24sp" android:textStyle="bold"
+                            android:textColor="@color/status_completed_text" android:layout_marginTop="2dp" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+            </LinearLayout>
+        </HorizontalScrollView>
+
+        <!-- ════ STATUS SUMMARY ════ -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/dashboard_status_summary"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.04"
+            android:textColor="@color/brand_text_dark"
+            android:layout_marginStart="20dp"
+            android:layout_marginEnd="20dp"
+            android:layout_marginTop="18dp"
+            android:layout_marginBottom="8dp" />
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="14dp"
+            android:layout_marginEnd="14dp"
+            app:cardCornerRadius="14dp"
+            app:cardElevation="2dp"
+            app:cardBackgroundColor="@color/brand_surface">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="14dp">
+
+                <!-- Row: Confirmed Fittings -->
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="horizontal" android:gravity="center_vertical"
+                    android:layout_marginBottom="4dp">
+                    <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Confirmed Fittings"
+                        android:textSize="12sp" android:textColor="@color/brand_text_dark" />
+                    <TextView android:id="@+id/tvCountConfirmedFittings"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="--" android:textSize="13sp" android:textStyle="bold"
+                        android:textColor="#0369A1" />
+                </LinearLayout>
+                <FrameLayout android:layout_width="match_parent" android:layout_height="4dp"
+                    android:background="@color/progress_track" android:layout_marginBottom="10dp">
+                    <View android:id="@+id/progressConfirmedFittings"
+                        android:layout_width="match_parent" android:layout_height="match_parent"
+                        android:background="#0369A1" android:scaleX="0"
+                        android:transformPivotX="0dp" />
+                </FrameLayout>
+
+                <!-- Row: Lease Conversions -->
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="horizontal" android:gravity="center_vertical"
+                    android:layout_marginBottom="4dp">
+                    <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Lease Conversions"
+                        android:textSize="12sp" android:textColor="@color/brand_text_dark" />
+                    <TextView android:id="@+id/tvCountLeaseConversions"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="--" android:textSize="13sp" android:textStyle="bold"
+                        android:textColor="@color/kpi_purple" />
+                </LinearLayout>
+                <FrameLayout android:layout_width="match_parent" android:layout_height="4dp"
+                    android:background="@color/progress_track" android:layout_marginBottom="10dp">
+                    <View android:id="@+id/progressLeaseConversions"
+                        android:layout_width="match_parent" android:layout_height="match_parent"
+                        android:background="@color/kpi_purple" android:scaleX="0"
+                        android:transformPivotX="0dp" />
+                </FrameLayout>
+
+                <!-- Row: Pending Approvals -->
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="horizontal" android:gravity="center_vertical"
+                    android:layout_marginBottom="4dp">
+                    <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Pending Approvals"
+                        android:textSize="12sp" android:textColor="@color/brand_text_dark" />
+                    <TextView android:id="@+id/tvCountPendingApprovals"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="--" android:textSize="13sp" android:textStyle="bold"
+                        android:textColor="#B45309" />
+                </LinearLayout>
+                <FrameLayout android:layout_width="match_parent" android:layout_height="4dp"
+                    android:background="@color/progress_track" android:layout_marginBottom="10dp">
+                    <View android:id="@+id/progressPendingApprovals"
+                        android:layout_width="match_parent" android:layout_height="match_parent"
+                        android:background="#B45309" android:scaleX="0"
+                        android:transformPivotX="0dp" />
+                </FrameLayout>
+
+                <!-- Row: Pending Pickups -->
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="horizontal" android:gravity="center_vertical"
+                    android:layout_marginBottom="4dp">
+                    <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Pending Pickups"
+                        android:textSize="12sp" android:textColor="@color/brand_text_dark" />
+                    <TextView android:id="@+id/tvCountPendingPickups"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="--" android:textSize="13sp" android:textStyle="bold"
+                        android:textColor="@color/kpi_teal" />
+                </LinearLayout>
+                <FrameLayout android:layout_width="match_parent" android:layout_height="4dp"
+                    android:background="@color/progress_track" android:layout_marginBottom="10dp">
+                    <View android:id="@+id/progressPendingPickups"
+                        android:layout_width="match_parent" android:layout_height="match_parent"
+                        android:background="@color/kpi_teal" android:scaleX="0"
+                        android:transformPivotX="0dp" />
+                </FrameLayout>
+
+                <!-- Row: Active Leases -->
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="horizontal" android:gravity="center_vertical"
+                    android:layout_marginBottom="4dp">
+                    <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Active Leases"
+                        android:textSize="12sp" android:textColor="@color/brand_text_dark" />
+                    <TextView android:id="@+id/tvCountActiveLeases"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="--" android:textSize="13sp" android:textStyle="bold"
+                        android:textColor="@color/kpi_purple" />
+                </LinearLayout>
+                <FrameLayout android:layout_width="match_parent" android:layout_height="4dp"
+                    android:background="@color/progress_track" android:layout_marginBottom="10dp">
+                    <View android:id="@+id/progressActiveLeases"
+                        android:layout_width="match_parent" android:layout_height="match_parent"
+                        android:background="@color/kpi_purple" android:scaleX="0"
+                        android:transformPivotX="0dp" />
+                </FrameLayout>
+
+                <!-- Row: Cancelled / Rejected -->
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="horizontal" android:gravity="center_vertical"
+                    android:layout_marginBottom="4dp">
+                    <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Cancelled / Rejected"
+                        android:textSize="12sp" android:textColor="@color/brand_text_dark" />
+                    <TextView android:id="@+id/tvCountCancelledRejected"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="--" android:textSize="13sp" android:textStyle="bold"
+                        android:textColor="@color/gray_600" />
+                </LinearLayout>
+                <FrameLayout android:layout_width="match_parent" android:layout_height="4dp"
+                    android:background="@color/progress_track" android:layout_marginBottom="10dp">
+                    <View android:id="@+id/progressCancelledRejected"
+                        android:layout_width="match_parent" android:layout_height="match_parent"
+                        android:background="@color/gray_600" android:scaleX="0"
+                        android:transformPivotX="0dp" />
+                </FrameLayout>
+
+                <!-- Row: Completed -->
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="horizontal" android:gravity="center_vertical"
+                    android:layout_marginBottom="4dp">
+                    <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Completed"
+                        android:textSize="12sp" android:textColor="@color/brand_text_dark" />
+                    <TextView android:id="@+id/tvCountCompleted"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="--" android:textSize="13sp" android:textStyle="bold"
+                        android:textColor="@color/kpi_green" />
+                </LinearLayout>
+                <FrameLayout android:layout_width="match_parent" android:layout_height="4dp"
+                    android:background="@color/progress_track">
+                    <View android:id="@+id/progressCompleted"
+                        android:layout_width="match_parent" android:layout_height="match_parent"
+                        android:background="@color/kpi_green" android:scaleX="0"
+                        android:transformPivotX="0dp" />
+                </FrameLayout>
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- ════ PEOPLE OVERVIEW ════ -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/dashboard_people_overview"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.04"
+            android:textColor="@color/brand_text_dark"
+            android:layout_marginStart="20dp"
+            android:layout_marginEnd="20dp"
+            android:layout_marginTop="18dp"
+            android:layout_marginBottom="8dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginStart="10dp"
+            android:layout_marginEnd="10dp">
+
+            <!-- Customers tile -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardPeopleCustomers"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_margin="5dp"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp"
+                app:cardBackgroundColor="@color/brand_surface"
+                android:clickable="true"
+                android:focusable="true">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="vertical" android:gravity="center"
+                    android:paddingVertical="14dp" android:paddingHorizontal="8dp">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="👥" android:textSize="22sp" android:layout_marginBottom="4dp" />
+                    <TextView android:id="@+id/tvPeopleCustomers"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="--" android:textSize="22sp" android:textStyle="bold"
+                        android:textColor="@color/brand_text_dark" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="Customers" android:textSize="10sp"
+                        android:textColor="@color/brand_text_subtitle"
+                        android:layout_marginTop="2dp" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Bookings tile -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardPeopleBookings"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_margin="5dp"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp"
+                app:cardBackgroundColor="@color/brand_surface"
+                android:clickable="true"
+                android:focusable="true">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="vertical" android:gravity="center"
+                    android:paddingVertical="14dp" android:paddingHorizontal="8dp">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="📋" android:textSize="22sp" android:layout_marginBottom="4dp" />
+                    <TextView android:id="@+id/tvPeopleBookings"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="--" android:textSize="22sp" android:textStyle="bold"
+                        android:textColor="@color/brand_text_dark" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="Bookings" android:textSize="10sp"
+                        android:textColor="@color/brand_text_subtitle"
+                        android:layout_marginTop="2dp" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Items tile -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardPeopleItems"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_margin="5dp"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp"
+                app:cardBackgroundColor="@color/brand_surface"
+                android:clickable="true"
+                android:focusable="true">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="vertical" android:gravity="center"
+                    android:paddingVertical="14dp" android:paddingHorizontal="8dp">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="🛍" android:textSize="22sp" android:layout_marginBottom="4dp" />
+                    <TextView android:id="@+id/tvPeopleItems"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="--" android:textSize="22sp" android:textStyle="bold"
+                        android:textColor="@color/brand_text_dark" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="Items" android:textSize="10sp"
+                        android:textColor="@color/brand_text_subtitle"
+                        android:layout_marginTop="2dp" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+        </LinearLayout>
+
+        <!-- ════ FITTING SNAPSHOT ════ -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/dashboard_fitting_snapshot"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.04"
+            android:textColor="@color/brand_text_dark"
+            android:layout_marginStart="20dp"
+            android:layout_marginEnd="20dp"
+            android:layout_marginTop="18dp"
+            android:layout_marginBottom="8dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginStart="10dp"
+            android:layout_marginEnd="10dp">
+
+            <!-- Confirmed -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:layout_margin="5dp"
+                app:cardCornerRadius="12dp" app:cardElevation="2dp"
+                app:cardBackgroundColor="@color/status_confirmed_bg">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="vertical" android:padding="12dp">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="Confirmed" android:textSize="9sp"
+                        android:textColor="@color/status_confirmed_text" android:textAllCaps="true"
+                        android:letterSpacing="0.05" />
+                    <TextView android:id="@+id/tvFittingConfirmed"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="--" android:textSize="22sp" android:textStyle="bold"
+                        android:textColor="@color/status_confirmed_text" android:layout_marginTop="2dp" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Completed -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:layout_margin="5dp"
+                app:cardCornerRadius="12dp" app:cardElevation="2dp"
+                app:cardBackgroundColor="@color/status_completed_bg">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="vertical" android:padding="12dp">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="Completed" android:textSize="9sp"
+                        android:textColor="@color/status_completed_text" android:textAllCaps="true"
+                        android:letterSpacing="0.05" />
+                    <TextView android:id="@+id/tvFittingCompleted"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="--" android:textSize="22sp" android:textStyle="bold"
+                        android:textColor="@color/status_completed_text" android:layout_marginTop="2dp" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Converted -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:layout_margin="5dp"
+                app:cardCornerRadius="12dp" app:cardElevation="2dp"
+                app:cardBackgroundColor="@color/status_converted_bg">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="vertical" android:padding="12dp">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="Converted" android:textSize="9sp"
+                        android:textColor="@color/status_converted_text" android:textAllCaps="true"
+                        android:letterSpacing="0.05" />
+                    <TextView android:id="@+id/tvFittingConverted"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="--" android:textSize="22sp" android:textStyle="bold"
+                        android:textColor="@color/status_converted_text" android:layout_marginTop="2dp" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Cancelled -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:layout_margin="5dp"
+                app:cardCornerRadius="12dp" app:cardElevation="2dp"
+                app:cardBackgroundColor="@color/status_cancelled_bg">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="vertical" android:padding="12dp">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="Cancelled" android:textSize="9sp"
+                        android:textColor="@color/status_cancelled_text" android:textAllCaps="true"
+                        android:letterSpacing="0.05" />
+                    <TextView android:id="@+id/tvFittingCancelled"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="--" android:textSize="22sp" android:textStyle="bold"
+                        android:textColor="@color/status_cancelled_text" android:layout_marginTop="2dp" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+        </LinearLayout>
+
+        <!-- ════ RECENT ACTIVITY ════ -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/dashboard_recent_activity"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.04"
+            android:textColor="@color/brand_text_dark"
+            android:layout_marginStart="20dp"
+            android:layout_marginEnd="20dp"
+            android:layout_marginTop="18dp"
+            android:layout_marginBottom="8dp" />
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="14dp"
+            android:layout_marginEnd="14dp"
+            app:cardCornerRadius="14dp"
+            app:cardElevation="2dp"
+            app:cardBackgroundColor="@color/brand_surface">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <!-- Table header row -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:background="@color/brand_cream_bg"
+                    android:paddingHorizontal="14dp"
+                    android:paddingVertical="8dp">
+                    <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="CUSTOMER" android:textSize="9sp"
+                        android:textStyle="bold" android:textColor="@color/brand_text_subtitle"
+                        android:letterSpacing="0.08" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="STATUS / DATE" android:textSize="9sp"
+                        android:textStyle="bold" android:textColor="@color/brand_text_subtitle"
+                        android:letterSpacing="0.08" />
+                </LinearLayout>
+
+                <View android:layout_width="match_parent" android:layout_height="1dp"
+                    android:background="@color/progress_track" />
+
+                <!-- Dynamic rows populated from Kotlin -->
+                <LinearLayout
+                    android:id="@+id/recentActivityContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+
+                <!-- Empty state -->
+                <TextView
+                    android:id="@+id/tvRecentEmpty"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/dashboard_no_activity"
+                    android:textColor="@color/brand_text_subtitle"
+                    android:textSize="13sp"
+                    android:gravity="center"
+                    android:padding="24dp"
+                    android:visibility="gone" />
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- ════ FOOTER ════ -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="20dp"
+            android:paddingVertical="14dp">
+            <View
+                android:layout_width="8dp"
+                android:layout_height="8dp"
+                android:background="@drawable/circle_green" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="  Live updates enabled"
+                android:textSize="12sp"
+                android:textColor="@color/success_green" />
+        </LinearLayout>
+
+        <View android:layout_width="match_parent" android:layout_height="16dp" />
+
+    </LinearLayout>
+
+</ScrollView>

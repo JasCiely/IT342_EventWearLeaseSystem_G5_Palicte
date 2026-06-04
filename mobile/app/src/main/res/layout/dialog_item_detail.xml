@@ -1,0 +1,315 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/brand_cream_bg"
+    android:fillViewport="true"
+    android:scrollbars="none">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingHorizontal="20dp"
+        android:paddingTop="16dp"
+        android:paddingBottom="24dp">
+
+        <!-- Much larger Image with rounded corners & shadow -->
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="340dp"
+            android:layout_marginBottom="20dp"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="4dp"
+            app:cardBackgroundColor="@color/brand_surface">
+
+            <ImageView
+                android:id="@+id/idivImage"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                android:background="@color/gray_300" />
+
+        </androidx.cardview.widget.CardView>
+
+        <!-- Name + Status row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="8dp">
+
+            <TextView
+                android:id="@+id/idtvName"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:textColor="@color/brand_text_dark"
+                android:lineSpacingExtra="2dp" />
+
+            <TextView
+                android:id="@+id/idtvStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:paddingHorizontal="12dp"
+                android:paddingVertical="6dp" />
+        </LinearLayout>
+
+        <!-- Category -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="CATEGORY"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:textColor="@color/brand_text_subtitle"
+            android:letterSpacing="0.08"
+            android:layout_marginBottom="4dp" />
+        <TextView
+            android:id="@+id/idtvCategory"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="15sp"
+            android:textColor="@color/brand_text_dark"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Subcategory (initially gone) -->
+        <TextView
+            android:id="@+id/idlabelSubtype"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="SUBCATEGORY"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:textColor="@color/brand_text_subtitle"
+            android:letterSpacing="0.08"
+            android:layout_marginBottom="4dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/idtvSubtype"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="15sp"
+            android:textColor="@color/brand_text_dark"
+            android:layout_marginBottom="16dp"
+            android:visibility="gone" />
+
+        <!-- Divider -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/input_stroke"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Price row -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="PRICE"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:textColor="@color/brand_text_subtitle"
+            android:letterSpacing="0.08"
+            android:layout_marginBottom="4dp" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="16dp">
+
+            <TextView
+                android:id="@+id/idtvPriceOld"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="15sp"
+                android:textColor="@color/brand_text_subtitle"
+                android:layout_marginEnd="10dp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/idtvPrice"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:textColor="@color/brand_burgundy" />
+        </LinearLayout>
+
+        <!-- Promo tag -->
+        <TextView
+            android:id="@+id/idtvPromoTag"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:textColor="#065F46"
+            android:background="#D1FAE5"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="6dp"
+            android:layout_marginBottom="16dp"
+            android:visibility="gone" />
+
+        <!-- Sizes -->
+        <TextView
+            android:id="@+id/idlabelSizes"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="SIZES"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:textColor="@color/brand_text_subtitle"
+            android:letterSpacing="0.08"
+            android:layout_marginBottom="4dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/idtvSizes"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="15sp"
+            android:textColor="@color/brand_text_dark"
+            android:layout_marginBottom="16dp"
+            android:visibility="gone" />
+
+        <!-- Age Range -->
+        <TextView
+            android:id="@+id/idlabelAgeRange"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="AGE RANGE"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:textColor="@color/brand_text_subtitle"
+            android:letterSpacing="0.08"
+            android:layout_marginBottom="4dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/idtvAgeRange"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="15sp"
+            android:textColor="@color/brand_text_dark"
+            android:layout_marginBottom="16dp"
+            android:visibility="gone" />
+
+        <!-- Maintenance -->
+        <TextView
+            android:id="@+id/idlabelMaintenance"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="MAINTENANCE UNTIL"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:textColor="@color/brand_text_subtitle"
+            android:letterSpacing="0.08"
+            android:layout_marginBottom="4dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/idtvMaintenance"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="15sp"
+            android:textColor="@color/brand_text_dark"
+            android:layout_marginBottom="16dp"
+            android:visibility="gone" />
+
+        <!-- Description -->
+        <TextView
+            android:id="@+id/idlabelDescription"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="DESCRIPTION"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:textColor="@color/brand_text_subtitle"
+            android:letterSpacing="0.08"
+            android:layout_marginBottom="4dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/idtvDescription"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="15sp"
+            android:textColor="@color/brand_text_dark"
+            android:layout_marginBottom="16dp"
+            android:lineSpacingMultiplier="1.4"
+            android:visibility="gone" />
+
+        <!-- Photos (optional) -->
+        <TextView
+            android:id="@+id/idtvPhotos"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="13sp"
+            android:textColor="@color/brand_text_subtitle"
+            android:layout_marginBottom="20dp"
+            android:visibility="gone" />
+
+        <!-- Divider before actions -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/input_stroke"
+            android:layout_marginBottom="20dp" />
+
+        <!-- Change Status button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/idbtnChangeStatus"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginBottom="10dp"
+            android:text="Change Status"
+            android:textColor="@color/brand_burgundy"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            app:backgroundTint="#FFF1F3"
+            app:cornerRadius="28dp"
+            app:strokeColor="@color/brand_burgundy"
+            app:strokeWidth="1.5dp" />
+
+        <!-- Action buttons: side by side to save vertical space -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="4dp">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/idbtnEdit"
+                android:layout_width="0dp"
+                android:layout_height="52dp"
+                android:layout_weight="1"
+                android:layout_marginEnd="8dp"
+                android:text="Edit"
+                android:textColor="@android:color/white"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                app:backgroundTint="@color/brand_burgundy"
+                app:cornerRadius="28dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/idbtnDelete"
+                android:layout_width="0dp"
+                android:layout_height="52dp"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:text="Delete"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                app:backgroundTint="#FEE2E2"
+                android:textColor="#B91C1C"
+                app:cornerRadius="28dp"
+                app:strokeColor="#FECACA"
+                app:strokeWidth="1.5dp" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+</ScrollView>

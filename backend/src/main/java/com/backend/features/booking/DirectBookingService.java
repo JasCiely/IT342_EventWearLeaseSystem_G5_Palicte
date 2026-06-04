@@ -63,4 +63,6 @@ public interface DirectBookingService {
     // Customer-facing edit: validates ownership, allows Pending/Approved/Active Lease.
     // Active Lease locks start date; only end date may change.
     DirectBookingResponse editCustomerBookingDates(String bookingId, String userId, LocalDate startDate, LocalDate endDate);
+
+    DirectBookingResponse markPayment(String bookingId, String notes);
 }

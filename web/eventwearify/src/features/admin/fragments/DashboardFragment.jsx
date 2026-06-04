@@ -1,14 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  CalendarCheck, Clock, CheckCircle,
+  CalendarCheck, Clock,
   Package, PackageCheck, AlertCircle,
   TrendingUp, Users, BarChart2, Bell, ArrowRight,
   Zap, ShoppingBag, Activity, Star,
 } from 'lucide-react';
 import { getAllFittingBookings, getAllDirectBookings, fetchItems } from '../services/inventoryApi';
 import { fetchCustomers } from '../services/customerService';
-import { fetchStaff } from '../services/staffApi';
 import { sseService } from '../../../shared/services/sseService';
 import '../styles/DashboardFragment.css';
 
@@ -55,25 +54,22 @@ const DashboardFragment = () => {
   const [directs, setDirects]         = useState([]);
   const [itemCount, setItemCount]     = useState(0);
   const [customerCount, setCustomerCount] = useState(0);
-  const [staffCount, setStaffCount]   = useState(0);
 
   const adminName = localStorage.getItem('firstName') || 'Admin';
 
   const load = useCallback(async () => {
     setError(null);
     try {
-      const [f, d, items, customers, staff] = await Promise.all([
+      const [f, d, items, customers] = await Promise.all([
         fetchAllPages(getAllFittingBookings),
         fetchAllPages(getAllDirectBookings),
         fetchItems().catch(() => []),
         fetchCustomers({ page: 0, size: 1 }).catch(() => ({ totalElements: 0 })),
-        fetchStaff({ page: 0, size: 1000 }).catch(() => []),
       ]);
       setFittings(Array.isArray(f) ? f : []);
       setDirects(Array.isArray(d) ? d : []);
       setItemCount(Array.isArray(items) ? items.length : 0);
       setCustomerCount(customers?.totalElements ?? 0);
-      setStaffCount(Array.isArray(staff) ? staff.length : 0);
     } catch (err) {
       setError(err.message || 'Failed to load dashboard data.');
     }
@@ -89,14 +85,17 @@ const DashboardFragment = () => {
 
   const totalBookings    = fittings.length + directs.length;
   const activeBookings   = fittings.filter(b => b.status === 'CONFIRMED').length
-                         + directs.filter(b => ['Pending', 'Approved'].includes(b.status)).length;
+                         + directs.filter(b => ['Pending', 'Approved'].includes(b.bookingStatus)).length;
   const cancelled        = fittings.filter(b => ['Cancelled', 'CANCELLED'].includes(b.status)).length
-                         + directs.filter(b => ['Cancelled', 'Rejected'].includes(b.status)).length;
+                         + directs.filter(b => ['Cancelled', 'Rejected'].includes(b.bookingStatus)).length;
   const completed        = fittings.filter(b => b.status === 'COMPLETED').length
-                         + directs.filter(b => b.status === 'Completed').length;
-  const activeLeases     = directs.filter(b => b.status === 'Active Lease').length;
-  const pendingApprovals = directs.filter(b => b.status === 'Pending').length;
-  const pendingPickups   = directs.filter(b => b.status === 'Approved').length;
+                         + directs.filter(b => b.bookingStatus === 'Completed').length;
+  const activeLeases     = directs.filter(b => b.bookingStatus === 'Active Lease').length;
+  const pendingApprovals   = directs.filter(b => b.bookingStatus === 'Pending').length;
+  const pendingPickups     = directs.filter(b => b.bookingStatus === 'Approved').length;
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const pendingPickupsToday = directs.filter(b => b.bookingStatus === 'Approved' && b.startDate === todayStr).length;
   const leaseConverted   = fittings.filter(b => b.status === 'LEASE_CONVERTED').length;
 
   const itemBookingMap = {};
@@ -123,7 +122,7 @@ const DashboardFragment = () => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const overdueLeases = directs.filter(b => {
-    if (b.status !== 'Active Lease') return false;
+    if (b.bookingStatus !== 'Active Lease') return false;
     const end = b.endDate ? new Date(b.endDate) : null;
     return end && end < today;
   });
@@ -139,7 +138,7 @@ const DashboardFragment = () => {
     { label: 'Total Bookings',  value: totalBookings,  icon: CalendarCheck, variant: 'total' },
     { label: 'Active Bookings', value: activeBookings, icon: Activity,      variant: 'active' },
     { label: 'Active Leases',   value: activeLeases,   icon: Package,       variant: 'rentals' },
-    { label: 'Pending Pickups', value: pendingPickups, icon: PackageCheck,  variant: 'pickup' },
+    { label: 'Pending Pickups', value: pendingPickupsToday, icon: PackageCheck,  variant: 'pickup' },
     { label: 'Inventory Items', value: itemCount,      icon: ShoppingBag,   variant: 'items' },
     { label: 'Customers',       value: customerCount,  icon: Users,         variant: 'customers' },
   ];
@@ -227,8 +226,8 @@ const DashboardFragment = () => {
                 { label: 'Pending',      count: pendingApprovals,                                      color: '#b45309', bg: 'rgba(180,83,9,0.07)' },
                 { label: 'Approved',     count: pendingPickups,                                        color: '#0369a1', bg: 'rgba(3,105,161,0.07)' },
                 { label: 'Active Lease', count: activeLeases,                                          color: '#7c3aed', bg: 'rgba(124,58,237,0.07)' },
-                { label: 'Returned',     count: directs.filter(b => b.status === 'Returned').length,   color: '#0e7490', bg: 'rgba(14,116,144,0.07)' },
-                { label: 'Completed',    count: directs.filter(b => b.status === 'Completed').length,  color: '#15803d', bg: 'rgba(21,128,61,0.07)' },
+                { label: 'Returned',     count: directs.filter(b => b.bookingStatus === 'Returned').length,   color: '#0e7490', bg: 'rgba(14,116,144,0.07)' },
+                { label: 'Completed',    count: directs.filter(b => b.bookingStatus === 'Completed').length,  color: '#15803d', bg: 'rgba(21,128,61,0.07)' },
               ].map((stage, i, arr) => (
                 <React.Fragment key={stage.label}>
                   <div
@@ -289,7 +288,8 @@ const DashboardFragment = () => {
                   <span>Date</span>
                 </div>
                 {recent.map((b, i) => {
-                  const meta = STATUS_META[b.status] ?? { label: b.status || '—', color: '#6b7280', bg: 'rgba(107,114,128,0.1)' };
+                  const statusKey = b._type === 'direct' ? b.bookingStatus : b.status;
+                  const meta = STATUS_META[statusKey] ?? { label: statusKey || '—', color: '#6b7280', bg: 'rgba(107,114,128,0.1)' };
                   const initial = (b.customerName || '?')[0].toUpperCase();
                   return (
                     <div
@@ -331,7 +331,7 @@ const DashboardFragment = () => {
                 { label: 'Confirmed Fittings',   count: fittings.filter(b => b.status === 'CONFIRMED').length, color: '#0369a1' },
                 { label: 'Lease Conversions',    count: leaseConverted,   color: '#7c3aed' },
                 { label: 'Pending Approvals',    count: pendingApprovals, color: '#b45309' },
-                { label: 'Pending Pickups',      count: pendingPickups,   color: '#0ea5e9' },
+                { label: 'Pending Pickups',      count: pendingPickupsToday, color: '#0ea5e9' },
                 { label: 'Active Leases',        count: activeLeases,     color: '#7c3aed' },
                 { label: 'Cancelled / Rejected', count: cancelled,        color: '#6b7280' },
                 { label: 'Completed',            count: completed,        color: '#15803d' },
@@ -397,11 +397,6 @@ const DashboardFragment = () => {
                 <div className="adf-people-icon adf-pi-customers"><Users size={18} /></div>
                 <span className="adf-people-count">{customerCount}</span>
                 <span className="adf-people-label">Customers</span>
-              </button>
-              <button className="adf-people-item" onClick={() => navigate('/admin/staff')}>
-                <div className="adf-people-icon adf-pi-staff"><CheckCircle size={18} /></div>
-                <span className="adf-people-count">{staffCount}</span>
-                <span className="adf-people-label">Staff</span>
               </button>
               <button className="adf-people-item" onClick={() => navigate('/admin/inventory')}>
                 <div className="adf-people-icon adf-pi-items"><Package size={18} /></div>

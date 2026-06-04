@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_bottom_sheet">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- Handle -->
+        <View
+            android:layout_width="40dp"
+            android:layout_height="4dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="12dp"
+            android:layout_marginBottom="4dp"
+            android:background="#D1D5DB" />
+
+        <!-- Item Image — fitCenter shows full garment without cropping -->
+        <ImageView
+            android:id="@+id/ivItemImage"
+            android:layout_width="match_parent"
+            android:layout_height="280dp"
+            android:scaleType="fitCenter"
+            android:background="@color/brand_cream_bg"
+            android:padding="8dp" />
+
+        <!-- Content -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingStart="20dp"
+            android:paddingEnd="20dp"
+            android:paddingTop="16dp"
+            android:paddingBottom="8dp">
+
+            <!-- Category + Status row -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="10dp">
+
+                <TextView
+                    android:id="@+id/tvCategory"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="#F3E8F0"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="10dp"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="4dp"
+                    android:text="Gown"
+                    android:textColor="@color/brand_burgundy"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+
+                <View
+                    android:layout_width="0dp"
+                    android:layout_height="1dp"
+                    android:layout_weight="1" />
+
+                <TextView
+                    android:id="@+id/tvStatus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="10dp"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="4dp"
+                    android:text="Available"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+
+            </LinearLayout>
+
+            <!-- Item Name -->
+            <TextView
+                android:id="@+id/tvItemName"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Item Name"
+                android:textColor="@color/brand_text_dark"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:fontFamily="serif"
+                android:layout_marginBottom="4dp" />
+
+            <!-- Sizes -->
+            <TextView
+                android:id="@+id/tvSizes"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Sizes: S, M, L"
+                android:textColor="@color/brand_text_subtitle"
+                android:textSize="13sp"
+                android:layout_marginBottom="12dp" />
+
+            <!-- Price row -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="4dp">
+
+                <TextView
+                    android:id="@+id/tvPriceOld"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text=""
+                    android:textColor="@color/brand_text_subtitle"
+                    android:textSize="13sp"
+                    android:layout_marginEnd="8dp"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/tvPrice"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="₱0/day"
+                    android:textColor="@color/brand_burgundy"
+                    android:textSize="24sp"
+                    android:textStyle="bold" />
+
+            </LinearLayout>
+
+            <!-- Promo tag -->
+            <TextView
+                android:id="@+id/tvPromoTag"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="#FEF3C7"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp"
+                android:text=""
+                android:textColor="#92400E"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="12dp"
+                android:visibility="gone" />
+
+            <!-- Divider -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/input_stroke"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="14dp" />
+
+            <!-- Description -->
+            <TextView
+                android:id="@+id/tvDescription"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textColor="@color/brand_text_subtitle"
+                android:textSize="14sp"
+                android:layout_marginBottom="20dp"
+                android:lineSpacingMultiplier="1.5"
+                android:visibility="gone" />
+
+            <!-- Book Fitting -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnBookFitting"
+                android:layout_width="match_parent"
+                android:layout_height="50dp"
+                android:backgroundTint="@color/brand_burgundy"
+                android:text="Book Fitting Appointment"
+                android:textColor="#FFFFFF"
+                android:textStyle="bold"
+                android:layout_marginBottom="10dp"
+                app:cornerRadius="12dp"
+                app:icon="@drawable/ic_bookings"
+                app:iconTint="#FFFFFF"
+                app:iconSize="18dp"
+                app:iconPadding="8dp" />
+
+            <!-- Book Direct -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnBookDirect"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="50dp"
+                android:text="Book Direct Rental"
+                android:textColor="@color/brand_burgundy"
+                android:textStyle="bold"
+                android:layout_marginBottom="28dp"
+                app:cornerRadius="12dp"
+                app:strokeColor="@color/brand_burgundy"
+                app:icon="@drawable/ic_overview"
+                app:iconTint="@color/brand_burgundy"
+                app:iconSize="18dp"
+                app:iconPadding="8dp" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</androidx.core.widget.NestedScrollView>
